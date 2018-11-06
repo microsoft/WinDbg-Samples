@@ -1,11 +1,11 @@
-#ImageInfo.js
+# ImageInfo.js
 
 ImageInfo.js is a [JavaScript](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/javascript-debugger-scripting) debugger extension which parses PE images mapped into the address space of the target and presents the resources within those images on the debugger's module object.
 
-##Usage
+## Usage
 Run `.scriptload ImageInfo.js` to load the script. Any module accessed via `dx`, for example `dx @$curprocess.Modules[0]` will have the information below added to it.
 
-##Extension 
+## Extension 
 This extension extends the debugger's concept of a module to include:
 * <b>Headers</b> - A list of available headers from the PE image for the module.
     * <b>ImageHeader</b> - The DOS header for the module -- an _IMAGE_DOS_HEADER.
