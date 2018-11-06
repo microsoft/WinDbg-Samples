@@ -1,14 +1,15 @@
+This is a collection of extensions and sample scripts for extending WinDbg. We'll be adding more samples and extensions over time.
 
-# Contributing
+# Getting Started
+To load JavaScript extensions:
+1. Download the script file locally.
+2. Ensure you have a recent version of WinDbg - [WinDbg Preview](http://aka.ms/WinDbgPreview) from the Microsoft Store will always be up to date. Otherwise you can use one of the other methods listed [here](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/) to install it.
+3. Start your debugging session.
+4. The JavaScript extension (JSProvider) should load automatically. You can validate it's loaded by running the `.scriptproviders` command and checking if JavaScript is on the list.
+    * If JavaScript isn't on the list, run `.load jsprovider`
+5. Run `.scriptload <path to script>` or `.scriptrun <path to script>`. The README for each script has more detailed usage information.
 
-This project welcomes contributions and suggestions.  Most contributions require you to agree to a
-Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us
-the rights to use your contribution. For details, visit https://cla.microsoft.com.
+We have more information on our JavaScript support at https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/javascript-debugger-scripting. If you want to learn more about a script you can open in it WinDbg Preview by hitting the "Scripting" ribbon and clicking "Open Script...". It has intellisense support for JavaScript and NatVis and you can load scripts by hitting "Exceute" in the scripting ribbon.
 
-When you submit a pull request, a CLA-bot will automatically determine whether you need to provide
-a CLA and decorate the PR appropriately (e.g., label, comment). Simply follow the instructions
-provided by the bot. You will only need to do this once across all repos using our CLA.
-
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).
-For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or
-contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+# Contribute
+All the samples and extensions we are publishing are open to contributions of fixes and improvements. At this point we aren't open to accepting new scripts and extensions from the community, but you can make your own repo and share them that way.
