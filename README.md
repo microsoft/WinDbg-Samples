@@ -3,7 +3,7 @@ This is a collection of extensions and sample scripts for extending WinDbg. We'l
 # Getting Started
 To load JavaScript extensions:
 1. Download the script file locally.
-2. Ensure you have a recent version of WinDbg - [WinDbg Preview](http://aka.ms/WinDbgPreview) from the Microsoft Store will always be up to date. Otherwise you can use one of the other methods listed [here](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/) to install it.
+2. Ensure you have a recent version of WinDbg - [WinDbg Preview](https://aka.ms/WinDbgPreview) from the Microsoft Store will always be up to date. Otherwise you can use one of the other methods listed [here](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/) to install it.
 3. Start your debugging session.
 4. The JavaScript extension (JSProvider) should load automatically. You can validate it's loaded by running the `.scriptproviders` command and checking if JavaScript is on the list.
     * If JavaScript isn't on the list, run `.load jsprovider`
