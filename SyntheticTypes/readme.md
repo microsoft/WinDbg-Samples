@@ -1,7 +1,11 @@
 # Synthetic Types
 It is often the case that public symbols simply do not contain type information for some of the types you may want to look at in the debugger even though those types are defined in public SDK headers.  The same can be said if you have to, for some reason, debug some piece of code at the assembly level with no symbols.
 
-The synthetic types extension comes to the rescue here!  This is a JavaScript extension which is intended to interpret memory in the debug target and present a façade over that memory to make it look as if you had type information.  It does this by reading type definitions from a **basic** C header file, dynamically producing JavaScript classes which create a façade for every type definition in the header, and subsequently giving you a way to “construct an instance” of any such class.  These will be fully usable in the **dx** command, the expression evaluator, as well as from other scripts.  As they are not real “symbols and types”, commands like **x** and **dt** will not operate on them.
+The synthetic types extension comes to the rescue here!  This is a JavaScript extension which is intended to interpret memory in the debug target and present a façade over that memory to make it look as if you had type information.  It does this by reading type definitions from a **basic** C header file, dynamically producing JavaScript classes which create a façade for every type definition in the header, and subsequently giving you a way to “construct an instance” of any such class.  These will be fully usable in the `dx` command, the expression evaluator, as well as from other scripts.  As they are not real “symbols and types”, commands like `x` and `dt` will not operate on them.
+
+## Usage
+Run `.scriptload SynTypes.js` to load the script. This will extend the debugger data model to add a namespace **Debugger.Utility.Analysis.SyntheticTypes** that can be accessed by the `dx` command or JavaScript extensions.
+
 ## A First Example
 Let’s take a look at a first example.  Consider the following header file:
 ```c
