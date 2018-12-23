@@ -1,4 +1,4 @@
-﻿"use strict";
+"use strict";
 
 /*************************************************
 Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,7 +9,7 @@ function invokeScript()
 {
     var path = "C:\\Users\\aluhrs\\Desktop\\HelloWorld.txt";
 
-    if(host.namespace.Debugger.Utility.FileSystem.FileExists(path)==true){
+    if(host.namespace.Debugger.Utility.FileSystem.FileExists(path)){
         readFile(path);
     }else{
         writeFile(path);
