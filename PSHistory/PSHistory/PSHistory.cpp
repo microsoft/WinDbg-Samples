@@ -12,6 +12,8 @@ Abstract:
 
     More information: https://gist.github.com/msuiche/2324aa8147c483a7a3e7d1b2d23ee407#file-getpowershellinfo-ps1-L23
 
+    Thanks a lot to Bill Messmer for taking to time to explain to me the internals of the RawCOM interface. Real rockstar.
+
 Author:
 
     Matthieu Suiche (@msuiche) 23-Jan-2019
