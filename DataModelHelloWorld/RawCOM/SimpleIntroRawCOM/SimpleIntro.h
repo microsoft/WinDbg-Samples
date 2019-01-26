@@ -13,6 +13,8 @@
 #include <wrl/implements.h>
 #include <wrl/module.h>
 
+using namespace Microsoft::WRL;
+
 #include <dbgmodel.h>
 
 #include <string>
