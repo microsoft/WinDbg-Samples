@@ -4,7 +4,7 @@ Copyright (c) 2019, Matthieu Suiche. All rights reserved.
 
 Module Name:
 
-    DataModel.cpp
+    PSHistory.cpp
 
 Abstract:
 
@@ -236,11 +236,14 @@ PSHistory::GetHistory(
     vector<wstring> tmp;
 
     wstring processName;
+
+    // TODO: Compare processName with "powershell.exe"
     hr = GetProcessNameFromDataModel(&processName);
     if (SUCCEEDED(hr))
     {
         g_Control4->Output(DEBUG_OUTPUT_NORMAL, "process name = %S\n", processName.c_str());
     }
+
 
     if (m_PowerShellHistory.size()) return S_OK;
 

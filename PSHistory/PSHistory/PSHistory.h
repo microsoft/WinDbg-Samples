@@ -4,7 +4,7 @@ Copyright (c) 2019, Matthieu Suiche. All rights reserved.
 
 Module Name:
 
-    DataModel.h
+    PSHistory.h
 
 Abstract:
 
