@@ -1,0 +1,14 @@
+//
+//    Copyright (C) Microsoft.  All rights reserved.
+//
+#include <windows.h>
+#include <ntverp.h>
+
+#define VER_FILETYPE             VFT_DLL
+#define VER_FILESUBTYPE          VFT_UNKNOWN
+#define VER_FILEDESCRIPTION_STR  "Sample C++ Data Model Extension Library"
+#define VER_INTERNALNAME_STR     "Sample C++ Data Model Extension Library"
+#define VER_ORIGINALFILENAME_STR "SimpleIntroRawCOM.dll"
+
+#include <common.ver>
+

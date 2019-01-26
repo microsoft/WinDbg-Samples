@@ -1,0 +1,7 @@
+EXPORTS
+    DebugExtensionInitialize
+    DebugExtensionCanUnload
+    DebugExtensionUninitialize
+    DebugExtensionUnload
+
+    pshistory
