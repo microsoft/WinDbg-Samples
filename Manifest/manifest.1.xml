@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ExtensionPackages Version="1.0.0.0" Compression="none">
+    <ExtensionPackage>
+        <Name>CodeFlow</Name>
+        <Version>1.0.0.1</Version>
+        <Description>Adds the ability to trace data flow backwards through the control flow of a function.</Description>
+        <Components>
+            <ScriptComponent Name="CodeFlow" Type="Engine" File="..\CodeFlow\CodeFlow.js" FilePathKind="RepositoryRelative">
+                <FunctionAliases>
+                    <FunctionAlias Name="dflow">
+                        <AliasItem>
+                            <Syntax>
+                                <![CDATA[!dflow [<address>]]]>
+                            </Syntax>
+                            <Description>
+                                <![CDATA[Shows the instructions of the function containing [<address>] which influence the source operands of that instruction.]]>
+                            </Description>
+                        </AliasItem>
+                    </FunctionAlias>
+                    <FunctionAlias Name="dis">
+                        <AliasItem>
+                            <Syntax>
+                                <![CDATA[!dis [<address>]]]>
+                            </Syntax>
+                            <Description>
+                                <![CDATA[Disassembles instructions starting at [<address>] using the data model disassembler.]]>
+                            </Description>
+                        </AliasItem>
+                    </FunctionAlias>
+                </FunctionAliases>
+                <ObjectExtensionList>
+                    <NamedExtension Name="Debugger.Models.Utility" Namespace="Debugger.Models.Utility.Code" Property="Code" />
+                    <NamedExtension Name="Debugger.Models.Utility.Code.Instruction" />
+                </ObjectExtensionList>
+            </ScriptComponent>
+        </Components>
+    </ExtensionPackage>
+
+    <ExtensionPackage>
+        <Name>SyntheticTypes</Name>
+        <Version>1.0.0.1</Version>
+        <Description>Interprets memory in the debug target and present a facade over that memory to make it look as if you had type information. It does this by reading type definitions from a basic C header file, dynamically producing JavaScript classes which create a façade for every type definition in the header, and subsequently giving you a way to “construct an instance” of any such class. These will be fully usable in the dx command, the expression evaluator, as well as from other scripts. As they are not real “symbols and types”, commands like x and dt will not operate on them.</Description>
+        <Components>
+            <ScriptComponent Name="SynTypes" Type="Engine" File="..\SyntheticTypes\SynTypes.js" FilePathKind="RepositoryRelative">
+                <ObjectExtensionList>
+                    <NamedExtension Name="Debugger.Models.Utility" Namespace="Debugger.Models.Utility.Analysis" Property="Analysis" />
+                </ObjectExtensionList>
+            </ScriptComponent>
+        </Components>
+    </ExtensionPackage>
+
+    <ExtensionPackage>
+        <Name>ImageInfo</Name>
+        <Version>2.0.0.2</Version>
+        <Description>Provides information about loaded modules (resource tables, import/export information, etc...)</Description>
+        <Components>
+            <ScriptComponent Name="ImageInfo" Type="Engine" File="..\ImageInfo\ImageInfo.js" FilePathKind="RepositoryRelative">
+                <ObjectExtensionList>
+                    <NamedExtension Name="Debugger.Models.Module" Namespace="Debugger.Models.Module.Contents" Property="Contents" />
+                </ObjectExtensionList>
+            </ScriptComponent>
+        </Components>
+    </ExtensionPackage>
+</ExtensionPackages>
