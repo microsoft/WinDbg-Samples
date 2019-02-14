@@ -9,12 +9,13 @@ There's an extension gallery included in recent versions of WinDbg and WinDbg Pr
 Extension galleries are enabled through the `.settings` command, and we've provided a configuration file you can load to set it up. Once you've cloned this repo locally, you can follow these steps to setup the gallery.
 1. Find the `LocalCacheRootFolder` element in *your repo path*\Manifest\config.xml
 2. Update the value to "*your repo path*\Manifest\"
-3. In a debugger session run `.settings load *your repo path*\Manifest\config.xml`
+3. In a debugger session run `.settings load *your repo path*\Manifest\config.xml`. The debugger should indicate the config file has been loaded successfully.
 4. Run `.settings save`. This will save your settings to persist between sessions.
 5. Restart your debugger session.
-6. To validate everything is setup correctly, you can try running `dx @$curprocess.Modules.First().Contents` then `.scriptlist`. You should see ImageInfo.js loaded.
+6. Run `dx @$curprocess.Modules.First().Contents`. You should see the extended module information, such as Header and Directories.
+7. To see that the ImageInfo script was loaded dynamically, run .scriptlist. You should see ImageInfo.js loaded after the associated objects were referenced with the dx command.
 
-From then on running a command, function alias, or accessing a namespace that is defined in that manifest will load the extension and run it.
+Because the manifest information is saved as part of the debuggers settings,  when running a command, calling a function alias, or accessing a namespace that is defined in that manifest, the debugger will load the extension and run it.
 
 ## Add your own extension
 To add an extension to a gallery, you just need to modify the manifest XML. You can use the existing extensions as a reference.
@@ -46,7 +47,7 @@ If your script extends the debugger data model, you'll need to define the name o
 Each `NamedExtension` in the `ObjectExtensionList` can have three properties:
 * **Name** - The named model which is being extended (ex. "Debugger.Models.Module")
 * **Namespace** - The acquired namespace (ex. "Debugger.Models.Module.Contents"). This is an optional property. If it is provided then "Property" property must be provided.
-* **Property** - The property under the model which will be added to retrieve the acquired namespace (ex. "Contents" i.e. under "Debugger.Models.Module" will be added a property "Content"). This is a mandatory property if the Namespace property is provided, otherwise shouldn’t be provided.
+* **Property** - The property under the model which will be added to retrieve the acquired namespace (ex. "Contents" i.e. under "Debugger.Models.Module" will be added a property "Contents"). This is a mandatory property if the Namespace property is provided, otherwise shouldn’t be provided.
 
 ## Make your own gallery
 You can also make your own extension gallery! You'll want to look through all three files in this folder to understand what to do.
@@ -57,4 +58,4 @@ Each gallery has a manifest file, the exact contents of a manifest is outlined a
 Each gallery has a manifest version file that defines the version of the gallery. For the vast majority of cases, you'll want the exact copy of what's in this repo. Incrementing the number on the first line will change which manifest file is referenced.
 
 ### Configuration File - config.xml
-The configuration file is loaded into the debugger with the `.settings` command and contains some XML elements defining the gallery. Each gallery should have a GUID for a unique ID and the location of the gallery.
+The configuration file is loaded into the debugger with the `.settings` command and contains some XML elements defining the gallery. Each gallery should have a GUID for a unique GUID and the location of the gallery.
