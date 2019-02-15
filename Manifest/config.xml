@@ -3,7 +3,7 @@
   <Namespace Name="Extensions">
     <Setting Name="ExtensionRepository" Type="VT_BSTR" Value="Implicit"></Setting>
     <Namespace Name="ExtensionRepositories">
-      <Namespace Name="TestGallery">
+      <Namespace Name="WinDbgSamples Gallery">
         <Setting Name="Id" Type="VT_BSTR" Value="CD0CF60D-72DC-4C74-A7B9-BC428BF11268"></Setting>
         <Setting Name="LocalCacheRootFolder" Type="VT_BSTR" Value="C:\Repos\WinDbg-Samples\Manifest"></Setting>
         <Setting Name="IsEnabled" Type="VT_BOOL" Value="true"></Setting>

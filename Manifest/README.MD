@@ -1,4 +1,6 @@
 # Extension Gallery
+*To use these feature, you need to be running WinDbg Preview 1.0.1902 or newer* 
+
 Many people find themselves with quite a few scripts and extensions to help out with debugging specific issues. Keeping track of where they all are, what's loaded, and how to invoke them can be a bit of a tedious process. A while back we added the concept of what we call an extension gallery or repository to enable seamless loading of scripts and extensions.
 
 There's an extension gallery included in recent versions of WinDbg and WinDbg Preview with some of the extensions that are included with the debugger, but we're also adding one here to make it easy for people who clone this repo to load the extensions.
