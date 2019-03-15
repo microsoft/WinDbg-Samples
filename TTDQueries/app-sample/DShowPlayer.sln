@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.26730.15
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DShowPlayer", "DShowPlayer.vcxproj", "{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Debug|Win32.Build.0 = Debug|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Debug|x64.ActiveCfg = Debug|x64
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Debug|x64.Build.0 = Debug|x64
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Debug|x86.ActiveCfg = Debug|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Debug|x86.Build.0 = Debug|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Release|Win32.ActiveCfg = Release|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Release|Win32.Build.0 = Release|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Release|x64.ActiveCfg = Release|x64
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Release|x64.Build.0 = Release|x64
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Release|x86.ActiveCfg = Release|Win32
+		{9D7A67A0-5BC7-4CE8-A338-0A10268C00CF}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {557001FD-09C0-4E4C-B89B-5F450917BDB0}
+	EndGlobalSection
+EndGlobal
