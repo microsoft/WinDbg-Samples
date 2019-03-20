@@ -11,7 +11,7 @@ Download the following software in order to follow along:
 
 * WindbgNext from the Windows Store
 * Visual Studio 15
-* Ability to run processes elevated, with admin priviledges 
+* Ability to run processes elevated, with admin priviledges
 
 ## Prepare program to record
 
@@ -24,7 +24,13 @@ This tutorial will use the program from [app-sample](https://github.com/Microsof
    1. Click on the 'OpenFile' under the 'File' menu
    2. Choose any non video file to be opened and you will see an error like this:
 
-  ![DShowPlayer Error](images/dshowplayer-error.jpg)
+<img src="images/dshowplayer-error.jpg" alt="DShowPlayer Error" width="500"/>
+
+**Context**:
+As you see the error you get in the message box doesn't make sense: "Operation completed successfully".
+If you are not familiar with Windows Error API, the error may be cleared/reset
+every time a Windows API is called, therefore if you don't call `Kernelbase::GetLastError()`
+right after the Windows API call you may get a different error. That is what has happened here.
 
 ## Recording
 
@@ -36,13 +42,14 @@ you prefer a different location from the default.
 
 At this point in the steps you should see something like this:
 
-![Windbg Preview Launch](images/windbg-launch.jpg)
+<img src="images/windbg-launch.jpg" alt="Windbg Preview Launch" width="1100"/>
 
 5. Once you select 'OK', the program will be launched and recorded by TTD.
 
 You should see a little dialog with information about the recording in progress:
 
-![Windbg Preview Record Progress](images/windbg-record-progress.jpg)
+<img src="images/windbg-record-progress.jpg" alt="Windbg Preview Record Progress" width="1000"/>
+
 
 6. Follow the steps from [Reproduce the problem](#Prepare-program-to-record) to
 reproduce the issue
@@ -53,12 +60,12 @@ for you to replay and/or debug it.
 
 8. Inspect the console output to identify resulting file name (the recording).
 
-![Windbg Preview Load Trace Output](images/windbg-console-load-trace.jpg)
+<img src="images/windbg-console-load-trace.jpg" alt="Windbg Preview Load Trace Output" width="600"/>
 
 9. As soon as the trace file is loaded in Windbg Preview, it will be index.
 Check the output in the console window to make sure it was successful.
 
-![Windbg Preview Indexing](images/windbg-console-index.jpg)
+<img src="images/windbg-console-index.jpg" alt="Windbg Preview Indexing" width="600"/>
 
 Indexing a TTD trace file highly improves the replay performance, the look
 up of memory values as well as the experience of stepping forwards and
@@ -85,7 +92,7 @@ dx @$cursession.TTD
 
 You should see something like:
 
-![Windbg Preview TTD session](images/windbg-ttd-session.jpg)
+<img src="images/windbg-ttd-session.jpg" alt="Windbg Preview TTD Session" width="1100"/>
 
 Finding out what caused your program to crash is like detective work, you
 need to figure out what happened and where. Think about what questions
@@ -98,16 +105,10 @@ with certain return and/or inputs values.
 And finally, transform the rest of the questions to certain memory
 location use (read/write/execute) and/or pattern.
 
-**First, context**:
-As you can see the error you get in the message box doesn't make sense: "Operation completed successfully".
-If you are not familiar with Windows Error API, the error may be cleared/reset
-every time a Windows API is called, therefore if you don't call `Kernelbase::GetLastError()`
-right after the Windows API call you may get a different error. That is what has happened here.
+### Using queries to go directly to the point of interest in execution
 
 Can we find out the exact point in time where the program created the message box with
 the confusing error?
-
-### Using queries to go directly to the point of interest in execution
 
 One way to think about this problem is to list all calls to `user32!MessageBoxW` (Windows
 API to show a message box), order it by the start time of the function, and then pick the
@@ -136,22 +137,23 @@ You can click on the time link ('Time Travel').
 Look at the stack and change your frame to frame 0x1, the caller of `user32!MessageBoxW`, by
 double clicking on it.
 
-![Windbg Preview Message Box Call](images/windbg-message-box-call.jpg)
+<img src="images/windbg-message-box-call.jpg" alt="Windbg Preview Message Box Call" width="1200"/>
 
-As you can see the error comes from calling GetLastError(). [Windows behavior](First-context).
-At the point when GetLastError() is called the real error has been reset. This is
-likely to happen if you don't call GetLastError() right after the Windows API that
-reports the issue and store the result in a variable.
+As you can see the error comes from calling GetLastError(). At the point when
+GetLastError() is called the real error has been reset. This is likely to happen
+if you don't call GetLastError() right after the Windows API that reports the
+issue and store the result in a variable.
 
 The next frame down in the stack is our program trying to open a file. We can step back from
 this point, to figure out what file it was trying to open.
-To do this, click on the back step over control in the ribbon of Windbg Preview.
+To do this, click on the backwards 'step over' control in the ribbon of Windbg Preview.
 
-![Windbg Preview TTD Controls](images/windbg-ttd-controls.jpg)
+<img src="images/windbg-ttd-controls.jpg" alt="Windbg Preview TTD Controls" width="900"/>
 
-Now that we have stepped backwards, we are able to see what file `` was trying to open.
+Now that we have stepped backwards, we are able to see what file `DShowPlayer!MainWindow::OnFileOpen()`
+was trying to open.
 
-![Windbg Preview Invalid File](images/windbg-invalid-file.jpg)
+<img src="images/windbg-invalid-file.jpg" alt="Windbg Preview Invalid File" width="1200"/>
 
 ### Using queries to discover patterns in execution data
 
@@ -172,7 +174,7 @@ it as determine how you want to slice the data available in the recording.
 dx -g @$cursession.TTD.Calls("kernelbase!GetLastError").Where( x=> x.ReturnValue != 0).GroupBy(x => x.ReturnValue).Select(x => new { ErrorNumber = x.First().ReturnValue, ErrorCount = x.Count()}).OrderByDescending(p => p.ErrorCount),d
 ```
 
-![Windbg Preview TTD Errors Grid](images/windbg-ttd-error-grid.jpg)
+<img src="images/windbg-ttd-error-grid.jpg" alt="Windbg Preview TTD Errors Grid" width="400"/>
 
 ### Using queries to monitor memory and data structures
 
@@ -181,10 +183,10 @@ read/write/execute accesses to a memory range. Most debuggers limit the breakpoi
 size to 8 bytes max, with TTD Memory queries you can go as big as you would like.
 
 For example, you could write a query than spams an entire binary, and you can build
-a code coverage check using the results. There is an example of this [here]().
+a code coverage check using the results.
+There is an example of a [code coverage from TTD](https://github.com/0vercl0k/windbg-scripts/tree/master/codecov).
 
-In this sample program, we can achive the same result as using the
-[Calls query](Using-queries-to-go-directly-to-the-point-of-interest-in-execution) approach
+In this sample program, we can arrive to the same conclusion as the previous investigation,
 but instead we'll use Memory queries to figure out where the error came from and
 what file is causing the problem.
 
@@ -196,7 +198,7 @@ different query later.
 dx @$dialog = @$cursession.TTD.Calls("user32!MessageBoxW").OrderBy(c => c.TimeStart).Last().TimeStart
 
 Result:
-@$dialog = @$cursession.TTD.Calls("user32!MessageBoxW").OrderBy(c => c.TimeStart).Last().TimeStart                 : 306600:5BF [Time Travel]
+@$dialog = @$cursession.TTD.Calls("user32!MessageBoxW").OrderBy(c => c.TimeStart).Last().TimeStart  : 306600:5BF [Time Travel]
     Sequence         : 0x306600
     Steps            : 0x5bf
 ```
@@ -222,23 +224,20 @@ Time Travel Position: 3065BF:1A
 @$cursession.TTD.Memory(&@$teb->LastErrorValue, &@$teb->LastErrorValue + 0x4, "r").Where(m => m.TimeStart < @$dialog).OrderBy(m => m.TimeStart).Last().TimeEnd.SeekTo()
 ```
 
-Examine the stack at this point in time. As you can see in the stack we were trying
-to open a file. Step backwards using the TTD controls to inspect what happened.
-
-Like in the first approach [Calls query](Using-queries-to-go-directly-to-the-point-of-interest-in-execution),
-At the point when GetLastError() is called the real error has been reset. This is
-likely to happen if you don't call GetLastError() right after the Windows API that
-reports the issue and store the result in a variable.
+Examine the stack at this point in time. As you can see it in the stack, the program
+was trying to open a file. Step backwards using the TTD controls to inspect what happened.
+As we saw before, at the point when GetLastError() is called the real error has been reset.
 
 The next frame down in the stack is our program trying to open a file. We can step back from
 this point, to figure out what file it was trying to open.
-To do this, click on the back step over control in the ribbon of Windbg Preview.
+To do this, click on the backwards 'step over' control in the ribbon of Windbg Preview.
 
-![Windbg Preview TTD Controls](images/windbg-ttd-controls.jpg)
+<img src="images/windbg-ttd-controls.jpg" alt="Windbg Preview TTD Controls" width="900"/>
 
-Now that we have stepped backwards, we are able to see what file `` was trying to open.
+Now that we have stepped backwards, we are able to see what file `DShowPlayer!MainWindow::OnFileOpen()`
+was trying to open.
 
-![Windbg Preview Invalid File](images/windbg-invalid-file.jpg)
+<img src="images/windbg-invalid-file.jpg" alt="Windbg Preview Invalid File" width="1200"/>
 
 [Time Travel Debugging]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-overview
 [Sample folder]: https://github.com/Microsoft/Windows-classic-samples/tree/master/Samples
