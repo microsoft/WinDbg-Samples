@@ -12,7 +12,7 @@ In order to use Time Travel Debugging you must:
 
 * Have a Windows 10 environment
 * Download WindbgNext from the Windows Store
-* Ability to run processes elevated, aka. with admin priviledges
+* Ability to run processes elevated, aka. with admin privileges
 
 ## Time Travel Debugging
 
@@ -36,16 +36,17 @@ execution instead of stepping through individual lines of code. You can use a LI
 query to **search** a TTD trace file by **function calls, time positions, memory addresses**, etc.
 Check out [TTD - Queries] to learn more.
 
-### Debugging using a query is great because
+### Debugging using a query is great because you can
 
 * Search for problems and control results using familiar LINQ syntax
 * Easily visualize patterns in grid view
-* Faster than conditional breakpoints
+* Narrow your search faster than using conditional breakpoints
 
 ## Video references
 
 * [Defrag Tools - Time Travel Debugging - Introduction](https://channel9.msdn.com/Shows/Defrag-Tools/Defrag-Tools-185-Time-Travel-Debugging-Introduction)
 * [Defrag Tools - Time Travel Debugging - Advanced](https://channel9.msdn.com/Shows/Defrag-Tools/Defrag-Tools-186-Time-Travel-Debugging-Advanced)
+* [CppCon 2017 - Root Causing Bugs in Commercial Scale Software](https://www.youtube.com/watch?v=l1YJTg_A914)
 
 [Time Travel Debugging]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-overview
 [TTD - Troubleshoot]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-troubleshooting
