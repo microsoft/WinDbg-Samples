@@ -9,9 +9,9 @@ the execution of the code in question.
 Note that this tutorial only applies to Windows 10 environments.
 Download the following software in order to follow along:
 
-* WindbgNext from the Windows Store
+* Windbg Preview from the Windows Store
 * Visual Studio 15
-* Ability to run processes elevated, with admin priviledges
+* Ability to run processes elevated, with admin privileges
 
 ## Prepare program to record
 
@@ -29,7 +29,7 @@ This tutorial will use the program from [app-sample](https://github.com/Microsof
 **Context**:
 As you see the error you get in the message box doesn't make sense: "Operation completed successfully".
 If you are not familiar with Windows Error API, the error may be cleared/reset
-every time a Windows API is called, therefore if you don't call `Kernelbase::GetLastError()`
+every time a Windows API is called, therefore if you don't call `GetLastError()`
 right after the Windows API call you may get a different error. That is what has happened here.
 
 ## Recording
@@ -40,7 +40,7 @@ right after the Windows API call you may get a different error. That is what has
 4. Select the 'Record process with Time Travel Debugging' and fill in the 'Output directory' if
 you prefer a different location from the default.
 
-At this point in the steps you should see something like this:
+At this point in the steps, you should see something like this:
 
 <img src="images/windbg-launch.jpg" alt="Windbg Preview Launch" width="1100"/>
 
@@ -83,7 +83,7 @@ have the pdb files right next to the executable, therefore the debugger will
 find them without issue.
    * Otherwise, add to the debugger's symbol path by running `.sympath+ <pdb path>`
 
-2. Before running your first query, explore the Data Model Oject that contains
+2. Before running your first query, explore the Data Model Object that contains
 TTD specific queries. Run this command:
 
 ```LINQ
@@ -93,6 +93,8 @@ dx @$cursession.TTD
 You should see something like:
 
 <img src="images/windbg-ttd-session.jpg" alt="Windbg Preview TTD Session" width="1100"/>
+
+For documentation about the dx command in Windbg Preview go [here](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-data-model-function-aliases).
 
 Finding out what caused your program to crash is like detective work, you
 need to figure out what happened and where. Think about what questions
@@ -110,7 +112,7 @@ location use (read/write/execute) and/or pattern.
 Can we find out the exact point in time where the program created the message box with
 the confusing error?
 
-One way to think about this problem is to list all calls to `user32!MessageBoxW` (Windows
+One way to think about this problem is to list all calls to `MessageBoxW` (Windows
 API to show a message box), order it by the start time of the function, and then pick the
 last call. That is the point in time where we'll be able to inspect where the error came from:
 
@@ -134,7 +136,7 @@ Result:
 We can navigate to that position in time in order to figure out where the error came from.
 You can click on the time link ('Time Travel').
 
-Look at the stack and change your frame to frame 0x1, the caller of `user32!MessageBoxW`, by
+Look at the stack and change your frame to frame 0x1, the caller of `MessageBoxW`, by
 double clicking on it.
 
 <img src="images/windbg-message-box-call.jpg" alt="Windbg Preview Message Box Call" width="1200"/>
@@ -157,13 +159,13 @@ was trying to open.
 
 ### Using queries to discover patterns in execution data
 
-Maybe you would like to understand what is the pattern arround the error's data.
+Maybe you would like to understand what is the pattern around the error's data.
 You can write queries and display them in a grid for better visualization. The `-g`
 option in dx allows you to enumerable data in a grid display.
 
 We could a get general sense for the errors encountered in our program by looking
 at the count of each error reported by `GetLastError()`.
-We do this by looking for all the calls to the function `KernelBase::GetLastError()`,
+We do this by looking for all the calls to the function `GetLastError()`,
 removing calls that return success (value of 0), groping the calls by their return,
 and lastly ordering them by frequency.
 
@@ -182,7 +184,7 @@ Another powerful query in TTD is the Memory query. It allows you to query for
 read/write/execute accesses to a memory range. Most debuggers limit the breakpoint
 size to 8 bytes max, with TTD Memory queries you can go as big as you would like.
 
-For example, you could write a query than spams an entire binary, and you can build
+For example, you could write a query than spans an entire binary, and you can build
 a code coverage check using the results.
 There is an example of a [code coverage from TTD](https://github.com/0vercl0k/windbg-scripts/tree/master/codecov).
 
@@ -203,8 +205,8 @@ Result:
     Steps            : 0x5bf
 ```
 
-In Windows programs each thread has a know structure that contains all the information
-regarding its state. It is called the Thread Environment Block ([TEB](https://docs.microsoft.com/en-us/windows/desktop/api/winternl/ns-winternl-_teb)). The result returned by `KernelBase::GetLastError()` is
+In Windows programs each thread has a known structure that contains all the information
+regarding its state. It is called the Thread Environment Block ([TEB](https://docs.microsoft.com/en-us/windows/desktop/api/winternl/ns-winternl-_teb)). The result returned by `GetLastError()` is
 stored in this data structure.
 Windbg Preview allows to query this data structure by running `dx @$teb`. If you
 look at the TEB's members you'll see there is a LastErrorValue variable, 4 bytes in size.
@@ -241,3 +243,6 @@ was trying to open.
 
 [Time Travel Debugging]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-overview
 [Sample folder]: https://github.com/Microsoft/Windows-classic-samples/tree/master/Samples
+
+As you can see, the file that was opened is not a media file, and the video reader
+doesn't know how to open such file, causing the program to error.
