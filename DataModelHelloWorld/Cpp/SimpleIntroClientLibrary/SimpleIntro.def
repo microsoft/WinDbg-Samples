@@ -1,0 +1,5 @@
+EXPORTS
+    DebugExtensionInitialize
+    DebugExtensionCanUnload
+    DebugExtensionUninitialize
+    DebugExtensionUnload
