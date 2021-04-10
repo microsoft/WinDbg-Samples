@@ -78,6 +78,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IgnoreImportLibrary>true</IgnoreImportLibrary>
     <LinkIncremental>false</LinkIncremental>
+    <CustomBuildBeforeTargets>
+    </CustomBuildBeforeTargets>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -153,11 +155,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources;GeneratedSources\Release;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -170,6 +173,8 @@
       <TypeLibraryName>$(IntDir)ExdiGdbSrvSample.tlb</TypeLibraryName>
       <DllDataFileName />
       <ValidateAllParameters>true</ValidateAllParameters>
+      <AdditionalIncludeDirectories>.\GeneratedSources;.\GeneratedSources\x64\Release;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>GeneratedSources</OutputDirectory>
     </Midl>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -192,7 +197,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUPUT=$(OutputPath);WIN32_LEAN_AND_MEAN;</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;..\..\..\..\external\exdi;GeneratedSources</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <MinimalRebuild>true</MinimalRebuild>
@@ -203,10 +208,10 @@
       <HeaderFileName>ExdiGdbSrvSample.h</HeaderFileName>
       <ProxyFileName>ExdiGdbSrvSample_p.c</ProxyFileName>
       <GenerateStublessProxies>true</GenerateStublessProxies>
-      <TypeLibraryName>$(IntDir)ExdiGdbSrvSample.tlb</TypeLibraryName>
+      <TypeLibraryName>ExdiGdbSrvSample.tlb</TypeLibraryName>
       <DllDataFileName>
       </DllDataFileName>
-      <AdditionalIncludeDirectories>..\..\..\..\external\exdi;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>ExdiGdbSrvSample;.\GeneratedSources;.\GeneratedSources\x64\Release</AdditionalIncludeDirectories>
       <OutputDirectory>GeneratedSources</OutputDirectory>
     </Midl>
     <ResourceCompile>
@@ -221,6 +226,14 @@
       <RegisterOutput>true</RegisterOutput>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+    <CustomBuildStep>
+      <Command>
+      </Command>
+    </CustomBuildStep>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
