@@ -461,7 +461,7 @@ class GdbSrvController::GdbSrvControllerImpl
                          m_pTextHandler(nullptr),
                          m_cachedProcessorCount(0),
                          m_lastKnownActiveCpu(0),
-                         m_TargetHaltReason(TARGET_UNKNOWN),
+                         m_TargetHaltReason(TARGET_HALTED::TARGET_UNKNOWN),
                          m_displayCommands(true),
                          m_targetProcessorArch(UNKNOWN_ARCH),
                          m_ThreadStartIndex(-1),
@@ -470,9 +470,9 @@ class GdbSrvController::GdbSrvControllerImpl
     {
         m_cachedKPCRStartAddress.clear();
         //  Bind the exdi functions
-		SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvController::GdbSrvControllerImpl::AttachGdbSrv, 
-		                                                         this, std::placeholders::_1, std::placeholders::_2));
-		SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvController::GdbSrvControllerImpl::CloseGdbSrvCore, 
+        SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvControllerImpl::AttachGdbSrv,
+                                                                 this, std::placeholders::_1, std::placeholders::_2));
+		SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvControllerImpl::CloseGdbSrvCore, 
 		                                                         this, std::placeholders::_1, std::placeholders::_2));
         ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
         m_IsThrowExceptionEnabled = cfgData.IsExceptionThrowEnabled();
@@ -924,6 +924,7 @@ class GdbSrvController::GdbSrvControllerImpl
                             m_lastKnownActiveCpu = coreStopReply.processorNumber;
                         }
                     }
+                    memcpy(pStopReply, &coreStopReply, sizeof(StopReplyPacketStruct));
                     break;
                 }
                 else if (core == lastKnownCpu)
@@ -1040,7 +1041,7 @@ class GdbSrvController::GdbSrvControllerImpl
         _snprintf_s(setThreadCommand, _TRUNCATE, "%s%s%x", setThreadCommand, pOperation, processorNumber);
         bool isSet = false;
         int retryCounter = 0;
-        RSP_Response_Packet replyType;
+        RSP_Response_Packet replyType = RSP_ERROR;
         unsigned lastGoodActiveCpu = m_lastKnownActiveCpu;
         m_lastKnownActiveCpu = processorNumber;
 
@@ -1256,7 +1257,7 @@ class GdbSrvController::GdbSrvControllerImpl
     //
     static ULONGLONG GdbSrvControllerImpl::ParseRegisterValue(_In_ const std::string &stringValue)
     {
-        ULARGE_INTEGER result;
+        ULARGE_INTEGER result = { 0 };
         if (sscanf_s(stringValue.c_str(), "%I64x", &result.QuadPart) != 1)
         {
             throw _com_error(E_INVALIDARG);
@@ -2302,11 +2303,11 @@ class GdbSrvController::GdbSrvControllerImpl
     std::vector<AddressType> m_cachedKPCRStartAddress;
     int m_ThreadStartIndex;
     std::unique_ptr <GdbSrvRspClient<TcpConnectorStream>> m_pRspClient;
-    typedef std::function<bool(const std::wstring &connectionStr, unsigned)> ExdiFunctions;
-	std::map<std::wstring, ExdiFunctions> m_exdiFunctions;
+    typedef std::function<bool (const std::wstring &connectionStr, unsigned)> ExdiFunctions;
+    std::map<std::wstring, ExdiFunctions> m_exdiFunctions;
     bool m_IsThrowExceptionEnabled;
 
-    inline void GdbSrvControllerImpl::SetExdiFunctions(_In_ PCWSTR pFunctionText, _In_ ExdiFunctions function)
+    inline void GdbSrvControllerImpl::SetExdiFunctions(_In_ PCWSTR pFunctionText, _In_ const ExdiFunctions function)
     {
         m_exdiFunctions[std::wstring(pFunctionText)] = function;
     }

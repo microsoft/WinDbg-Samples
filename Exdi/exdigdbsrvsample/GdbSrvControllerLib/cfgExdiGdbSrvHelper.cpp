@@ -58,9 +58,9 @@ typedef struct
     bool fMultiCoreGdbServer;       //  Flag if set then we support multi-core connections with the DbgServer, so
                                     //  there will be one GdbServer launched for each core CPU.
     size_t maxServerPacketLength;   //  Maximum GdbServer packet length.
-    int maxConnectAttempts;         //  Connect session maximum attempts
-    int sendTimeout;                //  Send RSP packet timeout
-    int receiveTimeout;             //  Receive timeout
+    unsigned int maxConnectAttempts; //  Connect session maximum attempts
+    unsigned int sendTimeout;      //  Send RSP packet timeout
+    unsigned int receiveTimeout;   //  Receive timeout
     vector<wstring> coreConnectionParameters;  //  Connection string (hostname-ip:port) for each GdbServer core instance.
 } ConfigGdbServerData;
 
@@ -578,17 +578,17 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         return m_ExdiGdbServerData.gdbServer.maxServerPacketLength;
     }
 
-    inline int ConfigExdiGdbServerHelperImpl::GetMaxConnectAttempts()
+    inline unsigned int ConfigExdiGdbServerHelperImpl::GetMaxConnectAttempts()
     {
         return m_ExdiGdbServerData.gdbServer.maxConnectAttempts;
     }
 
-    inline int ConfigExdiGdbServerHelperImpl::GetSendPacketTimeout()
+    inline unsigned int ConfigExdiGdbServerHelperImpl::GetSendPacketTimeout()
     {
         return m_ExdiGdbServerData.gdbServer.sendTimeout;
     }
 
-    inline int ConfigExdiGdbServerHelperImpl::GetReceiveTimeout()
+    inline unsigned int ConfigExdiGdbServerHelperImpl::GetReceiveTimeout()
     {
         return m_ExdiGdbServerData.gdbServer.receiveTimeout;
     }
