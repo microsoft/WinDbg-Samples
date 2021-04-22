@@ -86,9 +86,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath);WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;..\..\..\..\external\exdi;GeneratedSources</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -102,7 +102,6 @@
       <TypeLibraryName>$(IntDir)ExdiGdbSrvSample.tlb</TypeLibraryName>
       <DllDataFileName />
       <ValidateAllParameters>true</ValidateAllParameters>
-      <AdditionalIncludeDirectories>..\..\..\..\external\exdi</AdditionalIncludeDirectories>
       <OutputDirectory>GeneratedSources</OutputDirectory>
     </Midl>
     <ResourceCompile>
@@ -113,8 +112,8 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <ModuleDefinitionFile>.\ExdiGdbSrvSample.def</ModuleDefinitionFile>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <RegisterOutput>true</RegisterOutput>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <RegisterOutput>false</RegisterOutput>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -122,9 +121,9 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath);WIN32_LEAN_AND_MEAN</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>GeneratedSources;GeneratedSources\x64\Release;..\GdbSrvControllerLib;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -137,7 +136,7 @@
       <TypeLibraryName>ExdiGdbSrvSample.tlb</TypeLibraryName>
       <DllDataFileName>
       </DllDataFileName>
-      <AdditionalIncludeDirectories>GeneratedSources;GeneratedSources\x64\Release</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedSources</AdditionalIncludeDirectories>
       <OutputDirectory>GeneratedSources</OutputDirectory>
       <GenerateTypeLibrary>true</GenerateTypeLibrary>
     </Midl>
@@ -149,8 +148,9 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <ModuleDefinitionFile>.\ExdiGdbSrvSample.def</ModuleDefinitionFile>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
-      <RegisterOutput>true</RegisterOutput>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
+      <RegisterOutput>false</RegisterOutput>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -158,9 +158,10 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources;GeneratedSources\Release;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -184,23 +185,22 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <ModuleDefinitionFile>.\ExdiGdbSrvSample.def</ModuleDefinitionFile>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <RegisterOutput>true</RegisterOutput>
+      <RegisterOutput>false</RegisterOutput>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUPUT=$(OutputPath);WIN32_LEAN_AND_MEAN;</PreprocessorDefinitions>
+      <Optimization>MinSpace</Optimization>
+      <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
-      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <MinimalRebuild>true</MinimalRebuild>
+      <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>Default</LanguageStandard>
       <LanguageStandard_C>Default</LanguageStandard_C>
       <RuntimeTypeInfo>
@@ -209,7 +209,6 @@
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <HeaderFileName>ExdiGdbSrvSample.h</HeaderFileName>
       <ProxyFileName>ExdiGdbSrvSample_p.c</ProxyFileName>
       <GenerateStublessProxies>true</GenerateStublessProxies>
@@ -222,12 +221,12 @@
     <ResourceCompile>
       <Culture>0x0409</Culture>
       <AdditionalIncludeDirectories>GeneratedSources;$(IntDir);%(AdditionalIncludeDirectories);GeneratedSources\Debug</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <ModuleDefinitionFile>.\ExdiGdbSrvSample.def</ModuleDefinitionFile>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <RegisterOutput>false</RegisterOutput>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
