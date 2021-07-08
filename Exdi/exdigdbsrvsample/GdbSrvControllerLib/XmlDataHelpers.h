@@ -21,8 +21,6 @@
 #include "HandleHelpers.h"
 #include "GdbSrvControllerLib.h"
 
-using namespace GdbSrvControllerLib;
-using namespace std;
 // Tag-attribute maximum length.
 const size_t C_MAX_ATTR_LENGTH = (256 + 1);
 
@@ -45,26 +43,26 @@ typedef struct
 //  This type indicate the Exdi component configuration data.
 typedef struct
 {
-    wstring agentNamePacket;        //  Agent name
-    wstring uuid;                   //  Class identifier.
+    std::wstring agentNamePacket;   //  Agent name
+    std::wstring uuid;              //  Class identifier.
     bool fDisplayCommPackets;       //  Flag if set then we display the communication packets characters.
     bool fDebuggerSessionByCore;	//	Flag if set then we do debug only by core processor, so step and continue
                                     //	commands happen only on one core at the time. If not set then we 
                                     //	let all cores run when we do step/continue commands.
     bool fExceptionThrowEnabled;    //  Allow throwing exception by the Exdi COM server.
                                     //  Used to disallow throwing exceptions when memory failures occur.
-    wstring qSupportedPacket;       //  GDB server supported, if this empty then will send the default "qsupported" packet
+    std::wstring qSupportedPacket;  //  GDB server supported, if this empty then will send the default "qsupported" packet
 } ConfigExdiData;
 
 //  This type indicates the Target data.
 typedef struct
 {
-    TargetArchitecture targetArchitecture; //  The target architecture.
+    GdbSrvControllerLib::TargetArchitecture targetArchitecture; //  The target architecture.
     DWORD targetFamily;             //  The target architecture.
     unsigned numberOfCores;         //  Number of cores of the target processor CPU.
     bool fEnabledIntelFpSseContext; //  Flag if set then the Intel floating SSE context is processed.
     DWORD64 heuristicChunkSize;     //  Chunk size used by the heurisitic scanning memory mechanism.
-    wstring targetDescriptionFileName; //  Target description file name.
+    std::wstring targetDescriptionFileName; //  Target description file name.
 } ConfigExdiTargetData;
 
 //  This type indicates the GdbServer specific data.
@@ -76,7 +74,7 @@ typedef struct
     int maxConnectAttempts;         //  Connect session maximum attempts
     int sendTimeout;                //  Send RSP packet timeout
     int receiveTimeout;             //  Receive timeout
-    vector<wstring> coreConnectionParameters;  //  Connection string (hostname-ip:port) for each GdbServer core instance.
+    std::vector<std::wstring> coreConnectionParameters;  //  Connection string (hostname-ip:port) for each GdbServer core instance.
 } ConfigGdbServerData;
 
 //  This type indicates the GdbServer memory extended command
@@ -92,13 +90,13 @@ typedef struct
 } ConfigGdbServerMemoryCommands;
 
 //  Type describes the vector Register structure
-typedef vector<RegistersStruct> vectorRegister;
+typedef std::vector<GdbSrvControllerLib::RegistersStruct> vectorRegister;
 
 //  This type indicates the GDB server registers
 typedef struct
 {
-    TargetArchitecture registerSet; //  The register set architecture.
-    std::unique_ptr<wstring> featureNameSupported;  //  Identifier for the feature name supported, so we can avoid failing
+    GdbSrvControllerLib::TargetArchitecture registerSet; //  The register set architecture.
+    std::unique_ptr<std::wstring> featureNameSupported;  //  Identifier for the feature name supported, so we can avoid failing
                                         //  processing in case that there is an item that is not supported in the feature
                                         //  registers, all - means all feature tags will be processed, other
                                         //  sys/banked - process only system register feature, this matches with the name
@@ -115,17 +113,17 @@ typedef struct
 //
 typedef struct
 {
-    TargetArchitecture systemRegArchitecture; //  The register set architecture.
-    std::unique_ptr <systemRegistersMapType> spSysRegisterMap; //  Map containing the system register mapping to reg. access code
+    GdbSrvControllerLib::TargetArchitecture systemRegArchitecture; //  The register set architecture.
+    std::unique_ptr <GdbSrvControllerLib::systemRegistersMapType> spSysRegisterMap; //  Map containing the system register mapping to reg. access code
 } ConfigSystemRegMapAccessCode;
 
 //  Type describe the target description xml file
 //  contain the list of the files with the register description
 typedef struct
 {
-    TargetArchitecture registerGroupArchitecture; //  The name of the target architecture for the received target description file.
+    GdbSrvControllerLib::TargetArchitecture registerGroupArchitecture; //  The name of the target architecture for the received target description file.
     bool isTargetTagEmpty;                        //  Flag indicates if the name of the target architecture tag has been processed.
-    std::unique_ptr <targetDescriptionFilesMap> registerGroupFiles; //  Map containing the target description files
+    std::unique_ptr <GdbSrvControllerLib::targetDescriptionFilesMap> registerGroupFiles; //  Map containing the target description files
 } ConfigTargetDescriptionFile;
 
 //  This type indicates the data structure that will be created after processing
@@ -155,8 +153,8 @@ typedef struct
 {
     LIST_ENTRY  token;
     //  Attribute pair localName="value"
-    wstring localName;
-    wstring value;
+    std::wstring localName;
+    std::wstring value;
 } AttrList_NodeElem_Struct, * PAttrList_NodeElem_Struct;
 
 //  List Tag-Attributes
@@ -199,7 +197,7 @@ public:
     static bool XmlGetStringValue(_In_z_ PCWSTR pAttrValue, _In_ size_t fieldOffset,
         _In_ size_t totalSizeOfStruct, _In_ size_t numberOfElements,
         _Out_writes_(totalSizeOfStruct) void* pOutData);
-    static TargetArchitecture GetTargetGdbServerArchitecture(_In_ PCWSTR pDataString);
+    static GdbSrvControllerLib::TargetArchitecture GetTargetGdbServerArchitecture(_In_ PCWSTR pDataString);
     static DWORD GetTargetGdbServerFamily(_In_ PCWSTR pDataString);
     static PCWSTR GetXmlErrorMsg(HRESULT hr);
     static void ReportXmlError(_In_ PCWSTR pMessage);
@@ -238,8 +236,8 @@ public:
         _Out_ ConfigExdiGdbSrvData* pConfigTable);
 private:
     static const ULONG c_numberOfAccessCodeFields = 5;
-    static inline bool IsRegisterPresent(_In_ const string& regOrder,
-        _In_ std::unique_ptr <systemRegistersMapType>& spSysRegisterMap);
+    static inline bool IsRegisterPresent(_In_ const std::string & regOrder,
+        _In_ std::unique_ptr <GdbSrvControllerLib::systemRegistersMapType>& spSysRegisterMap);
 };
 
 #pragma endregion

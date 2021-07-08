@@ -93,7 +93,7 @@
     <ExdiGdbServerConfigData agentNamePacket = "BMC.OpenOCD.Windbg.Gdb" uuid = "72d4aeda-9723-4972-b89a-679ac79810ef" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386" >
       <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xfffe" targetDescriptionFile = "target.xml" />
       <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
-        <Value HostNameAndPort="10.124.204.127:3333" />
+        <Value HostNameAndPort="LocalHost:3333" />
       </GdbServerConnectionParameters> 
       <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "yes" SystemRegisterDecoding = "yes">
       </ExdiGdbServerMemoryCommands>
@@ -181,7 +181,7 @@
     <ExdiGdbServerConfigData agentNamePacket = "" uuid = "72d4aeda-9723-4972-b89a-679ac79810ef" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386">
       <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xfffe" targetDescriptionFile = "target.xml" />
       <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
-        <Value HostNameAndPort="192.168.1.19:1234" />
+        <Value HostNameAndPort="LocalHost:1234" />
       </GdbServerConnectionParameters>
       <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "no" SystemRegisterDecoding = "no">
       </ExdiGdbServerMemoryCommands>

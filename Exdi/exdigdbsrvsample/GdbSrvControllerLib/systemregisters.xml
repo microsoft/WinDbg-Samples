@@ -1,7 +1,7 @@
 <SystemRegisterMap>
-	<SystemRegisters Architecture = "ARM64" >
-	    <!-- system core registers -->
-		<register Name ="SPSR_EL1"   AccessCode = "3, 0,  4, 0, 0" />
+  <SystemRegisters Architecture = "ARM64" >
+      <!-- system core registers -->
+    <register Name ="SPSR_EL1"   AccessCode = "3, 0,  4, 0, 0" />
         <register Name ="SPSR_EL2"   AccessCode = "3, 4,  4, 0, 0" />
         <register Name ="SPSR_EL3"   AccessCode = "3, 6,  4, 0, 0" />
         <register Name ="ELR_EL1"    AccessCode = "3, 0,  4, 0, 1" />
@@ -21,15 +21,15 @@
         <register Name ="CTR_EL0"          AccessCode = "3, 3,  0, 0, 1" />
         <register Name ="ARM64_VMPIDR_EL2" AccessCode = "3, 4,  0, 0, 5" />
         <register Name ="ID_AA64PFR1_EL1"  AccessCode = "3, 0,  0, 4, 1" />
-		<register Name ="ID_AA64DFR0_EL1"  AccessCode = "3, 0,  0, 5, 0" />
-		<register Name ="ID_AA64DFR1_EL1"  AccessCode = "3, 0,  0, 5, 1" />
-		<register Name ="ID_AA64AFR0_EL1"  AccessCode = "3, 0,  0, 5, 4" />
-		<register Name ="ID_AA64AFR1_EL1"  AccessCode = "3, 0,  0, 5, 5" />
-		<register Name ="ID_AA64ISAR0_EL1" AccessCode = "3, 0,  0, 6, 0" />
-		<register Name ="ID_AA64ISAR1_EL1" AccessCode = "3, 0,  0, 6, 1" />
-		<register Name ="ID_AA64MMFR0_EL1" AccessCode = "3, 0,  0, 7, 0" />
-		<register Name ="ID_AA64MMFR1_EL1" AccessCode = "3, 0,  0, 7, 1" />
-		<register Name ="ID_AA64MMFR2_EL1" AccessCode = "3, 0,  0, 7, 2" />
+        <register Name ="ID_AA64DFR0_EL1"  AccessCode = "3, 0,  0, 5, 0" />
+        <register Name ="ID_AA64DFR1_EL1"  AccessCode = "3, 0,  0, 5, 1" />
+        <register Name ="ID_AA64AFR0_EL1"  AccessCode = "3, 0,  0, 5, 4" />
+        <register Name ="ID_AA64AFR1_EL1"  AccessCode = "3, 0,  0, 5, 5" />
+        <register Name ="ID_AA64ISAR0_EL1" AccessCode = "3, 0,  0, 6, 0" />
+        <register Name ="ID_AA64ISAR1_EL1" AccessCode = "3, 0,  0, 6, 1" />
+        <register Name ="ID_AA64MMFR0_EL1" AccessCode = "3, 0,  0, 7, 0" />
+        <register Name ="ID_AA64MMFR1_EL1" AccessCode = "3, 0,  0, 7, 1" />
+        <register Name ="ID_AA64MMFR2_EL1" AccessCode = "3, 0,  0, 7, 2" />
 
 
         <!-- Aarch32 ID and feature registers -->
@@ -58,7 +58,7 @@
         <register Name ="SCTLR"          AccessCode = "3, 0,  1, 0, 0" />
         <register Name ="SCTLR_EL2"      AccessCode = "3, 4,  1, 0, 0" />
         <register Name ="HCR_EL2"        AccessCode = "3, 4,  1, 1, 0" />
-		<register Name ="HSTR_EL2"       AccessCode = "3, 4,  1, 1, 3" />
+        <register Name ="HSTR_EL2"       AccessCode = "3, 4,  1, 1, 3" />
         <register Name ="HACR_EL2"       AccessCode = "3, 4,  1, 1, 7" />
         <register Name ="ACTLR_EL1"      AccessCode = "3, 0,  1, 0, 1" />
         <register Name ="ACTLR_EL2"      AccessCode = "3, 4,  1, 0, 1" />
@@ -128,8 +128,8 @@
 
         <!-- Process, context and thread ID registers -->
         <register Name ="TPIDR_EL0"      AccessCode = "3, 3, 13, 0, 2" />
-		<register Name ="TPIDRRO_EL0"    AccessCode = "3, 3, 13, 0, 3" />        
-		<register Name ="TPIDR_EL1"      AccessCode = "3, 0, 13, 0, 4" />		
+        <register Name ="TPIDRRO_EL0"    AccessCode = "3, 3, 13, 0, 3" />        
+        <register Name ="TPIDR_EL1"      AccessCode = "3, 0, 13, 0, 4" />		
         <register Name ="TPIDR_EL2"      AccessCode = "3, 4, 13, 0, 2" />
         <register Name ="CONTEXTIDR_EL1" AccessCode = "3, 0, 13, 0, 1" />
 
@@ -168,5 +168,5 @@
         <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 2, 7" />
         <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 3, 7" />
 
-	</SystemRegisters>
+  </SystemRegisters>
 </SystemRegisterMap>
