@@ -852,7 +852,6 @@ bool GdbSrvRspClient<TcpConnectorStream>::ConfigRspSession(_In_ const RSP_CONFIG
                 break;
             }
 
-// @TODO test foem Ampere this code , it was working w/o this
             unsigned char ackFrequency = 1;
             long unsigned int bytesReturned = 0;
             if (pStream->SetWSAIoctl(SIO_TCP_SET_ACK_FREQUENCY, &ackFrequency, 
@@ -861,8 +860,6 @@ bool GdbSrvRspClient<TcpConnectorStream>::ConfigRspSession(_In_ const RSP_CONFIG
                 configDone = false;
                 break;
             }
-             
-
 
             //  Enable TCP keep alive packets, so we can check if the GdbServer is alive
             DWORD isKeepAlive = 1;
