@@ -40,7 +40,7 @@ using namespace GdbSrvControllerLib;
 const char * GetDataAccessBreakPointCommand(_In_ DATA_ACCESS_TYPE dataAccessType, _In_ bool fInsertCmd)
 {
     char * pCommandType = nullptr;
-    
+
     if (dataAccessType == daExecution)
     {
         if (fInsertCmd)
@@ -115,6 +115,7 @@ AsynchronousGdbSrvController::AsynchronousGdbSrvController(_In_ const std::vecto
 {
     m_AsynchronousCmd.pController = nullptr;
     m_AsynchronousCmd.isRspNeeded = false;
+    m_AsynchronousCmd.isReqNeeded = false;
 }
 
 AsynchronousGdbSrvController::~AsynchronousGdbSrvController()
@@ -177,7 +178,7 @@ unsigned AsynchronousGdbSrvController::CreateCodeBreakpoint(_In_ AddressType add
     char breakCmd[128] = {0}; 
     TargetArchitecture targetArchitecture = GdbSrvController::GetTargetArchitecture();
     PCSTR pFormat = (targetArchitecture == ARM64_ARCH || targetArchitecture == AMD64_ARCH) ?
-                     "Z0,%I64x,%d" : "Z0,%x,%d";     
+                     "Z0,%I64x,%d" : "Z0,%x,%d";
     sprintf_s(breakCmd, _countof(breakCmd), pFormat, address, GetBreakPointSize());
 
     bool isReplyOK = false;
@@ -199,7 +200,7 @@ unsigned AsynchronousGdbSrvController::CreateCodeBreakpoint(_In_ AddressType add
             }
         }
         while (IS_BAD_REPLY(replyType) && IS_RETRY_ALLOWED(++retryCounter));
-        
+
     }
     if (!isReplyOK)
     {
@@ -441,7 +442,17 @@ std::string AsynchronousGdbSrvController::ExecuteCommandOnProcessor(_In_ LPCSTR 
     return GdbSrvController::ExecuteCommandOnProcessor(pCommand, isExecCmd, size, currentActiveProcessor);
 }
 
-void AsynchronousGdbSrvController::StartAsynchronousCommand(_In_ LPCSTR pCommand, _In_ bool isRspNeeded)
+std::string AsynchronousGdbSrvController::GetResponseOnProcessor(_In_ size_t size, _In_ unsigned currentActiveProcessor)
+{
+    if (IsAsynchronousCommandInProgress())
+    {
+        throw std::exception("Cannot execute a command while an asynchronous command is in progress (e.g. target is running)\r\n");
+    }
+
+    return GdbSrvController::GetResponseOnProcessor(size, currentActiveProcessor);
+}
+
+void AsynchronousGdbSrvController::StartAsynchronousCommand(_In_ LPCSTR pCommand, _In_ bool isRspNeeded, _In_ bool isReqNeeded)
 {
     assert(pCommand != nullptr);
     if (IsAsynchronousCommandInProgress())
@@ -461,6 +472,7 @@ void AsynchronousGdbSrvController::StartAsynchronousCommand(_In_ LPCSTR pCommand
     DWORD threadId = 0;
     m_AsynchronousCmd.pController = this;
     m_AsynchronousCmd.isRspNeeded = isRspNeeded;
+    m_AsynchronousCmd.isReqNeeded = isReqNeeded;
 
     m_asynchronousCommandThread = CreateThread(nullptr, 0, AsynchronousCommandThreadBody, 
                                                reinterpret_cast<PVOID>(&m_AsynchronousCmd), 0, &threadId);
@@ -521,9 +533,18 @@ DWORD AsynchronousGdbSrvController::AsynchronousCommandThreadBody(LPVOID p)
         }
         else
         {
-            pCmdStruct->pController->m_currentAsynchronousCommandResult = 
-            pCmdStruct->pController->GdbSrvController::ExecuteCommandEx(pCmdStruct->pController->m_currentAsynchronousCommand.c_str(),
-                                                                        pCmdStruct->isRspNeeded, 0);
+            if (pCmdStruct->isReqNeeded)
+            {
+                pCmdStruct->pController->m_currentAsynchronousCommandResult = 
+                pCmdStruct->pController->GdbSrvController::ExecuteCommandEx(pCmdStruct->pController->m_currentAsynchronousCommand.c_str(),
+                                                                            pCmdStruct->isRspNeeded, 0);
+            }
+            else
+            {
+                pCmdStruct->pController->m_currentAsynchronousCommandResult = 
+                pCmdStruct->pController->GdbSrvController::GetResponseOnProcessor(0, 
+                    pCmdStruct->pController->GdbSrvController::GetLastKnownActiveCpu());
+            }
         }
         return 0;
     }
@@ -540,67 +561,48 @@ void AsynchronousGdbSrvController::StartStepCommand(unsigned processorNumber)
             MessageBox(0, _T("Unable to set processor number or the GdbServer is not ready continue on any thread"), nullptr, MB_ICONERROR);
         }
     }
-    StartAsynchronousCommand("s", false);
+    StartAsynchronousCommand("s", false, true);
 }
 
 void AsynchronousGdbSrvController::StartRunCommand()
 {
-    StartAsynchronousCommand("c", false);
+    StartAsynchronousCommand("c", false, true);
 }
 
 bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * pPcAddress, _Out_ DWORD * pProcessorNumber,
                                                          _Out_ bool * pEventNotification)
 {
     assert(pPcAddress != nullptr && pProcessorNumber != nullptr && pEventNotification != nullptr);
-    bool isDone = false;
 
+    bool isBreakDone = false;
+    *pEventNotification = false;
     if (GdbSrvController::InterruptTarget())
     {
+        isBreakDone = true;
         StopReplyPacketStruct stopReply;
-        std::string reply = GetCommandResult();
-        if (!reply.empty())
+        ULONG attempts = 0;
+        do
         {
-            //  Verify the previously asynchronous response
-            GdbSrvController::HandleAsynchronousCommandResponse(reply, &stopReply);
+            std::string reply = GetCommandResult();
+            if (!reply.empty())
+            {
+                //  Verify the previously asynchronous response
+                GdbSrvController::HandleAsynchronousCommandResponse(reply, &stopReply);
+                HandleStopReply(reply, stopReply, pPcAddress, pProcessorNumber, pEventNotification);
+            }
         }
-        else
+        while (!*pEventNotification && attempts++ != c_attemptsWaitingOnPendingResponse);
+
+        if (!*pEventNotification)
         {
+            //  We did not get the GDB "stop-reply" packet, so enquire
+            //  the target status.
             GdbSrvController::ReportReasonTargetHalted(&stopReply);
-        }
-        //  Is it a T AA packet type?
-        if (stopReply.status.isTAAPacket && 
-            (stopReply.stopReason == TARGET_BREAK_SIGINT || stopReply.stopReason == TARGET_BREAK_SIGTRAP))
-        {
-            *pEventNotification = true;            
-            *pPcAddress = stopReply.currentAddress;
-            // Do we have core/thread specified in the response?
-            if (stopReply.status.isThreadFound)
-            {
-                assert(stopReply.processorNumber != static_cast<ULONG>(-1));
-                if (GdbSrvController::GetFirstThreadIndex() > 0)
-                {
-                    *pProcessorNumber = stopReply.processorNumber - 1;
-                }
-                else
-                {
-                    *pProcessorNumber = stopReply.processorNumber;
-                }
-            }
-            else
-            {
-                *pProcessorNumber = GdbSrvController::GetLastKnownActiveCpu();
-            }
-            isDone = true;
-        } 
-        //  Is it a S AA packet type?
-        else if (stopReply.status.isSAAPacket)
-        {
-            *pEventNotification = true;            
-            *pProcessorNumber = GdbSrvController::GetLastKnownActiveCpu();
-            isDone = true;
+            std::string noReply;
+            HandleStopReply(noReply, stopReply, pPcAddress, pProcessorNumber, pEventNotification);
         }
     }
-    return isDone;
+    return isBreakDone;
 }
 
 int AsynchronousGdbSrvController::GetBreakPointSize()
@@ -625,3 +627,96 @@ int AsynchronousGdbSrvController::GetBreakPointSize()
     }
     return breakPointLength;
 }
+
+void AsynchronousGdbSrvController::HandleStopReply(_In_ const std::string reply, _In_ StopReplyPacketStruct & stopReply,
+    _Inout_ AddressType* pPcAddress, _Out_ DWORD* pProcessorNumber, _Out_ bool * pEventNotification)
+{
+    *pEventNotification = false;
+
+    //  Is it a OXX console packet
+    if (stopReply.status.isOXXPacket)
+    {
+        //  Try to display the GDB server ouput message if there is an attached text console.
+        GdbSrvController::DisplayConsoleMessage(reply);
+        //  Post another receive request on the packet buffer
+        ContinueWaitingOnStopReplyPacket();
+        Sleep(100);
+    }
+    else if (stopReply.status.isTAAPacket &&
+        (stopReply.stopReason == TARGET_BREAK_SIGINT || 
+         stopReply.stopReason == TARGET_BREAK_SIGTRAP ||
+         stopReply.stopReason == TARGET_UNKNOWN))
+    {
+        *pEventNotification = true;
+        if (stopReply.status.isPcRegFound)
+        {
+            *pPcAddress = stopReply.currentAddress;
+        }
+        // Do we have core/thread specified in the response?
+        if (stopReply.status.isThreadFound)
+        {
+            assert(stopReply.processorNumber != static_cast<ULONG>(-1));
+            if (stopReply.processorNumber != static_cast<ULONG>(C_ALLCORES))
+            {
+                *pProcessorNumber = stopReply.processorNumber;
+            }
+        }
+        else
+        {
+            *pProcessorNumber = GdbSrvController::GetLastKnownActiveCpu();
+        }
+    }
+    //  Is it a S AA packet type?
+    else if (stopReply.status.isSAAPacket)
+    {
+        *pEventNotification = true;
+        *pProcessorNumber = GdbSrvController::GetLastKnownActiveCpu();
+    }
+}
+
+void AsynchronousGdbSrvController::ContinueWaitingOnStopReplyPacket()
+{
+    if (IsAsynchronousCommandInProgress())
+    {
+        throw std::exception("Cannot execute a command while an asynchronous command is in progress (e.g. target is running).");
+    }
+
+    if (m_asynchronousCommandThread == nullptr)
+    {
+        throw std::exception("No active asynchronous command is running");
+    }
+
+    //  the same thread is using the command
+    m_currentAsynchronousCommand = "";
+    m_currentAsynchronousCommandResult.clear();
+
+    m_AsynchronousCmd.pController = this;
+    m_AsynchronousCmd.isRspNeeded = true;
+    m_AsynchronousCmd.isReqNeeded = false;
+    AsynchronousCommandThreadBody(reinterpret_cast<PVOID>(&m_AsynchronousCmd));
+}
+
+void AsynchronousGdbSrvController::StopTargetAtRun()
+{
+    if (IsAsynchronousCommandInProgress() && 
+        m_currentAsynchronousCommand == "c" &&
+        m_AsynchronousCmd.isRspNeeded == false)
+    {
+        //  In case that the target is at run and  the client debugger requested 
+        //  a command w/o interruption, then force to interrup the waiting state
+        //  of the GDB client link layer. This situation should not happen, since the debugger engine
+        //  should not post any command unless the target is at break state, but
+        //  there is small chance that this client has not notified the engine about
+        //  the current target state (target is at run/at break).
+        ADDRESS_TYPE currentAddress;
+        DWORD eventProcessor = 0;
+        bool eventNotification = false;
+        //  Set the thread interrupt event
+        HandleInterruptTarget(reinterpret_cast<AddressType*>(&currentAddress),
+            &eventProcessor, &eventNotification);
+        //  Wait for the thread to finish itself once the interrup event is received.
+        WaitForSingleObject(m_asynchronousCommandThread, INFINITE);
+    }
+
+}
+

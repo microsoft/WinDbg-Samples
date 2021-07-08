@@ -13,6 +13,7 @@
 
 namespace GdbSrvControllerLib
 {
+    const int c_attemptsWaitingOnPendingResponse = 30;
     class AsynchronousGdbSrvController : public GdbSrvController
     {
     public:
@@ -22,14 +23,15 @@ namespace GdbSrvControllerLib
         {
             AsynchronousGdbSrvController * pController;
             bool isRspNeeded;
+            bool isReqNeeded;
         } startAsynchronousCommandStruct;
 
         virtual std::string ExecuteCommand(_In_ LPCSTR pCommand) override;
         virtual std::string ExecuteCommandEx(_In_ LPCSTR pCommand,_In_ bool isExecCmd,  _In_ size_t size) override;
-        virtual std::string AsynchronousGdbSrvController::ExecuteCommandOnProcessor(_In_ LPCSTR pCommand, _In_ bool isExecCmd, 
-                                                                                    _In_ size_t size, _In_ unsigned currentActiveProcessor);
-        
-        void StartAsynchronousCommand(_In_ LPCSTR pCommand, _In_ bool isRspNeeded);
+        virtual std::string ExecuteCommandOnProcessor(_In_ LPCSTR pCommand, _In_ bool isExecCmd, 
+                                                      _In_ size_t size, _In_ unsigned currentActiveProcessor);
+        virtual std::string GetResponseOnProcessor(_In_ size_t size, _In_ unsigned currentActiveProcessor);
+        void StartAsynchronousCommand(_In_ LPCSTR pCommand, _In_ bool isRspNeeded, _In_ bool isReqNeeded);
         bool IsAsynchronousCommandInProgress();
         bool GetAsynchronousCommandResult(_In_ DWORD timeoutInMilliseconds, _Out_opt_ std::string * pResult);
 
@@ -51,8 +53,12 @@ namespace GdbSrvControllerLib
         void SetAsynchronousCmdStopReplyPacket() {m_isAsynchronousCmdStopReplyPacket = true;}
         void ResetAsynchronousCmdStopReplyPacket() {m_isAsynchronousCmdStopReplyPacket = false;}
         bool GetAsynchronousCmdStopReplyPacket() {return m_isAsynchronousCmdStopReplyPacket;}
-
+        void ContinueWaitingOnStopReplyPacket();
+        void HandleStopReply(_In_ const std::string reply, _In_ StopReplyPacketStruct& stopReply,
+            _Inout_ AddressType* pPcAddress, _Out_ DWORD* pProcessorNumber, _Out_ bool* pEventNotification);
         ~AsynchronousGdbSrvController();
+        void StopTargetAtRun();
+
     protected:
         AsynchronousGdbSrvController(_In_ const std::vector<std::wstring> &coreConnectionParameters);
 

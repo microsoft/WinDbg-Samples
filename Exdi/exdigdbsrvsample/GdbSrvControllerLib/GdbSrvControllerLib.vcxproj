@@ -176,8 +176,10 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrvSample.h" /W1 /I"..\ExdiGdb
     <ClInclude Include="GdbSrvRspClient.h" />
     <ClInclude Include="HandleHelpers.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="TargetArchitectureHelpers.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TcpConnectorStream.h" />
+    <ClInclude Include="XmlDataHelpers.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AsynchronousGdbSrvController.cpp" />
@@ -186,6 +188,7 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrvSample.h" /W1 /I"..\ExdiGdb
     <ClCompile Include="GdbSrvRspClient.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="TcpConnectorStream.cpp" />
+    <ClCompile Include="XmlDataHelpers.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

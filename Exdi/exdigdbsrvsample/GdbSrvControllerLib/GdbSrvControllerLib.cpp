@@ -17,26 +17,16 @@
 #include <algorithm>
 #include <string>
 #include <memory>
+#include "TargetArchitectureHelpers.h"
+#include "Arm64SystemRegistersMap.h"
 
 using namespace GdbSrvControllerLib;
 
 //=============================================================================
 // Private data definitions
 //=============================================================================    
-#define TARGET_ARM_ARCH_PTR_SIZE(target)      ((target == ARM32_ARCH) ? sizeof(ULONG) : sizeof(ULONG64))
-#define TARGET_INTEL_ARCH_PTR_SIZE(target)    ((target == X86_ARCH) ? sizeof(ULONG) : sizeof(ULONG64))
-#define GET_PTR_SIZE_BY_ARCH(arch)            (((arch == X86_ARCH) || (arch == AMD64_ARCH)) ? \
-                                               TARGET_INTEL_ARCH_PTR_SIZE(arch) : TARGET_ARM_ARCH_PTR_SIZE(arch))
-
-// ARM64 Exception Level 1 cpsr register values (CPSRM_EL1h)
-const DWORD C_EL1TCPSRREG = 4;
-const DWORD C_EL1HCPSRREG = 5;
-// ARM64 Exception Level 2
-const DWORD C_EL2TCPSRREG = 8;
-const DWORD C_EL2HCPSRREG = 9;
-
 //  Maximum monitor command buffer
-const DWORD C_MAX_MONITOR_CMD_BUFFER = 2048;
+const DWORD C_MAX_MONITOR_CMD_BUFFER = 4096;
 
 //  Maximum size of register name string
 const DWORD C_MAX_REGISTER_NAME_ARRAY_ELEM = 32;
@@ -50,433 +40,90 @@ const PCWSTR exdiComponentFunctionList[] =
     L"close"
 };
 
-//  The below arrays array will be used for processing CPU context (Set/GetContext) related RSP packets.
-//  An array entry contains the following fields:
-//  1. The register name descriptor,
-//  2. The register ID that matches with the array entry number. 
-//     It's used to indentify the register in Set context related packets.
-//  3. The register size in bytes.
-//  
+// 
+//  Request to read feature target file from the GDB server 
+//  It's use to request reading xml registers target file.
+// 
+LPCSTR const g_RequestGdbReadFeatureFile = "qXfer:features:read:";
 
-//  This structure indicates the GdbServer x86 register array.
-const RegistersStruct x86RegisterArray[MAX_REG_X86_NUMBER] =
+//
+//  Type indicates the different ways that are used to read the system
+//  registers for this client.
+//
+const PCWSTR c_GetSystemRegisterFunctionHandler[] =
 {
-  {"Eax",           "0",     4},
-  {"Ecx",           "1",     4},
-  {"Edx",           "2",     4},
-  {"Ebx",           "3",     4},
-  {"Esp",           "4",     4},
-  {"Ebp",           "5",     4},
-  {"Esi",           "6",     4},
-  {"Edi",           "7",     4},
-  {"Eip",           "8",     4},
-  {"EFlags",        "9",     4},
-  {"SegCs",         "a",     4},
-  {"SegSs",         "b",     4},
-  {"SegDs",         "c",     4},
-  {"SegEs",         "d",     4},
-  {"SegFs",         "e",     4},
-  {"SegGs",         "f",     4},
-  {"st0",           "10",    10},
-  {"st1",           "11",    10},
-  {"st2",           "12",    10},
-  {"st3",           "13",    10},
-  {"st4",           "14",    10},
-  {"st5",           "15",    10},
-  {"st6",           "16",    10},
-  {"st7",           "17",    10},
-  {"ControlWord",   "18",    4},
-  {"StatusWord",    "19",    4},
-  {"TagWord",       "1a",    4},
-  {"ErrorOffset",   "1b",    4},
-  {"ErrorSelector", "1c",    4},
-  {"DataOffset",    "1d",    4},
-  {"DataSelector",  "1e",    4},
-  {"Cr0NpxState",   "1f",    4},
-  {"xmm0",          "20",    16},
-  {"xmm1",          "21",    16},
-  {"xmm2",          "22",    16},
-  {"xmm3",          "23",    16},
-  {"xmm4",          "24",    16},
-  {"xmm5",          "25",    16},
-  {"xmm6",          "26",    16},
-  {"xmm7",          "27",    16},
+    //  QueryRegCmd - means that the GDB client uses the regular register GDB request to get the reg. value. 
+    //                That also means that the client also stored a copy of the system registers
+    //                sent by the GDb server (xml target description file was processed).
+    //                (i.e. QEMU supports, OpenOCD also supports it, but don't send a small amount of system registers)
+    L"QueryRegCmd",
+
+    //  GDBMonitorCmd - means that client obtains the system registers by the GDB protocol Monitor command.
+    //                  (i.e. BMC-OpenOCD supports this method for reading all system registers).
+    L"GDBMonitorCmd",
+
+    //  MemoryCustomizedCmd - means that the GDB client obtains the reg. values via specific customized
+    //                        memory commands (GDB protocol "m" apcket with some additional attributes).
+    //                        i.e. Trace32 GDB server supports this method for reading all type of memory 
+    //                        and system registers
+    //
+    L"MemoryCustomizedCmd"
 };
 
-// this is a variant implemented by QEMU
-// NB: a better approach would be to use the Xfer:features:read packet to query supported registers
-const RegistersStruct arm32RegisterArray_Qemu[MAX_REG_ARM32_NUMBER] =
-{
-  {"r0",           "0",     4},
-  {"r1",           "1",     4},
-  {"r2",           "2",     4},
-  {"r3",           "3",     4},
-  {"r4",           "4",     4},
-  {"r5",           "5",     4},
-  {"r6",           "6",     4},
-  {"r7",           "7",     4},
-  {"r8",           "8",     4},
-  {"r9",           "9",     4},
-  {"r10",          "a",     4},
-  {"r11",          "b",     4},
-  {"r12",          "c",     4},
-  {"sp",           "d",     4},
-  {"lr",           "e",     4},
-  {"pc",           "f",     4},
-  // Legacy floating-point registers (always zero)
-  {"f0",           "10",    12},
-  {"f1",           "11",    12},
-  {"f2",           "12",    12},
-  {"f3",           "13",    12},
-  {"f4",           "14",    12},
-  {"f5",           "15",    12},
-  {"f6",           "16",    12},
-  {"f7",           "17",    12},
-  {"fps",          "18",    4},
-  // Processor status flags register
-  {"Cpsr",         "19",    4},
-};
+//
+//  Set of internal Exdi commands that are not sent to the GDB server,
+//  so these commands are processed offline, and they are accessible via 
+// .exdicmd debugger command.
+//
 
-//  This structure indicates the GdbServer Arm 32 bit register array.
-const RegistersStruct arm32RegisterArray[MAX_REG_ARM32_NUMBER] =
-{
-  {"r0",           "0",     4},
-  {"r1",           "1",     4},
-  {"r2",           "2",     4},
-  {"r3",           "3",     4},
-  {"r4",           "4",     4},
-  {"r5",           "5",     4},
-  {"r6",           "6",     4},
-  {"r7",           "7",     4},
-  {"r8",           "8",     4},
-  {"r9",           "9",     4},
-  {"r10",          "a",     4},
-  {"r11",          "b",     4},
-  {"r12",          "c",     4},
-  {"sp",           "d",     4},
-  {"lr",           "e",     4},
-  {"pc",           "f",     4},
-  // Processor status flags register
-  {"Cpsr",         "10",    4},
-  // Neon register DWORD64 D[32]
-  {"d0",           "11",    8},
-  {"d1",           "12",    8},
-  {"d2",           "13",    8},
-  {"d3",           "14",    8},
-  {"d4",           "15",    8},
-  {"d5",           "16",    8},
-  {"d6",           "17",    8},
-  {"d7",           "18",    8},
-  {"d8",           "19",    8},
-  {"d9",           "1a",    8},
-  {"d10",          "1b",    8},
-  {"d11",          "1c",    8},
-  {"d12",          "1d",    8},
-  {"d13",          "1e",    8},
-  {"d14",          "1f",    8},
-  {"d15",          "20",    8},
-  {"d16",          "21",    8},
-  {"d17",          "22",    8},
-  {"d18",          "23",    8},
-  {"d19",          "24",    8},
-  {"d20",          "25",    8},
-  {"d21",          "26",    8},
-  {"d22",          "27",    8},
-  {"d23",          "28",    8},
-  {"d24",          "29",    8},
-  {"d25",          "2a",    8},
-  {"d26",          "2b",    8},
-  {"d27",          "2c",    8},
-  {"d28",          "2d",    8},
-  {"d29",          "2e",    8},
-  {"d30",          "2f",    8},
-  {"d31",          "30",    8},
-  // Floating point status register
-  {"Fpscr",        "31",    4},
-};
-
-//  This structure indicates the GdbServer amd64 register array.
-//  !!!! The amd64 code has not been tested, so ensure testing this array before using it !!!
-const RegistersStruct amd64RegisterArray[MAX_REG_AMD64_NUMBER] =
-{
-  {"rax",           "0",    8},
-  {"rbx",           "1",    8},
-  {"rcx",           "2",    8},
-  {"rdx",           "3",    8},
-  {"rsi",           "4",    8},
-  {"rdi",           "5",    8},
-  {"rbp",           "6",    8},
-  {"rsp",           "7",    8},
-  {"r8",            "8",    8},
-  {"r9",            "9",    8},
-  {"r10",           "a",    8},
-  {"r11",           "b",    8},
-  {"r12",           "c",    8},
-  {"r13",           "d",    8},
-  {"r14",           "e",    8},
-  {"r15",           "f",    8},
-  {"rip",           "10",   8},
-  {"eflags",        "11",   4},
-  {"ds",            "12",   4},
-  {"es",            "13",   4},
-  {"fs",            "14",   4},
-  {"gs",            "15",   4},
-  {"st0",           "16",   10},
-  {"st1",           "17",   10},
-  {"st2",           "18",   10},
-  {"st3",           "19",   10},
-  {"st4",           "1a",   10},
-  {"st5",           "1b",   10},
-  {"st6",           "1c",   10},
-  {"st7",           "1d",   10},
-  {"ControlWord",   "1e",   4},
-  {"StatusWord",    "1f",   4},
-  {"TagWord",       "20",   4},
-  {"ErrorOffset",   "21",   4},
-  {"ErrorSelector", "22",   4},
-  {"DataOffset",    "23",   4},
-  {"DataSelector",  "24",   4},
-  {"Cr0NpxState",   "25",   4},
-  {"xmm0",          "26",   16},
-  {"xmm1",          "27",   16},
-  {"xmm2",          "28",   16},
-  {"xmm3",          "29",   16},
-  {"xmm4",          "2a",   16},
-  {"xmm5",          "2b",   16},
-  {"xmm6",          "2c",   16},
-  {"xmm7",          "2d",   16},
-  {"xmm8",          "2e",   16},
-  {"xmm9",          "2f",   16},
-  {"xmm10",         "30",   16},
-  {"xmm11",         "31",   16},
-  {"xmm12",         "32",   16},
-  {"xmm13",         "33",   16},
-  {"xmm14",         "34",   16},
-  {"xmm15",         "35",   16},
-  {"mxcsr",         "36",   4}
-};
-
-//  This structure indicates the GdbServer Arm 64 bit register array.
-//  !!! this has not been tested yet, and it's incompleted no fp, lr, V registers !!!
-const RegistersStruct arm64RegisterArray[MAX_REG_ARM64_NUMBER] =
-{
-  {"X0",           "0",     8},
-  {"X1",           "1",     8},
-  {"X2",           "2",     8},
-  {"X3",           "3",     8},
-  {"X4",           "4",     8},
-  {"X5",           "5",     8},
-  {"X6",           "6",     8},
-  {"X7",           "7",     8},
-  {"X8",           "8",     8},
-  {"X9",           "9",     8},
-  {"X10",          "a",     8},
-  {"X11",          "b",     8},
-  {"X12",          "c",     8},
-  {"X13",          "d",     8},
-  {"X14",          "e",     8},
-  {"X15",          "f",     8},
-  {"X16",          "10",    8},
-  {"X17",          "11",    8},
-  {"X18",          "12",    8},
-  {"X19",          "13",    8},
-  {"X20",          "14",    8},
-  {"X21",          "15",    8},
-  {"X22",          "16",    8},
-  {"X23",          "17",    8},
-  {"X24",          "18",    8},
-  {"X25",          "19",    8},
-  {"X26",          "1a",    8},
-  {"X27",          "1b",    8},
-  {"X28",          "1c",    8},
-  {"fp",           "1d",    8},
-  {"lr",           "1e",    8},
-  {"sp",           "1f",    8},
-  {"pc",           "20",    8},
-  {"cpsr",         "21",    8},
-  // Neon FP registers, fpsr, fpcr
-  {"V0",           "22",    16},
-  {"V1",           "23",    16},
-  {"V2",           "24",    16},
-  {"V3",           "25",    16},
-  {"V4",           "26",    16},
-  {"V5",           "27",    16},
-  {"V6",           "28",    16},
-  {"V7",           "29",    16},
-  {"V8",           "2a",    16},
-  {"V9",           "2b",    16},
-  {"V10",          "2c",    16},
-  {"V11",          "2d",    16},
-  {"V12",          "2e",    16},
-  {"V13",          "2f",    16},
-  {"V14",          "30",    16},
-  {"V15",          "31",    16},
-  {"V16",          "32",    16},
-  {"V17",          "33",    16},
-  {"V18",          "34",    16},
-  {"V19",          "35",    16},
-  {"V20",          "36",    16},
-  {"V21",          "37",    16},
-  {"V22",          "38",    16},
-  {"V23",          "39",    16},
-  {"V24",          "3a",    16},
-  {"V25",          "3b",    16},
-  {"V26",          "3c",    16},
-  {"V27",          "3d",    16},
-  {"V28",          "3e",    16},
-  {"V29",          "3f",    16},
-  {"V30",          "3f",    16},
-  {"V31",          "3f",    16},
-  {"fpsr",         "40",    4},
-  {"fpcr",         "41",    4},
-};
-
-// Telemetry command and TargetIDs
+//  Telemetry command and TargetIDs
 LPCWSTR const g_GdbSrvTelemetryCmd = L"ExdiDbgType";
 LPCSTR const g_GdbSrvTrace32 = "GdbSrv-Trace32";
 LPCSTR const g_GdbSrvGeneric = "GdbSrv-Generic";
 
+//  Print current set of System registers
+LPCWSTR const g_GdbSrvPrintSystemRegs = L"info registers system";
+LPCWSTR const g_GdbSrvPrintSystemRegsVerbose = L"info registers system -v";
+LPCWSTR const g_GdbSrvPrintCoreRegs = L"info registers core";
+
+//  Header for the verbose command
+PCSTR const g_headerRegisterVerbose[] =
+{
+    "Name",
+    "Value",
+    "Access code"
+};
+
 //=============================================================================
 // Private function definitions
 //=============================================================================
-#pragma region Architecture helpers
-
-inline void MakeLowerCase(_In_ PCWSTR pIn, _Out_ std::wstring &out)
-{
-	out += pIn;
-	std::transform(out.cbegin(), out.cend(),  // Source
-				   out.begin(),				  // destination
-				   [] (wchar_t c) {
-				       return towlower(c);    // operation
-				   });                        
-}
-
-inline void DisplayTextData(_In_reads_bytes_(readSize) const char * pBuffer, _In_ size_t readSize,
-                            _In_ GdbSrvTextType textType, _In_ IGdbSrvTextHandler * const pTextHandler)
-{
-    assert(pTextHandler != nullptr);
-
-    pTextHandler->HandleText(textType, pBuffer, readSize);
-}
-
-void DisplayCommData(_In_reads_bytes_(readSize) const char * pBuffer,  _In_ size_t readSize,
-                     _In_ GdbSrvTextType textType, _In_ IGdbSrvTextHandler * const pTextHandler, _In_ unsigned channel)
-{
-    UNREFERENCED_PARAMETER(channel);
-    DisplayTextData(pBuffer, readSize, textType, pTextHandler);
-}
-
-void DisplayCommDataForChannel(_In_reads_bytes_(readSize) const char * pBuffer,  _In_ size_t readSize,
-                               _In_ GdbSrvTextType textType, _In_ IGdbSrvTextHandler * const pTextHandler, _In_ unsigned channel)
-{
-    UNREFERENCED_PARAMETER(readSize);
-    assert(pTextHandler != nullptr);
-
-    if (*pBuffer != '\x0')
-    {
-        char channelText[128]; 
-        sprintf_s(channelText, _countof(channelText), "Core:%u ", channel);
-        std::string channelString(channelText);
-        channelString += pBuffer;
-        DisplayTextData(channelString.c_str(), strlen(channelString.c_str()), textType, pTextHandler);
-    }
-}
-
-//
-//  ReverseRegValue         Returns a string containing the passed in register string in reverse order.
-//
-//  Parameters:
-//  inputRegTargetOrder     Reference to the input string that contains hex-ascii characters in target order.
-//
-//  Return:
-//  The reversed string.
-//
-std::string ReverseRegValue(_In_ const std::string & inputRegTargetOrder)
-{
-    std::string outRegValue(inputRegTargetOrder); 
-
-    size_t outRegValueLength = outRegValue.length();
-    for (size_t idx = 0; idx < outRegValueLength; idx +=2)
-    {
-        std::swap(outRegValue[idx], outRegValue[idx + 1]);
-    }
-    reverse(outRegValue.begin(), outRegValue.end());
-
-    return outRegValue;
-}
-
-HRESULT SetSpecialMemoryPacketTypeARM64(_In_ ULONGLONG cpsrReg, _Out_ memoryAccessType * pMemType)
-{
-    assert(pMemType != nullptr);
-
-    HRESULT hr = S_OK;
-    switch (cpsrReg & 0xf)
-    {
-        //  NT space
-        case C_EL1HCPSRREG :
-        case C_EL1TCPSRREG :
-        //  Hypervisor space
-        case C_EL2TCPSRREG :
-        case C_EL2HCPSRREG :
-            {
-                pMemType->isSpecialRegs = 1;
-            }
-        break;
-
-        default:
-            {
-                hr = E_FAIL;
-                MessageBox(0, _T("Error: Invalid processor mode for getting ARM64 special registers."), _T("EXDI-GdbServer"), MB_ICONERROR);
-            }
-    }
-    return hr;
-}
-
-HRESULT SetSpecialMemoryPacketType(_In_ TargetArchitecture arch, _In_ ULONGLONG cpsrReg, _Out_ memoryAccessType * pMemType)
-{
-    HRESULT hr = E_NOTIMPL;
-    if (arch == ARM64_ARCH)
-    {
-        hr = SetSpecialMemoryPacketTypeARM64(cpsrReg, pMemType);
-    }
-    return hr;
-}
-
-const char * GetProcessorStatusRegByArch(_In_ TargetArchitecture arch)
-{
-    const char * pStatusRegister = nullptr;
-    if (arch == ARM64_ARCH)
-    {
-        pStatusRegister = "cpsr";
-    }
-    return pStatusRegister;
-}
-#pragma endregion
-
 
 class GdbSrvController::GdbSrvControllerImpl
 {
-    public:
-		GdbSrvControllerImpl::GdbSrvControllerImpl(_In_ const std::vector<std::wstring> &coreNumberConnectionParameters) :
-                         m_pTextHandler(nullptr),
-                         m_cachedProcessorCount(0),
-                         m_lastKnownActiveCpu(0),
-                         m_TargetHaltReason(TARGET_HALTED::TARGET_UNKNOWN),
-                         m_displayCommands(true),
-                         m_targetProcessorArch(UNKNOWN_ARCH),
-                         m_ThreadStartIndex(-1),
-                         m_pRspClient(std::unique_ptr <GdbSrvRspClient<TcpConnectorStream>>
-                                     (new (std::nothrow) GdbSrvRspClient<TcpConnectorStream>(coreNumberConnectionParameters)))
+public:
+    GdbSrvControllerImpl::GdbSrvControllerImpl(_In_ const std::vector<std::wstring>& coreNumberConnectionParameters) :
+        m_pTextHandler(nullptr),
+        m_cachedProcessorCount(0),
+        m_lastKnownActiveCpu(0),
+        m_TargetHaltReason(TARGET_HALTED::TARGET_UNKNOWN),
+        m_displayCommands(true),
+        m_targetProcessorArch(UNKNOWN_ARCH),
+        m_ThreadStartIndex(-1),
+        m_pRspClient(std::unique_ptr <GdbSrvRspClient<TcpConnectorStream>>
+            (new (std::nothrow) GdbSrvRspClient<TcpConnectorStream>(coreNumberConnectionParameters)))
     {
         m_cachedKPCRStartAddress.clear();
+        m_targetProcessorIds.clear();
         //  Bind the exdi functions
         SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvControllerImpl::AttachGdbSrv,
-                                                                 this, std::placeholders::_1, std::placeholders::_2));
-		SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvControllerImpl::CloseGdbSrvCore, 
-		                                                         this, std::placeholders::_1, std::placeholders::_2));
-        ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+            this, std::placeholders::_1, std::placeholders::_2));
+        SetExdiFunctions(exdiComponentFunctionList[0], std::bind(&GdbSrvControllerImpl::CloseGdbSrvCore,
+            this, std::placeholders::_1, std::placeholders::_2));
+        ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
         m_IsThrowExceptionEnabled = cfgData.IsExceptionThrowEnabled();
-        
+        InitializeSystemRegistersFunctions();
+        InitializeInternalGdbClientFunctionMap();
+        cfgData.GetGdbServerRegisters(&m_spRegisterVector);
     }
 
     GdbSrvControllerImpl::~GdbSrvControllerImpl()
@@ -512,6 +159,13 @@ class GdbSrvController::GdbSrvControllerImpl
     {
         assert(pCmdToExecute != nullptr);
 
+        //  Check if this is an internal exdicmd function.
+        std::map<wstring, InternalGdbClientFunctions>::const_iterator itFunction =
+            m_InternalGdbFunctions.find(TargetArchitectureHelpers::WMakeLowerCase(pCmdToExecute));
+        if (itFunction != m_InternalGdbFunctions.end())
+        {
+            return itFunction->second();
+        }
 
         HRESULT gdbServerError = S_OK;
         //  Are we connected to the GdbServer on this core?
@@ -526,7 +180,7 @@ class GdbSrvController::GdbSrvControllerImpl
                 }
             }
         }
- 
+
         SimpleCharBuffer monitorResult;
         if (!monitorResult.TryEnsureCapacity(C_MAX_MONITOR_CMD_BUFFER))
         {
@@ -536,28 +190,6 @@ class GdbSrvController::GdbSrvControllerImpl
         if (core != C_ALLCORES && core > GetNumberOfRspConnections())
         {
             throw _com_error(E_INVALIDARG);
-        }
-
-        if (wcsstr(pCmdToExecute, g_GdbSrvTelemetryCmd) != nullptr)
-        {
-            // It's an Internal telemetry command
-            // Then return the Gdb Server type that is currently connected
-            LPCSTR pStrGdbSrvType;
-            size_t gdbSrvStrTypeLength;
-            if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM))
-            {
-                pStrGdbSrvType = g_GdbSrvTrace32;
-                gdbSrvStrTypeLength = strlen(g_GdbSrvTrace32);
-            }
-            else
-            {
-                pStrGdbSrvType = g_GdbSrvGeneric;
-                gdbSrvStrTypeLength = strlen(g_GdbSrvGeneric);
-            }
-            monitorResult.SetLength(monitorResult.GetLength() + gdbSrvStrTypeLength);
-            memcpy(&monitorResult[monitorResult.GetLength() - gdbSrvStrTypeLength], pStrGdbSrvType, gdbSrvStrTypeLength);
-
-            return monitorResult;
         }
 
         size_t cmdToExecMaxLength = (wcslen(pCmdToExecute) + 1) * sizeof(WCHAR);
@@ -600,15 +232,15 @@ class GdbSrvController::GdbSrvControllerImpl
             }
             else
             {
-                if (messageLength > (C_MAX_MONITOR_CMD_BUFFER - monitorResult.GetLength()))
+                if (messageLength >= (monitorResult.GetCapacity() - (monitorResult.GetLength() + 1)) ) 
                 {
-                    if (!monitorResult.TryEnsureCapacity(C_MAX_MONITOR_CMD_BUFFER))
+                    if (!monitorResult.TryEnsureCapacity((monitorResult.GetLength() + 1) + (4 * C_MAX_MONITOR_CMD_BUFFER)))
                     {
                         throw _com_error(E_OUTOFMEMORY);
                     }
                 }
                 size_t pos = (reply[0] == 'O') ? 1 : 0;
-	            for (; pos < messageLength; pos += 2)
+                for (; pos < messageLength; pos += 2)
                 {
                     monitorResult.SetLength(monitorResult.GetLength() + 1);
                     unsigned char highByte = ((AciiHexToNumber(reply[pos]) << 4) & 0xf0);
@@ -627,7 +259,7 @@ class GdbSrvController::GdbSrvControllerImpl
             }
         }
         while (!replyDone);
-        
+
         return monitorResult;
     }
 
@@ -650,9 +282,9 @@ class GdbSrvController::GdbSrvControllerImpl
         {
             throw _com_error(E_INVALIDARG);
         }
-        
+
         std::wstring functionToExec;
-        MakeLowerCase(pFunctionToExecute, functionToExec);
+        functionToExec = TargetArchitectureHelpers::WMakeLowerCase(pFunctionToExecute);
         std::map<std::wstring, ExdiFunctions>::const_iterator itFunction = m_exdiFunctions.find(functionToExec);
         if (itFunction == m_exdiFunctions.end())
         {
@@ -677,17 +309,18 @@ class GdbSrvController::GdbSrvControllerImpl
         }
         return isFuncDone;
     }
-	//  
-	//  AttachGdbSrv    Open a new communication channel and connect to the Gdbserver
-	//
-	//  Parameters:
-	//  connectionStr   Connection string.
-	//  core            Processor core.
-	//
-	//  Return:
-	//  true            Succeeded.
-	//  false           Otherwise.
-	//
+
+    //
+    //  AttachGdbSrv    Open a new communication channel and connect to the Gdbserver
+    //
+    //  Parameters:
+    //  connectionStr   Connection string.
+    //  core            Processor core.
+    //
+    //  Return:
+    //  true            Succeeded.
+    //  false           Otherwise.
+    //
     bool GdbSrvControllerImpl::AttachGdbSrv(_In_ const std::wstring &connectionStr, _In_ unsigned core)
     {
         assert(m_pRspClient != nullptr);
@@ -787,19 +420,19 @@ class GdbSrvController::GdbSrvControllerImpl
         {
             if (cfgData.GetMultiCoreGdbServer())
             {
-                pFunction = DisplayCommDataForChannel;
+                pFunction = TargetArchitectureHelpers::DisplayCommDataForChannel;
             }
             else
             {
-                pFunction = DisplayCommData;
+                pFunction = TargetArchitectureHelpers::DisplayCommData;
             }
             m_displayCommands = false;
         }
         const RSP_CONFIG_COMM_SESSION commSession = 
         {
-            cfgData.GetMaxConnectAttempts(), 
-            cfgData.GetSendPacketTimeout(), 
-            cfgData.GetReceiveTimeout(), 
+            static_cast<unsigned int>(cfgData.GetMaxConnectAttempts()), 
+            static_cast<unsigned int>(cfgData.GetSendPacketTimeout()),
+            static_cast<unsigned int>(cfgData.GetReceiveTimeout()),
             pFunction, 
             m_pTextHandler
         };
@@ -834,7 +467,7 @@ class GdbSrvController::GdbSrvControllerImpl
     bool GdbSrvControllerImpl::CheckGdbSrvAlive(_Out_ HRESULT & error)
     {
         assert(m_pRspClient != nullptr);
-        return m_pRspClient->GetRspSessionStatus(error, C_ALLCORES);    
+        return m_pRspClient->GetRspSessionStatus(error, C_ALLCORES);
     }
 
     //
@@ -852,7 +485,7 @@ class GdbSrvController::GdbSrvControllerImpl
     //      The processing of the packet response will be handled in the UpdateRspPacketFeatures() function.
     //  2.  Our current implementation looks for two feature replies (packet size and No ACK mode supported) 
     //      by the GdbServer.
-    //  
+    //
     bool GdbSrvControllerImpl::ReqGdbServerSupportedFeatures()
     {
         assert(m_pRspClient != nullptr);
@@ -869,14 +502,50 @@ class GdbSrvController::GdbSrvControllerImpl
             {
                 return false;
             }
+
         }
 
         //  Send the "qSupported" packet
-        const char qSupported[] = "qSupported";
-        std::string cmdResponse = ExecuteCommand(qSupported);
+        wstring wQSupportedConfigPacket;
+        cfgData.GetRequestQSupportedPacket(wQSupportedConfigPacket);
+        const string sQSupportedConfigPacket(wQSupportedConfigPacket.begin(), wQSupportedConfigPacket.end());
+        const char * qSupported = (sQSupportedConfigPacket.empty()) ? "qSupported" : sQSupportedConfigPacket.c_str();
+        string cmdResponse = ExecuteCommand(qSupported);
 
-        //  Set the features supported by invoking UpdateRspPacketFeatures(cmdResponse);
-        return m_pRspClient->UpdateRspPacketFeatures(cmdResponse);
+        //  Set the features supported and update the remote with our supported feature
+        bool IsSetFeatureSucceeded = m_pRspClient->UpdateRspPacketFeatures(cmdResponse);
+        if (IsSetFeatureSucceeded)
+        {
+            //  Tell the remote to turn on No ACK mode.
+            if (m_pRspClient->IsFeatureEnabled(PACKET_QSTART_NO_ACKMODE))
+            {
+                const char ClientNoAckMode[] = "QStartNoAckMode";
+                std::string noCmdResponse = ExecuteCommand(ClientNoAckMode);
+                if (IsReplyError(noCmdResponse))
+                {
+                    return false;
+                }
+            }
+
+            //  Process system registers if there are available
+            //  Tell the remote to turn on No ACK mode.
+            if (m_pRspClient->IsFeatureEnabled(PACKET_TARGET_DESCRIPTION))
+            {
+                HandleTargetDescriptionPacket(cfgData);
+            }
+
+            //  Enable extended features that are no advertised by the qSupported GDB server response,
+            //  it's needed to read system registers/ARM64 CP15 registers in such GDB servers w/o
+            //  having cutomized qSupported responses (i.e. OpenOCD GDB server, but Trace32 has customized 
+            //  GDB packets for reading special memory)
+            if (cfgData.IsSupportedSystemRegistersGdbMonitor())
+            {
+                //  Enable accessing target system register
+                m_pRspClient->SetFeatureEnable(PACKET_READ_OPENOCD_SPECIAL_REGISTER);
+                m_pRspClient->SetFeatureEnable(PACKET_WRITE_OPENOCD_SPECIAL_REGISTER);
+            }
+        }
+        return IsSetFeatureSucceeded;
     }
 
     //
@@ -907,6 +576,7 @@ class GdbSrvController::GdbSrvControllerImpl
         for (unsigned core = 0; core < numberOfCoreConnections; ++core)
         {
             std::string cmdResponse = ExecuteCommandOnProcessor(cmdHaltReason, true, 0, core);
+
             StopReplyPacketStruct coreStopReply;
             if (HandleAsynchronousCommandResponse(cmdResponse, &coreStopReply) && !coreStopReply.status.isCoreRunning)
             {
@@ -915,14 +585,8 @@ class GdbSrvController::GdbSrvControllerImpl
                 {
                     if (coreStopReply.processorNumber != static_cast<ULONG>(C_ALLCORES))
                     {
-                        if (GetFirstThreadIndex() > 0)
-                        {
-                            m_lastKnownActiveCpu = coreStopReply.processorNumber - 1;
-                        }
-                        else
-                        {
-                            m_lastKnownActiveCpu = coreStopReply.processorNumber;
-                        }
+                        m_lastKnownActiveCpu = coreStopReply.processorNumber;
+
                     }
                     memcpy(pStopReply, &coreStopReply, sizeof(StopReplyPacketStruct));
                     break;
@@ -955,7 +619,7 @@ class GdbSrvController::GdbSrvControllerImpl
 
         bool isTIB = false;
         const char cmdHaltReason[] = "qGetTIBAddr:0";
-        std::string cmdResponse = ExecuteCommand(cmdHaltReason);    
+        std::string cmdResponse = ExecuteCommand(cmdHaltReason);
 
         if (!IsReplyError(cmdResponse))
         {
@@ -1002,6 +666,7 @@ class GdbSrvController::GdbSrvControllerImpl
         return m_pRspClient->SendRspInterrupt();
     }
 
+    //
     //  SetThreadCommand    Sets the thread/processor number.
     //  
     //  Request:
@@ -1037,8 +702,15 @@ class GdbSrvController::GdbSrvControllerImpl
         }
 
         //  We need to set the processor number before query the register values
-        char setThreadCommand[32] = "H";
-        _snprintf_s(setThreadCommand, _TRUNCATE, "%s%s%x", setThreadCommand, pOperation, processorNumber);
+        char setThreadCommand[256] = "H";
+        if (m_targetProcessorIds.empty())
+        {
+            _snprintf_s(setThreadCommand, _TRUNCATE, "%s%s%x", setThreadCommand, pOperation, processorNumber);
+        }
+        else
+        {
+            _snprintf_s(setThreadCommand, _TRUNCATE, "%s%s%s", setThreadCommand, pOperation, m_targetProcessorIds[processorNumber].c_str());
+        }
         bool isSet = false;
         int retryCounter = 0;
         RSP_Response_Packet replyType = RSP_ERROR;
@@ -1048,7 +720,7 @@ class GdbSrvController::GdbSrvControllerImpl
         do
         {
             std::string cmdResponse = ExecuteCommand(setThreadCommand);
-    
+
             //  We should receive OK or ERR XXXX
             replyType = GetRspResponse(cmdResponse);
             if (replyType == RSP_OK)
@@ -1115,7 +787,7 @@ class GdbSrvController::GdbSrvControllerImpl
             throw _com_error(E_POINTER);
         }
 
-	    std::string result;
+        std::string result;
         if (result.max_size() < stringSize)
         {
             throw _com_error(E_INVALIDARG);
@@ -1149,7 +821,48 @@ class GdbSrvController::GdbSrvControllerImpl
             m_pRspClient->HandleRspErrors(GdbSrvTextType::CommandError);
             throw _com_error(HRESULT_FROM_WIN32(m_pRspClient->GetRspLastError()));
         }
-    
+
+        if (m_pTextHandler != nullptr && m_displayCommands)
+        {
+            const char * pResult = result.c_str(); 
+            m_pTextHandler->HandleText(GdbSrvTextType::CommandOutput, pResult, strlen(pResult));
+        }
+        return result;
+    }
+
+    //
+    //  GetCommandOnProcessor   Get any response pending on the processor
+    //
+    //  Parameters:
+    //  stringSize              Size of the result string. Allows to control the maximum size of the string
+    //                          in order to minimize the STL automatically resizing mechanism.
+    //  processor               Processor core to send the command.
+    //
+    //  Return:
+    //  The command response.
+    //
+    std::string GdbSrvControllerImpl::GetResponseOnProcessor(_In_ size_t stringSize, _In_ unsigned processor)
+    {
+        std::string result;
+        if (result.max_size() < stringSize)
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+
+        if (result.capacity() < stringSize)
+        {
+            result.reserve(stringSize);
+        }
+
+        bool isPollingMode = false;
+        bool isDone = m_pRspClient->ReceiveRspPacketEx(result, processor, true, isPollingMode, false);
+        if (!isDone)
+        {
+            //  A fatal error or a communication error ocurred
+            m_pRspClient->HandleRspErrors(GdbSrvTextType::CommandError);
+            throw _com_error(HRESULT_FROM_WIN32(m_pRspClient->GetRspLastError()));
+        }
+
         if (m_pTextHandler != nullptr && m_displayCommands)
         {
             const char * pResult = result.c_str(); 
@@ -1197,8 +910,8 @@ class GdbSrvController::GdbSrvControllerImpl
         }
 
         std::string command(pCommand);
-        
-        bool isDone = false;        
+
+        bool isDone = false;
         unsigned numberOfCoreConnections = static_cast<unsigned>(m_pRspClient->GetNumberOfStreamConnections());
 
         for (unsigned core = 0; core < numberOfCoreConnections; ++core)
@@ -1209,6 +922,7 @@ class GdbSrvController::GdbSrvControllerImpl
                 break;
             }
         }
+
         if (isDone)
         {
             bool IsPollingChannelMode = true;
@@ -1235,7 +949,7 @@ class GdbSrvController::GdbSrvControllerImpl
             m_pRspClient->HandleRspErrors(GdbSrvTextType::CommandError);
             throw _com_error(HRESULT_FROM_WIN32(m_pRspClient->GetRspLastError()));
         }
-    
+
         if (m_pTextHandler != nullptr && m_displayCommands)
         {
             const char * pResult = result.c_str(); 
@@ -1257,7 +971,7 @@ class GdbSrvController::GdbSrvControllerImpl
     //
     static ULONGLONG GdbSrvControllerImpl::ParseRegisterValue(_In_ const std::string &stringValue)
     {
-        ULARGE_INTEGER result = { 0 };
+        ULARGE_INTEGER result={0};
         if (sscanf_s(stringValue.c_str(), "%I64x", &result.QuadPart) != 1)
         {
             throw _com_error(E_INVALIDARG);
@@ -1289,16 +1003,76 @@ class GdbSrvController::GdbSrvControllerImpl
         int lenghtOfRegisterValue = static_cast<int>(registerValue.length());
         assert(lenghtOfRegisterValue <= (registerAreaLength * 2));
 
-	    for (int pos = 0, index = 0; pos < lenghtOfRegisterValue && index < registerAreaLength; pos += 2, ++index)
+        for (int pos = 0, index = 0; pos < lenghtOfRegisterValue && index < registerAreaLength; pos += 2, ++index)
         {
-		    assert(index < registerAreaLength);
-		    unsigned char highByte = ((AciiHexToNumber(registerValue[pos]) << 4) & 0xf0);
+            assert(index < registerAreaLength);
+            unsigned char highByte = ((AciiHexToNumber(registerValue[pos]) << 4) & 0xf0);
             pRegisterArea[index] = highByte | (AciiHexToNumber(registerValue[pos + 1]) & 0x0f);
         }
     }
 
     //
-    //  QueryAllRegisters       Reads all general registers.
+    //  QueryAllRegistersEx     Reads all registers specified by the group type.
+    //
+    //  Request:
+    //      'g'
+    //
+    //  Response
+    //      'XXXXXXX...XXXXX'   This is a hex string where each byte will be represented by two hex digits.
+    //                          The bytes are transmitted in target byte order. The size and the order are determined
+    //                          by the target architecture.
+    //      ‘E NN’              Error reading the registers.
+    //
+    //  Example:
+    //  Get all registers (r command)
+    //
+    //  Request:
+    //  $g#67
+    //  
+    //  Response:
+    //  +
+    //  $00000000b035d1ff000000007026d685e43ab0828c3bb08220118781000000007f586281460200000800000010000000230
+    //  0000023000000300000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+    //  000000000000000000000000000000000000000000000000000000000000000000000000000000000000000007f020000000
+    //  00000ffff000000000000000000000000000000000000#b6
+    //  +
+    //
+    std::map<std::string, std::string> GdbSrvControllerImpl::QueryAllRegistersEx(_In_ unsigned processorNumber,
+        _In_ RegisterGroupType groupType = CORE_REGS)
+    {
+        //  Set the processor core from where we will get the registers.
+        if (!SetThreadCommand(processorNumber, "g"))
+        {
+            throw _com_error(E_FAIL);
+        }
+
+        const char command[] = "g";
+        std::string reply = ExecuteCommand(command);
+        if (IsReplyError(reply))
+        {
+            throw _com_error(E_FAIL);
+        }
+
+        size_t numberOfElements = 0;
+        std::map<std::string, std::string> result;
+        size_t startIdx = 0;
+        size_t endIdx = 0;
+        size_t replyLength = reply.length();
+        for (const_regIterator it = RegistersBegin(groupType);
+             it != RegistersEnd(groupType) && startIdx < replyLength;
+             ++it)
+        {
+            //  Each response byte is transmitted as a two-digit hexadecimal ascii number in target order.
+            endIdx = (it->registerSize << 1);
+            //  Reverse the register value from target order to memory order.
+            result[it->name] = TargetArchitectureHelpers::ReverseRegValue(reply.substr(startIdx, endIdx));
+            startIdx += endIdx;
+        }
+        return result;
+    }
+
+    //
+    //  QueryAllRegisters       Reads all general registers
     //
     //  Request:
     //      'g'
@@ -1325,43 +1099,17 @@ class GdbSrvController::GdbSrvControllerImpl
     //
     std::map<std::string, std::string> GdbSrvControllerImpl::QueryAllRegisters(_In_ unsigned processorNumber)
     {
-        //  Set the processor core from where we will get the registers.
-        if (!SetThreadCommand(processorNumber, "g"))
-        {
-            throw _com_error(E_FAIL);
-        }
-
-	    const char command[] = "g";
-        std::string reply = ExecuteCommand(command);
-        if (IsReplyError(reply))
-        {
-            throw _com_error(E_FAIL);
-        }
-
-        size_t numberOfElements = 0;
-        const RegistersStruct * pRegisterArray = GetRegisterArrayTargetPtr(&numberOfElements);
-        std::map<std::string, std::string> result;
-        size_t startIdx = 0;
-        size_t endIdx = 0;
-        size_t replyLength = reply.length();
-        for (size_t index = 0; index < numberOfElements && startIdx < replyLength; ++index, ++pRegisterArray)
-        {
-            //  Each response byte is transmitted as a two-digit hexadecimal ascii number in target order.
-            endIdx = (pRegisterArray->registerSize << 1);
-            //  Reverse the register value from target order to memory order.
-            result[pRegisterArray->name] = ReverseRegValue(reply.substr(startIdx, endIdx));
-            startIdx += endIdx;
-        }
-        return result;
+        return QueryAllRegistersEx(processorNumber, CORE_REGS);
     }
 
     //
-    //  SetRegisters        Sets all general registers.  
+    //  SetRegistersEx      Sets all general registers.  
     //
     //  Parameters:
     //  processorNumber     Processor core number.
     //  registerValues      Map containing the registers to be set.
     //  isRegisterValuePtr  Flag telling how the register map second element should be treated (pointer/value).
+    //  groupType           Register group type
     //
     //  Request:
     //   https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#Packets
@@ -1380,9 +1128,10 @@ class GdbSrvController::GdbSrvControllerImpl
     //  +
     //  OK
     //
-    void GdbSrvControllerImpl::SetRegisters(_In_ unsigned processorNumber, 
-                                            _In_ const std::map<std::string, AddressType> &registerValues,
-                                            _In_ bool isRegisterValuePtr)
+    void GdbSrvControllerImpl::SetRegistersEx(_In_ unsigned processorNumber, 
+                                              _In_ const std::map<std::string, AddressType> &registerValues,
+                                              _In_ bool isRegisterValuePtr,
+                                              _In_ RegisterGroupType groupType = CORE_REGS)
     {
         if (processorNumber != -1)
         {
@@ -1394,19 +1143,18 @@ class GdbSrvController::GdbSrvControllerImpl
         }
         for (auto const& kv: registerValues)
         {
-            const RegistersStruct * pRegEntry = FindRegisterEntry(kv.first);
-            assert(pRegEntry != nullptr);
-                
+            const_regIterator it = FindRegisterVectorEntryEx(kv.first, groupType);
+
             std::string registerValue;
             const unsigned char * pRawRegBuffer = (isRegisterValuePtr) ? reinterpret_cast<const unsigned char *>(kv.second) : 
                                                                          reinterpret_cast<const unsigned char *>(&kv.second);
-            for (size_t idx = 0; idx < pRegEntry->registerSize; ++idx)
+            for (size_t idx = 0; idx < it->registerSize; ++idx)
             {
                 registerValue.insert(registerValue.end(), 1, NumberToAciiHex(((pRawRegBuffer[idx] >> 4) & 0xf)));
                 registerValue.insert(registerValue.end(), 1, NumberToAciiHex((pRawRegBuffer[idx] & 0xf)));
             }
             char command[512];
-            _snprintf_s(command, _TRUNCATE, "P%s=%s", pRegEntry->nameOrder.c_str(), registerValue.c_str());
+            _snprintf_s(command, _TRUNCATE, "P%s=%s", it->nameOrder.c_str(), registerValue.c_str());
 
             std::string reply = ExecuteCommand(command);
             if (!IsReplyOK(reply))
@@ -1416,13 +1164,21 @@ class GdbSrvController::GdbSrvControllerImpl
         }
     }
 
+    void GdbSrvControllerImpl::SetRegisters(_In_ unsigned processorNumber,
+        _In_ const std::map<std::string, AddressType>& registerValues,
+        _In_ bool isRegisterValuePtr)
+    {
+        SetRegistersEx(processorNumber, registerValues, isRegisterValuePtr, CORE_REGS);
+    }
+
     //
-    //  QueryRegisters      Request reading a specific set of registers.
+    //  QueryRegisters      Request reading core registers.
     //
     //  Parameters:
     //  processorNumber     Processor core number.
     //  registerNames       An array containing the list of register names to query.
     //  numberOfElements    Number of elements in the query array.
+    //  groupType           Register group type
     //  
     //  Return:
     //  A map containing the register name and its hex-decimal ascii value.
@@ -1445,9 +1201,11 @@ class GdbSrvController::GdbSrvControllerImpl
     //      $7d7d7a453aa90f3e836ecd794962dc09#d5
     //      +
     //
-    std::map<std::string, std::string> GdbSrvControllerImpl::QueryRegisters(_In_ unsigned processorNumber,
-                                                                            _In_reads_(numberOfElements) const char * registerNames[],
-                                                                            _In_ const size_t numberOfElements) 
+    std::map<std::string, std::string> GdbSrvControllerImpl::QueryRegistersEx(
+        _In_ unsigned processorNumber,
+        _In_reads_(numberOfElements) const char * registerNames[],
+        _In_ const size_t numberOfElements,
+        _In_ RegisterGroupType groupType = CORE_REGS) 
     {
         if (processorNumber != -1)
         {
@@ -1457,16 +1215,15 @@ class GdbSrvController::GdbSrvControllerImpl
                 throw _com_error(E_FAIL);
             }
         }
-      
+
         std::map<std::string, std::string> result;
         for (size_t index = 0; index < numberOfElements; ++index)
         {
             std::string registerName(registerNames[index]); 
-            const RegistersStruct * pRegEntry = FindRegisterEntry(registerName);
-            assert(pRegEntry != nullptr);
-                
+            const_regIterator it = FindRegisterVectorEntryEx(registerName, groupType);
+
             char command[512];
-            _snprintf_s(command, _TRUNCATE, "p%s", pRegEntry->nameOrder.c_str());
+            _snprintf_s(command, _TRUNCATE, "p%s", it->nameOrder.c_str());
 
             std::string reply = ExecuteCommand(command);
             if (IsReplyError(reply) || reply.empty())
@@ -1474,9 +1231,279 @@ class GdbSrvController::GdbSrvControllerImpl
                 throw _com_error(E_FAIL);
             }
             //  Process the register value returned by the GDBServer
-            result[registerName] = ReverseRegValue(reply);
+            result[registerName] = TargetArchitectureHelpers::ReverseRegValue(reply);
         }
         return result;
+    }
+
+    std::map<std::string, std::string> GdbSrvControllerImpl::QueryRegisters(
+        _In_ unsigned processorNumber,
+        _In_reads_(numberOfElements) const char * registerNames[],
+        _In_ const size_t numberOfElements) 
+    {
+        return QueryRegistersEx(processorNumber, registerNames, numberOfElements, CORE_REGS);
+    }
+
+    //
+    //  QueryRegistersByGroup  Request reading all registers for the passed in group type
+    //
+    //  Parameters:
+    //  processorNumber        Processor core number.
+    //  groupType              Register group type
+    //  maxRegisterNameLength  the maximum length of the register name set
+    //  
+    //  Return:
+    //  A map containing the register name and its hex-decimal ascii value.
+    //
+    //  Request:
+    //  ‘p n’               Reads the register n (where the register number n is in hexadecimal ascii number).
+    //               
+    //  Response:
+    //  ‘XX…’               Success.
+    //  ‘E NN’              Error.
+    //  ''                  Ignore
+    //
+    //  Example:
+    //  Request the register xmm0 (rXi)
+    //
+    //  Request:
+    //      $p20#d2
+    //  Response:    
+    //      +
+    //      $7d7d7a453aa90f3e836ecd794962dc09#d5
+    //      +
+    //
+    std::map<std::string, std::string> GdbSrvControllerImpl::QueryRegistersByGroup(
+        _In_ unsigned processorNumber, _In_ RegisterGroupType groupType,
+        _Out_ int & maxRegisterNameLength)
+    {
+        if (processorNumber != -1)
+        {
+            //  Set the processor core before setting the register values.
+            if (!SetThreadCommand(processorNumber, "g"))
+            {
+                throw _com_error(E_FAIL);
+            }
+        }
+
+        maxRegisterNameLength = 0;
+        std::map<std::string, std::string> result;
+        for (const_regIterator it = RegistersBegin(groupType);
+            it != RegistersEnd(groupType); ++it)
+        {
+            const_regIterator itReg = FindRegisterVectorEntryEx(it->name, groupType);
+
+            char command[512];
+            _snprintf_s(command, _TRUNCATE, "p%s", itReg->nameOrder.c_str());
+
+            std::string reply = ExecuteCommand(command);
+            if (IsReplyError(reply) || reply.empty())
+            {
+                throw _com_error(E_FAIL);
+            }
+            maxRegisterNameLength = (maxRegisterNameLength < itReg->name.length()) ? 
+                static_cast<int>(itReg->name.length()) :
+                maxRegisterNameLength;
+            //  Process the register value returned by the GDBServer
+            result[itReg->name] = TargetArchitectureHelpers::ReverseRegValue(reply);
+        }
+        return result;
+    }
+
+    //
+    //  ReadSystemRegistersFromGdbMonitor Obtains a register value from the GDB monitor command response.
+    //
+    //  Parameters:
+    //  systemRegIndex  Address pointing to the system register inndex encoded.
+    //  maxSize         Size of the expected system register value.
+    //  memType         The memory class that will be accessed by the read operation.
+    //
+    //  Return:
+    //  A simple buffer object containing the system register value.
+    //
+    //
+    SimpleCharBuffer GdbSrvControllerImpl::ReadSystemRegistersFromGdbMonitor(
+        _In_ AddressType systemRegIndex,
+        _In_ size_t maxSize,
+        _In_ const memoryAccessType memType)
+    {
+        // Decode the system register passed in index.
+        SystemRegister systemReg = {0};
+        if (TargetArchitectureHelpers::SetSystemRegister(m_targetProcessorArch, systemRegIndex, &systemReg) != S_OK)
+        {
+            throw _com_error(E_NOTIMPL);
+        }
+
+        PCSTR pFormat = GetReadMemoryCmd(memType);
+        unique_ptr<wchar_t> pWideFormat(new (nothrow) wchar_t[strlen(pFormat) + 1]);
+        if (pWideFormat == nullptr)
+        {
+            throw _com_error(E_OUTOFMEMORY);
+        }
+        if (MultiByteToWideChar(CP_ACP, 0, pFormat, -1, pWideFormat.get(), static_cast<int>(strlen(pFormat) + 1)) == 0)
+        {
+            throw _com_error(E_FAIL);
+        }
+
+        wchar_t systemRegCmd[256] = {0};
+        swprintf_s(systemRegCmd, ARRAYSIZE(systemRegCmd), pWideFormat.get(),
+                   systemReg.Op0, systemReg.Op1, systemReg.CRn, systemReg.CRm, systemReg.Op2);
+
+        SimpleCharBuffer monitorString = ExecuteExdiGdbSrvMonitor(GetLastKnownActiveCpu(), systemRegCmd);
+        std::string memoryValueStr(monitorString.GetInternalBuffer(), monitorString.GetEndOfData());
+        // Validate the response, since GDB can include additional spew in front of the register value
+        std::size_t pos = memoryValueStr.find("0x");
+        if (pos == string::npos || memoryValueStr.length() <= maxSize)
+        {
+            throw _com_error(E_FAIL);
+        }
+
+        ULONG64 regValue = 0;
+        if (sscanf_s(&memoryValueStr[pos], "%I64x", &regValue) != 1)
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+
+        SimpleCharBuffer memoryValue;
+        if (!memoryValue.TryEnsureCapacity(memoryValueStr.size()))
+        {
+            throw _com_error(E_OUTOFMEMORY);
+        }
+
+        size_t copySize = min(sizeof(regValue), memoryValue.GetCapacity()); 
+        memcpy(memoryValue.GetInternalBuffer(), &regValue, copySize);
+        memoryValue.SetLength(copySize);
+        return memoryValue; 
+    }
+
+    //
+    //  ReadSysRegByQueryRegGdbCmd Reads System registers by query register command
+    //
+    //  Parameters:
+    //  address         Memory address location to read.
+    //  maxSize         Size of the memory chunk to read.
+    //  memType         The memory class that will be accessed by the read operation.
+    //
+    //  Return:
+    //  A simple buffer object containing the memory content.
+    //
+    //  Request:
+    //
+    //  Response:
+    //
+    //  Example:
+    //  Request:
+    //
+    //  Response:
+    //
+    SimpleCharBuffer GdbSrvControllerImpl::ReadSysRegByQueryRegGdbCmd(
+        _In_ AddressType address, 
+        _In_ size_t maxSize, 
+        _In_ const memoryAccessType memType)
+    {
+        //  Find the system register Name by the register access code
+        //  each reg. code is an unique number that identifies the system registers
+        const char* arraySystemRegisterToQuery[] = { nullptr };
+        arraySystemRegisterToQuery[0] = GetSystemRegNamebyAccessCode(address);
+
+        std::map<std::string, std::string> systemRegMapResult = QueryRegistersEx(GetLastKnownActiveCpu(),
+            arraySystemRegisterToQuery, ARRAYSIZE(arraySystemRegisterToQuery), SYSTEM_REGS);
+        ULONGLONG systemRegValue = ParseRegisterValue(systemRegMapResult[arraySystemRegisterToQuery[0]]);
+
+        SimpleCharBuffer systemRegBuffer;
+        if (!systemRegBuffer.TryEnsureCapacity(C_MAX_MONITOR_CMD_BUFFER))
+        {
+            throw _com_error(E_OUTOFMEMORY);
+        }
+
+        //  Get the system reg. value back to the debugger engine
+        size_t copySize = std::min<size_t>(systemRegBuffer.GetCapacity(), sizeof(systemRegValue));
+        memcpy(systemRegBuffer.GetInternalBuffer(), &systemRegValue, copySize);
+        systemRegBuffer.SetLength(copySize);
+        return systemRegBuffer;
+    }
+
+    //
+    //  ReadSystemRegisters Reads System registers
+    //
+    //  Parameters:
+    //  address            Memory address location to read.
+    //  maxSize            Size of the memory chunk to read.
+    //  memType            The memory class that will be accessed by the read operation.
+    //
+    //  Return:
+    //  A simple buffer object containing the memory content.
+    //
+    //  Request:
+    //
+    //  Response:
+    //
+    //  Example:
+    //  Request:
+    //
+    //  Response:
+    //
+    SimpleCharBuffer GdbSrvControllerImpl::ReadSystemRegisters(_In_ AddressType address, _In_ size_t maxSize, _In_ const memoryAccessType memType)
+    {
+        std::map<PCWSTR, ReadSystemRegisterFunctions>::const_iterator itFunction =
+            m_ReadSystemRegisterFunctions.find(GetSystemRegHandler(memType));
+        if (itFunction == m_ReadSystemRegisterFunctions.end())
+        {
+            //  Unsupported function
+            throw _com_error(E_NOTIMPL);
+        }
+
+        return itFunction->second(address, maxSize, memType);
+    }
+
+    //
+    //  WriteSystemRegisters     Writes into a system register
+    //                  
+    //  Parameters:
+    //  address         Address location where we should write the data
+    //  size            Size of the memory write.
+    //  pRawBuffer      Pointer to the buffer that contains the data to write
+    //  pdwBytesWritten Pointer to the variable containing how many bytes have been written.
+    //  memType         The memory class that will be accessed by the write operation.
+    //  fReportWriteError Flag indicates if the function needs to report packet errors. 
+    //
+    //  Return:
+    //  true            if we succeeded.
+    //  false           otherwise.
+    //
+    //  Request:
+    //
+    //  Response: 
+    //
+    bool GdbSrvControllerImpl::WriteSystemRegisters(_In_ AddressType address, _In_ size_t size, _In_ const void* pRawBuffer,
+        _Out_ DWORD* pdwBytesWritten, _In_ const memoryAccessType memType,
+        _In_ bool fReportWriteError)
+    {
+        std::map<PCWSTR, WriteSystemRegisterFunctions>::const_iterator itFunction =
+            m_WriteSystemRegisterFunctions.find(GetSystemRegHandler(memType));
+        if (itFunction == m_WriteSystemRegisterFunctions.end())
+        {
+            //  Unsupported function
+            throw _com_error(E_NOTIMPL);
+        }
+
+        return itFunction->second(address, size, pRawBuffer, pdwBytesWritten, memType, fReportWriteError);
+    }
+
+    bool GdbSrvControllerImpl::WriteSystemRegBySetRegisterGdbCmd(_In_ AddressType address, _In_ size_t size, 
+        _In_ const void* pRawBuffer, _Out_ DWORD* pdwBytesWritten, _In_ const memoryAccessType memType, _In_ bool fReportWriteError)
+    {
+        if (size != sizeof(ULONGLONG))
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+        const char* arraySystemRegisterToQuery[] = { nullptr };
+        arraySystemRegisterToQuery[0] = GetSystemRegNamebyAccessCode(address);
+        std::map<std::string, ULONGLONG> systemReg;
+        systemReg.insert({ arraySystemRegisterToQuery[0], *((ULONGLONG *)(pRawBuffer)) });
+        SetRegistersEx(GetLastKnownActiveCpu(), systemReg, false, SYSTEM_REGS);
+        *pdwBytesWritten = sizeof(ULONGLONG);
+        return true;
     }
 
     //
@@ -1536,7 +1563,7 @@ class GdbSrvController::GdbSrvControllerImpl
         //  We need to support local configuration maximum packet size and packetsize that 
         //  the GdbServer dynamically supports by sending chunk of data until we reach the maximum requested size.
         while (maxSize != 0)
-        {   
+        {
             size_t recvLength = 0;
             bool fError = false;
             size_t size = maxPacketLength; 
@@ -1555,7 +1582,7 @@ class GdbSrvController::GdbSrvControllerImpl
                 {
                     if (GetThrowExceptionEnabled())
                     {
-                        //  Yes, it is unacceptable            
+                        //  Yes, it is unacceptable
                         throw _com_error(E_FAIL);
                     }
                     fError = true;
@@ -1573,7 +1600,7 @@ class GdbSrvController::GdbSrvControllerImpl
                         throw _com_error(E_FAIL);
                     }
                     break;
-                }    
+                }
 
                 //  Handle the received memory data
                 for (size_t pos = 0; pos < messageLength ; pos += 2)
@@ -1675,8 +1702,8 @@ class GdbSrvController::GdbSrvControllerImpl
             sprintf_s(memoryAddrLength, _countof(memoryAddrLength), pFormat, address);
             char dataLength[128];
             sprintf_s(dataLength, _countof(dataLength), "%I64x", static_cast<ULONG64>(maxPacketSize));
-			std::string command(memoryAddrLength);
-			command += dataLength;
+            std::string command(memoryAddrLength);
+            command += dataLength;
             if (isQ32GdbServerCmd)
             {
                 command += ",";
@@ -1685,7 +1712,7 @@ class GdbSrvController::GdbSrvControllerImpl
             {
                 command += ":";
             }
-			command += dataBuffer.c_str();
+            command += dataBuffer.c_str();
 
             std::string reply = ExecuteCommand(command.c_str());
 
@@ -1775,7 +1802,7 @@ class GdbSrvController::GdbSrvControllerImpl
         //  Check if we have multi-core connection for each GdbServer instance
         //  if so, then we accept it as the number of processor cores
         if (m_cachedProcessorCount == 0)
-	    {
+        {
             unsigned numberOfCoreConnections = static_cast<unsigned>(m_pRspClient->GetNumberOfStreamConnections());
             if (numberOfCoreConnections == 1)
             {
@@ -1785,17 +1812,22 @@ class GdbSrvController::GdbSrvControllerImpl
                 {
                     throw _com_error(E_FAIL);
                 }
-                
+
                 if (m_ThreadStartIndex == -1 && reply[0] == 'm' && reply.length() > 1)
                 {
                     m_ThreadStartIndex = AciiHexAFToNumber(reply[1]);
                 }
 
                 unsigned int countOfThreads = 0;
+                m_targetProcessorIds.clear();
                 do
                 {
-                    if (reply.find("m") != string::npos && reply.length() > 1)
+                    std::size_t pos = reply.find("m");
+                    if (pos != string::npos && reply.length() > 1)
                     {
+                        // Store thread/processor Ids from the message
+                        TargetArchitectureHelpers::TokenizeThreadId(&reply[pos + 1], ",", 
+                            &m_targetProcessorIds);
                         //  We have a response to parse
                         countOfThreads += static_cast<int>(count(reply.cbegin(), reply.cend(), ','));
                         //  Request the subsequent query packet
@@ -1807,6 +1839,7 @@ class GdbSrvController::GdbSrvControllerImpl
                 while(reply.find("l") == string::npos && countOfThreads != 0);
             
                 m_cachedProcessorCount = (countOfThreads > 0) ? countOfThreads : 1;
+                assert(m_cachedProcessorCount == m_targetProcessorIds.size());
             }
             else
             {
@@ -1816,25 +1849,25 @@ class GdbSrvController::GdbSrvControllerImpl
             for (unsigned i = 0; i < m_cachedProcessorCount; ++i)
             {
                 m_cachedKPCRStartAddress.push_back(0); 
-            }    
+            }
         }
-	    return m_cachedProcessorCount;
+        return m_cachedProcessorCount;
     }
 
     //
-    //  FindPcRegisterArrayEntry    Returns the Pc register array entry for the current architecture
+    //  FindPcRegisterArrayEntry    Returns the Pc register iterator for the current architecture
     //
     //  Parameters:
     //  
     //  Return:
     //  The register entry for the PC register.
     //
-    const RegistersStruct * FindPcRegisterArrayEntry()
+    const_regIterator FindPcRegisterVectorEntry()
     {
-        const RegistersStruct * pRegEntry = nullptr;
+        const_regIterator it;
         if (m_targetProcessorArch == X86_ARCH)
         {
-           pRegEntry  = FindRegisterEntry("Eip");
+            it = FindRegisterVectorEntry("Eip");
         }
         else if (m_targetProcessorArch == AMD64_ARCH)
         {
@@ -1848,14 +1881,14 @@ class GdbSrvController::GdbSrvControllerImpl
         }
         else if (m_targetProcessorArch == ARM32_ARCH || m_targetProcessorArch == ARM64_ARCH)
         {
-           pRegEntry  = FindRegisterEntry("pc");
+            it = FindRegisterVectorEntry("pc");
         }
         else
         {
             assert(false);
         }
-        assert(pRegEntry != nullptr);
-        return pRegEntry;
+        assert(it != RegistersEnd());
+        return it;
     }
 
     //
@@ -1877,8 +1910,8 @@ class GdbSrvController::GdbSrvControllerImpl
         assert(pPcAddress != nullptr);
         bool isFound = false;
 
-        const RegistersStruct * pRegEntry = FindPcRegisterArrayEntry();
-        std::string pcRegAddress = pRegEntry->nameOrder + ":";
+        const_regIterator it = FindPcRegisterVectorEntry();
+        std::string pcRegAddress = it->nameOrder + ":";
         string::size_type pos = cmdResponse.find(pcRegAddress);
         if (pos != string::npos)
         {
@@ -1891,15 +1924,15 @@ class GdbSrvController::GdbSrvControllerImpl
                 {
                     if (Is64BitArchitecture())
                     {
-                        *pPcAddress = ParseRegisterValue(ReverseRegValue(pcAddress));
+                        *pPcAddress = ParseRegisterValue(TargetArchitectureHelpers::ReverseRegValue(pcAddress));
                     }
                     else
                     {
-                        *pPcAddress = ParseRegisterValue32(ReverseRegValue(pcAddress));
+                        *pPcAddress = ParseRegisterValue32(TargetArchitectureHelpers::ReverseRegValue(pcAddress));
                     }
-                    isFound = true;    
+                    isFound = true;
                 }
-            }            
+            }
         }
         return isFound;
     }
@@ -1929,7 +1962,15 @@ class GdbSrvController::GdbSrvControllerImpl
         if (!cmdResponse.empty())
         {
             memset(pRspPacket, 0x00, sizeof(StopReplyPacketStruct));
-             
+
+            if (cmdResponse[0] == 'O')
+            {
+                //  this is just a console message to wait for the real stop reply
+                //  so exit to handle the console message
+                pRspPacket->status.isOXXPacket = true;
+                return true;
+            }
+
             string::size_type startPosition = cmdResponse.find("T");
             if (startPosition == string::npos)
             {
@@ -1940,13 +1981,14 @@ class GdbSrvController::GdbSrvControllerImpl
             {
                 pRspPacket->status.isTAAPacket = true;
             }
+
             if (startPosition != string::npos)
             {
                 if (sscanf_s(&cmdResponse[startPosition + 1], "%2x", &pRspPacket->stopReason) != 1)
                 {
                     pRspPacket->stopReason = TARGET_MARKER;
                 }
-            
+
                 //  Extract the thread/processor number
                 string::size_type pos = cmdResponse.find("thread:");
                 if (pos != string::npos)
@@ -1957,9 +1999,21 @@ class GdbSrvController::GdbSrvControllerImpl
                     if (threadEndPos != string::npos)
                     {
                         std::string processorNumber = cmdResponse.substr(regValueStartPos, threadEndPos - regValueStartPos);
-                        if (sscanf_s(processorNumber.c_str(), "%x", &pRspPacket->processorNumber) != 1)
+                        if (!m_targetProcessorIds.empty())
                         {
-                            pRspPacket->processorNumber = static_cast<ULONG>(-1);    
+                            std::vector<std::string>::iterator it = std::find(m_targetProcessorIds.begin(), m_targetProcessorIds.end(), processorNumber);
+                            if (it != m_targetProcessorIds.end())
+                            {
+                                processorNumber = *it;
+                            }
+                            std::vector<std::string> processorIds;
+                            TargetArchitectureHelpers::TokenizeThreadId(processorNumber, ";", &processorIds);
+                            assert(processorIds.size() == 1);
+                            pRspPacket->processorNumber = GetProcessorNumberByThreadId(processorIds[0]);
+                        }
+                        else if (sscanf_s(processorNumber.c_str(), "%x", &pRspPacket->processorNumber) != 1)
+                        {
+                            pRspPacket->processorNumber = static_cast<ULONG>(-1);
                         }
                     }
                 }
@@ -1967,7 +2021,7 @@ class GdbSrvController::GdbSrvControllerImpl
                 //  Extract the current instruction address
                 if (FindPcAddressFromStopReply(cmdResponse, &pRspPacket->currentAddress))
                 {
-                    pRspPacket->status.isPcRegFound = true;                    
+                    pRspPacket->status.isPcRegFound = true;
                 }
                 else
                 {
@@ -2007,7 +2061,7 @@ class GdbSrvController::GdbSrvControllerImpl
     AddressType GdbSrvControllerImpl::GetKpcrOffset(_In_ unsigned processorNumber) 
     {
         assert(processorNumber <= m_cachedKPCRStartAddress.size());
-        
+
         return m_cachedKPCRStartAddress[processorNumber];
     }
 
@@ -2027,6 +2081,50 @@ class GdbSrvController::GdbSrvControllerImpl
         assert(processorNumber <= m_cachedKPCRStartAddress.size());
 
         m_cachedKPCRStartAddress[processorNumber] = kpcrOffset;
+    }
+
+    //
+    //  GetTargetThreadId Get the target thread ID from the passed in logical processor number
+    //
+    //  Parameters:
+    //  processorNumber Core processor number
+    //
+    //  Return:
+    //  the string containing the threadId
+    //
+    //  Note.
+    //  The ThreadID is the symbolic representation of the Target GDB server thread identifiers
+    //  as these IDs are reported in the initial qThreadinfo command.
+    //
+    std::string GdbSrvControllerImpl::GetTargetThreadId(_In_ unsigned processorNumber) 
+    {
+        assert(processorNumber <= m_targetProcessorIds.size());
+
+        return m_targetProcessorIds[processorNumber];
+    }
+
+    //
+    //  GetProcessorNumberByThreadId Get the virtualized core processor number that is used by the
+    //                               client debugger.
+    //
+    //  Parameters:
+    //  threadId                     ThreadId symbolic representation as it kept by the GDB server.
+    //
+    //  Return:
+    //  The core processor number as it's undertood by the client debugger
+    //
+    //  Note.
+    //  This is the symbolic representation of the threadID kept by the
+    //  GDB server entity
+    //
+    DWORD GdbSrvControllerImpl::GetProcessorNumberByThreadId(_In_ const std::string & threadId) 
+    {
+        std::vector<std::string>::const_iterator it = std::find(m_targetProcessorIds.cbegin(), m_targetProcessorIds.cend(), threadId);
+        if (it == m_targetProcessorIds.cend()) 
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+        return static_cast<DWORD>(std::distance(m_targetProcessorIds.cbegin(), it));
     }
 
     //
@@ -2065,7 +2163,6 @@ class GdbSrvController::GdbSrvControllerImpl
         RSP_Response_Packet response = RSP_ERROR;
 
         size_t replyLength = reply.length();
-
         //  Is it an OK response?
         if (reply.find("OK") != string::npos && replyLength == 2)
         {
@@ -2073,7 +2170,7 @@ class GdbSrvController::GdbSrvControllerImpl
         }
         else if (IsStopReply(reply))
         {
-            response = RSP_STOP_REPLY;    
+            response = RSP_STOP_REPLY;
         }
         else if (replyLength == 0)
         {
@@ -2135,9 +2232,10 @@ class GdbSrvController::GdbSrvControllerImpl
                 string::size_type threadEndPos = cmdResponse.find(";", regValueStartPos);
                 if (threadEndPos != string::npos)
                 {
-                    const RegistersStruct * pRegEntry = FindPcRegisterArrayEntry();
-                    assert(pRegEntry != nullptr);
-                    std::string pcRegAddress = pRegEntry->nameOrder + ":";
+                    const_regIterator it = FindPcRegisterVectorEntry();
+                    assert(it != RegistersEnd());
+
+                    std::string pcRegAddress = it->nameOrder + ":";
                     pos = cmdResponse.find(pcRegAddress);
                     if (pos != string::npos)
                     {
@@ -2167,7 +2265,7 @@ class GdbSrvController::GdbSrvControllerImpl
 
     inline void GdbSrvControllerImpl::DisplayLogEntry(_In_reads_bytes_(readSize) const char * pBuffer, _In_ size_t readSize)
     {
-        DisplayTextData(pBuffer, readSize, GdbSrvTextType::CommandError, m_pTextHandler);
+        TargetArchitectureHelpers::DisplayTextData(pBuffer, readSize, GdbSrvTextType::CommandError, m_pTextHandler);
     }
 
     void GdbSrvControllerImpl::CreateNeonRegisterNameArray(_In_ const std::string & registerName,
@@ -2177,63 +2275,29 @@ class GdbSrvController::GdbSrvControllerImpl
         assert(pRegNameArray != nullptr);
 
         size_t numberOfRegisters = 0;
-        const RegistersStruct * pRegEntry = FindRegisterEntryAndNumberOfElements(registerName, numberOfRegisters);
-        if (pRegEntry == nullptr)
+        const_regIterator it = FindRegisterVectorEntryAndNumberOfElements(registerName, numberOfRegisters);
+        if (it == RegistersEnd())
         {
-            throw _com_error(E_POINTER);
+            throw _com_error(E_FAIL);
         }
         assert(numberOfRegArrayElem < numberOfRegisters);
 
-        for (size_t index = 0; index < numberOfRegArrayElem; ++index, ++pRegEntry)
+        for (size_t index = 0; index < numberOfRegArrayElem; ++index, ++it)
         {
             pRegNameArray[index] = std::unique_ptr <char>(new (std::nothrow) char[C_MAX_REGISTER_NAME_ARRAY_ELEM]);
             if (pRegNameArray[index] == nullptr)
             {
                 throw _com_error(E_OUTOFMEMORY);
             }
-            FillNeonRegisterNameArrayEntry(pRegEntry, pRegNameArray[index].get(), C_MAX_REGISTER_NAME_ARRAY_ELEM);
-        }    
+            FillNeonRegisterNameArrayEntry(it, pRegNameArray[index].get(), C_MAX_REGISTER_NAME_ARRAY_ELEM);
+        }
     }
 
     inline int GdbSrvControllerImpl::GetFirstThreadIndex() {return m_ThreadStartIndex;}
 
     void GdbSrvControllerImpl::GetMemoryPacketType(_In_ DWORD64 cpsrRegValue, _Out_ memoryAccessType * pMemType)
     {
-        assert(pMemType != nullptr);    
-        
-        *pMemType = {0};
-        if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && (m_targetProcessorArch == ARM64_ARCH))
-        {
-            //  Check the current target CPU mode stored in the CPSR register in order to set the correct memory type.
-            if (cpsrRegValue != 0)
-            {
-                switch (cpsrRegValue & 0xf)
-                {
-                //  NT space
-                case C_EL1HCPSRREG :
-                case C_EL1TCPSRREG :
-                    {
-                        pMemType->isSupervisor = true;
-                    }
-                    break;
-
-                //  Hypervisor space
-                case C_EL2TCPSRREG :
-                case C_EL2HCPSRREG :
-                    {
-                        pMemType->isHypervisor = true;
-                    }
-                    break;
-
-                default:
-                    {
-                        // Force to use a supervisor mode packet as it should never fail the memory read,
-                        // other than hypervisor or secure mode
-                        pMemType->isSupervisor = true;
-                    }
-                }
-            }
-        }
+        TargetArchitectureHelpers::GetMemoryPacketType(m_targetProcessorArch, cpsrRegValue, pMemType);
     }
 
     inline bool GdbSrvControllerImpl::GetThrowExceptionEnabled()
@@ -2250,19 +2314,20 @@ class GdbSrvController::GdbSrvControllerImpl
     {
         HRESULT hr = E_FAIL;
         const char * statusRegister[] = { nullptr };
-        statusRegister[0] = GetProcessorStatusRegByArch(m_targetProcessorArch);
+        statusRegister[0] = TargetArchitectureHelpers::GetProcessorStatusRegByArch(m_targetProcessorArch);
         if (statusRegister[0] != nullptr)
         {
             std::map<std::string, std::string> cpsrRegisterValue = QueryRegisters(dwProcessorNumber, statusRegister, ARRAYSIZE(statusRegister));
             ULONGLONG processorStatusRegValue = ParseRegisterValue(cpsrRegisterValue[statusRegister[0]]);
 
             memoryAccessType memType = {0};
-            hr = SetSpecialMemoryPacketType(m_targetProcessorArch, processorStatusRegValue, &memType);
+            hr = TargetArchitectureHelpers::SetSpecialMemoryPacketType(m_targetProcessorArch, 
+                processorStatusRegValue, &memType);
             if (hr == S_OK)
             {
                 assert(memType.isSpecialRegs);
                 *pValue = 0;
-                SimpleCharBuffer buffer = ReadMemory(dwRegisterIndex, sizeof(*pValue), memType);
+                SimpleCharBuffer buffer = ReadSystemRegisters(dwRegisterIndex, sizeof(*pValue), memType);
                 size_t copySize = std::min<size_t>(buffer.GetLength(), sizeof(*pValue));
                 memcpy(pValue, buffer.GetInternalBuffer(), copySize);
             }
@@ -2274,28 +2339,85 @@ class GdbSrvController::GdbSrvControllerImpl
     {
         HRESULT hr = E_FAIL;
         const char * statusRegister[] = { nullptr };
-        statusRegister[0] = GetProcessorStatusRegByArch(m_targetProcessorArch);
+        statusRegister[0] = TargetArchitectureHelpers::GetProcessorStatusRegByArch(m_targetProcessorArch);
         if (statusRegister[0] != nullptr)
         {
             std::map<std::string, std::string> cpsrRegisterValue = QueryRegisters(dwProcessorNumber, statusRegister, ARRAYSIZE(statusRegister));
             ULONGLONG processorStatusRegValue = ParseRegisterValue(cpsrRegisterValue[statusRegister[0]]);
 
             memoryAccessType memType = {0};
-            hr = SetSpecialMemoryPacketType(m_targetProcessorArch, processorStatusRegValue, &memType);
+            hr = TargetArchitectureHelpers::SetSpecialMemoryPacketType(m_targetProcessorArch, 
+                processorStatusRegValue, &memType);
             if (hr == S_OK)
             {
                 assert(memType.isSpecialRegs);
                 DWORD bytesWritten = 0;
-                bool isMemoryWritten = WriteMemory(dwRegisterIndex, sizeof(value), &value, &bytesWritten, memType, true);
+                bool isMemoryWritten = WriteSystemRegisters(dwRegisterIndex, sizeof(value), &value, &bytesWritten, memType, true);
                 hr = (isMemoryWritten && (bytesWritten != 0)) ? S_OK : E_FAIL;
             }
         }
         return hr;
     }
 
+    //
+    //  DisplayConsoleMessage    Display message to the attached console if the text console is available
+    //  
+    //  Parameters:
+    //  message                  String with the Message formatted in hex-ascii.
+    //
+    //  Return:
+    //  Nothing
+    //
+    void GdbSrvControllerImpl::DisplayConsoleMessage(_In_ const std::string& message)
+    {
+        if (message.empty() || m_pTextHandler == nullptr)
+        {
+            return;
+        }
+
+        size_t messageLength = message.length();
+        std::string consoleMsg;
+        size_t pos = (message[0] == 'O') ? 1 : 0;
+        for (; pos < messageLength; pos += 2) 
+        {
+            string part = message.substr(pos, 2);
+            char ch = static_cast<char>(stoul(part, nullptr, 16));
+            consoleMsg += ch;
+        }
+
+        m_pTextHandler->HandleText(GdbSrvTextType::CommandOutput, consoleMsg.c_str(), consoleMsg.length());
+    }
+
+    //
+    //  SetSystemRegisterXmlFile  Stores the system register xml full path.
+    //
+    //  Parameters:
+    //  pSystemRegFilePath  Pointer to the full path location of the system register mapping xml file
+    //
+    //  Return:
+    //  Nothing
+    //
+    void GdbSrvControllerImpl::SetSystemRegisterXmlFile(_In_z_ PCWSTR pSystemRegFilePath)
+    {
+        assert(pSystemRegFilePath != nullptr);
+
+        size_t systemFileLength = wcslen(pSystemRegFilePath);
+        if (systemFileLength == 0)
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+
+        m_spSystemRegXmlFile.reset(new(std::nothrow) WCHAR[systemFileLength + 1]);
+        if (m_spSystemRegXmlFile == nullptr)
+        {
+            throw _com_error(E_OUTOFMEMORY);
+        }
+        wcsncpy_s(m_spSystemRegXmlFile.get(), systemFileLength + 1, pSystemRegFilePath, systemFileLength);
+    }
+
     private:
-	IGdbSrvTextHandler * m_pTextHandler;
-	unsigned m_cachedProcessorCount;
+    IGdbSrvTextHandler * m_pTextHandler;
+    unsigned m_cachedProcessorCount;
     unsigned m_lastKnownActiveCpu;
     TARGET_HALTED m_TargetHaltReason;
     bool m_displayCommands;
@@ -2306,70 +2428,282 @@ class GdbSrvController::GdbSrvControllerImpl
     typedef std::function<bool (const std::wstring &connectionStr, unsigned)> ExdiFunctions;
     std::map<std::wstring, ExdiFunctions> m_exdiFunctions;
     bool m_IsThrowExceptionEnabled;
+    std::vector<std::string> m_targetProcessorIds;
+    typedef std::function <SimpleCharBuffer (AddressType, size_t, const memoryAccessType)> ReadSystemRegisterFunctions;
+    typedef map<PCWSTR, ReadSystemRegisterFunctions> ReadSystemRegisterFunctionsMap;
+    ReadSystemRegisterFunctionsMap m_ReadSystemRegisterFunctions;
+    typedef std::function <bool (_In_ AddressType address, _In_ size_t size, _In_ const void * pRawBuffer,
+        _Out_ DWORD* pdwBytesWritten, _In_ const memoryAccessType memType,
+        _In_ bool fReportWriteError)> WriteSystemRegisterFunctions;
+    typedef map<PCWSTR, WriteSystemRegisterFunctions> WriteSystemRegisterFunctionsMap;
+    WriteSystemRegisterFunctionsMap m_WriteSystemRegisterFunctions;
+    typedef std::function <SimpleCharBuffer()> InternalGdbClientFunctions;
+    typedef map<wstring, InternalGdbClientFunctions> InternalGdbMapFunctions;
+    InternalGdbMapFunctions m_InternalGdbFunctions;
+    unique_ptr <WCHAR[]> m_spSystemRegXmlFile;
+    unique_ptr<vector<RegistersStruct>> m_spRegisterVector;
+    unique_ptr<vector<RegistersStruct>> m_spSystemRegisterVector;
+    unique_ptr<systemRegistersMapType> m_spSystemRegAccessCodeMap;
+
+    const_regIterator RegistersBegin(_In_ RegisterGroupType type = CORE_REGS) const {return (type == CORE_REGS) ? m_spRegisterVector->begin() : m_spSystemRegisterVector->begin();}
+    const_regIterator RegistersEnd(_In_ RegisterGroupType type = CORE_REGS) const {return (type == CORE_REGS) ? m_spRegisterVector->end() : m_spSystemRegisterVector->end();}
+    size_t RegistersGroupSize(_In_ RegisterGroupType type = CORE_REGS) const { return (type == CORE_REGS) ? m_spRegisterVector->size() : m_spSystemRegisterVector->size(); }
 
     inline void GdbSrvControllerImpl::SetExdiFunctions(_In_ PCWSTR pFunctionText, _In_ const ExdiFunctions function)
     {
         m_exdiFunctions[std::wstring(pFunctionText)] = function;
     }
 
-    //  Get a pointer to the target architecture array.
-    const RegistersStruct * GdbSrvControllerImpl::GetRegisterArrayTargetPtr(_Out_opt_ size_t * pNumberOfElements)
+    inline void GdbSrvControllerImpl::InitializeSystemRegistersFunctions()
     {
-        const RegistersStruct * pRegisterArray = nullptr;
+        // Initialize function adapters for reading system regs.
+        m_ReadSystemRegisterFunctions = [this]()->auto {
+            ReadSystemRegisterFunctionsMap _m_ReadSystemRegisterFunctions;
+            _m_ReadSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[0]] =
+                std::bind(&GdbSrvControllerImpl::ReadSysRegByQueryRegGdbCmd,
+                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+            _m_ReadSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[1]] =
+                std::bind(&GdbSrvControllerImpl::ReadSystemRegistersFromGdbMonitor,
+                this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+            _m_ReadSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[2]] =
+                std::bind(&GdbSrvControllerImpl::ReadMemory,
+                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
+            return _m_ReadSystemRegisterFunctions;
+        }();
 
-        if (m_targetProcessorArch == X86_ARCH)
-        {
-            pRegisterArray = x86RegisterArray;
-            if (pNumberOfElements != nullptr)
-            {
-                *pNumberOfElements = MAX_REG_X86_NUMBER;
-            }
-        }
-        else if (m_targetProcessorArch == AMD64_ARCH)
-        {
-            // !!! The amd64 code is not tested, so try enabling the below code !!!
-            //  pRegisterArray = amd64RegisterArray;
-            //  if (pNumberOfElements != nullptr)
-            //  {
-            //      *pNumberOfElements = MAX_REG_AMD64_NUMBER;
-            //  }
-            assert(false);
-        }
-        else if (m_targetProcessorArch == ARM32_ARCH)
-        {
-            // If we want to add another register mapping table (like arm32RegisterArray_Qemu)
-            // then we will need to add a configurable setting in the sample config.xml file.
-            pRegisterArray = arm32RegisterArray;
-            if (pNumberOfElements != nullptr)
-            {
-                *pNumberOfElements = MAX_REG_ARM32_NUMBER;
-            }
-        }
-        else if (m_targetProcessorArch == ARM64_ARCH)
-        {
-            pRegisterArray = arm64RegisterArray;
-            if (pNumberOfElements != nullptr)
-            {
-                *pNumberOfElements = MAX_REG_ARM64_NUMBER;
-            }
-        }
-        return pRegisterArray;
+        // Initialize function adapters for writing system regs.
+        m_WriteSystemRegisterFunctions = [this]()->auto {
+            WriteSystemRegisterFunctionsMap _m_WriteSystemRegisterFunctions;
+            _m_WriteSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[0]] =
+                std::bind(&GdbSrvControllerImpl::WriteSystemRegBySetRegisterGdbCmd,
+                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+                    std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
+            _m_WriteSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[1]] =
+                std::bind(&GdbSrvControllerImpl::WriteMemory,
+                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+                    std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
+            return _m_WriteSystemRegisterFunctions;
+        }();
+
     }
 
-    const RegistersStruct * GdbSrvControllerImpl::FindRegisterEntry(_In_ const std::string regName)
+    inline void InitializeInternalGdbClientFunctionMap()
     {
-        size_t numberOfElements;
-        const RegistersStruct * pRegisterArray = GetRegisterArrayTargetPtr(&numberOfElements);
-        assert(pRegisterArray != nullptr);
+        m_InternalGdbFunctions = [this]()->auto {
+            InternalGdbMapFunctions _m_InternalGdbFunctions;
+            _m_InternalGdbFunctions[TargetArchitectureHelpers::WMakeLowerCase(g_GdbSrvTelemetryCmd)] =
+                std::bind(&GdbSrvControllerImpl::CheckExdiGdbSrv, this);
+            _m_InternalGdbFunctions[TargetArchitectureHelpers::WMakeLowerCase(g_GdbSrvPrintSystemRegs)] =
+                std::bind(&GdbSrvControllerImpl::PrintSystemRegisters, this);
+            _m_InternalGdbFunctions[TargetArchitectureHelpers::WMakeLowerCase(g_GdbSrvPrintSystemRegsVerbose)] =
+                std::bind(&GdbSrvControllerImpl::PrintSystemRegistersVerbose, this);
+            _m_InternalGdbFunctions[TargetArchitectureHelpers::WMakeLowerCase(g_GdbSrvPrintCoreRegs)] =
+                std::bind(&GdbSrvControllerImpl::PrintCoreRegisters, this);
+            return _m_InternalGdbFunctions;
+        }();
+    }
 
-        for (size_t idx = 0; idx < numberOfElements; ++idx, ++pRegisterArray)
+    SimpleCharBuffer GdbSrvControllerImpl::CheckExdiGdbSrv()
+    {
+
+        SimpleCharBuffer monitorResult;
+        if (!monitorResult.TryEnsureCapacity(C_MAX_MONITOR_CMD_BUFFER))
         {
-            if (pRegisterArray->name == regName)
+            throw _com_error(E_OUTOFMEMORY);
+        }
+
+        // It's an Internal telemetry command
+        // Then return the Gdb Server type that is currently connected
+        ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+        LPCSTR pStrGdbSrvType;
+        size_t gdbSrvStrTypeLength;
+        wstring wGdbServerTarget;
+        cfgData.GetGdbServerTargetName(wGdbServerTarget);
+        const std::string sGdbServerTarget(wGdbServerTarget.begin(), wGdbServerTarget.end());
+        if (!sGdbServerTarget.empty())
+        {
+            pStrGdbSrvType = sGdbServerTarget.c_str();
+            gdbSrvStrTypeLength = sGdbServerTarget.length();
+        }
+        else
+        {
+            pStrGdbSrvType = g_GdbSrvGeneric;
+            gdbSrvStrTypeLength = strlen(g_GdbSrvGeneric);
+        }
+
+        monitorResult.SetLength(monitorResult.GetLength() + gdbSrvStrTypeLength);
+        memcpy(&monitorResult[monitorResult.GetLength() - gdbSrvStrTypeLength], 
+            pStrGdbSrvType, gdbSrvStrTypeLength);
+
+        return monitorResult;
+    }
+
+    inline AddressType GetAccessCodeByRegisterNumber(_In_ const string & regOrder)
+    {
+        for (auto it = m_spSystemRegAccessCodeMap->cbegin();
+            it != m_spSystemRegAccessCodeMap->cend();
+            ++it)
+        {
+            if (it->second.first == regOrder)
             {
-                return pRegisterArray;
+                return it->first;
             }
         }
-        return nullptr;    
+        return c_InvalidAddress;
+    }
+
+    inline const char * GetSystemRegNamebyAccessCode(_In_ AddressType regAccess)
+    {
+        auto it = m_spSystemRegAccessCodeMap->find(regAccess);
+        if (it != m_spSystemRegAccessCodeMap->end())
+        {
+            return it->second.second.c_str();
+        }
+        return "";
+    }
+
+    SimpleCharBuffer GdbSrvControllerImpl::PrintSystemRegisters()
+    {
+        return PrintRegistersGroup(SYSTEM_REGS);
+    }
+
+    SimpleCharBuffer GdbSrvControllerImpl::PrintSystemRegistersVerbose()
+    {
+        return PrintRegistersGroup(SYSTEM_REGS, true);
+    }
+
+    SimpleCharBuffer GdbSrvControllerImpl::PrintCoreRegisters()
+    {
+        return PrintRegistersGroup(CORE_REGS);
+    }
+
+    SimpleCharBuffer GdbSrvControllerImpl::PrintRegistersGroup(_In_ RegisterGroupType groupType, _In_ bool verbose = false)
+    {
+        //  Get the current system register values
+        int alignValue;
+        std::map<std::string, std::string> registers = QueryRegistersByGroup(GetLastKnownActiveCpu(),
+            groupType, alignValue);
+
+        size_t bufferCapacity = (registers.size() > 100) ? (2 * C_MAX_MONITOR_CMD_BUFFER) : 
+            C_MAX_MONITOR_CMD_BUFFER;
+        SimpleCharBuffer monitorResult;
+        if (!monitorResult.TryEnsureCapacity(bufferCapacity))
+        {
+            throw _com_error(E_OUTOFMEMORY);
+        }
+
+        char regPrtBuffer[256] = { 0 };
+        int index = 0;
+        int operationResult  = sprintf_s(&regPrtBuffer[index], ARRAYSIZE(regPrtBuffer),
+            "\nNumberOfRegisters: %zd\n", registers.size());
+
+        if (verbose)
+        {
+            index += operationResult;
+            operationResult = sprintf_s(&regPrtBuffer[index], ARRAYSIZE(regPrtBuffer) - index,
+                "\n%*s | %*s | %*s\n", alignValue, g_headerRegisterVerbose[0], -16,
+                g_headerRegisterVerbose[1], -6, g_headerRegisterVerbose[2]);
+        }
+
+        index += operationResult;
+        int numberOfRegs = 0;
+        for (const_regIterator it = RegistersBegin(groupType);
+             it != RegistersEnd(groupType); ++it, numberOfRegs++)
+        {
+            if (verbose)
+            {
+                char buffer[128] = { 0 };
+                AddressType accessCode = GetAccessCodeByRegisterNumber(it->nameOrder);
+                sprintf_s(buffer, ARRAYSIZE(buffer), "0x%llx", accessCode);
+                const char * pAccessCode = (accessCode == c_InvalidAddress) ?
+                    "n/a" : buffer;
+                operationResult = sprintf_s(&regPrtBuffer[index], ARRAYSIZE(regPrtBuffer) - index,
+                    "%*s | %016I64x | %*s", alignValue, it->name.c_str(),
+                    ParseRegisterValue(registers[it->name]),
+                    -7, pAccessCode);
+            }
+            else
+            {
+                operationResult = sprintf_s(&regPrtBuffer[index], ARRAYSIZE(regPrtBuffer) - index,
+                    "%*s = %016I64x ", alignValue, it->name.c_str(), 
+                    ParseRegisterValue(registers[it->name]));
+            }
+            if (operationResult == -1)
+            {
+                throw _com_error(E_FAIL);
+            }
+            index += operationResult;
+            bool isNeededPrint = (verbose) ? true : (((numberOfRegs + 1) % 3) == 0);
+            if (isNeededPrint)
+            {
+                sprintf_s(&regPrtBuffer[index], ARRAYSIZE(regPrtBuffer)- index, "\n");
+                size_t currentMsgLength = strlen(regPrtBuffer);
+                if ((currentMsgLength + monitorResult.GetLength()) >= monitorResult.GetCapacity()) 
+                {
+                    if (!monitorResult.TryEnsureCapacity((monitorResult.GetLength() + 
+                        ((2 * C_MAX_MONITOR_CMD_BUFFER) + 1))))
+                    {
+                        throw _com_error(E_OUTOFMEMORY);
+                    } 
+                }
+
+                monitorResult.SetLength(monitorResult.GetLength() + currentMsgLength);
+                memcpy(&monitorResult[monitorResult.GetLength() - currentMsgLength], 
+                    regPrtBuffer, currentMsgLength);
+                memset(regPrtBuffer, 0x00, sizeof(regPrtBuffer));
+                index = 0;
+            }
+        }
+
+        if (index != 0)
+        {
+            sprintf_s(&regPrtBuffer[index], ARRAYSIZE(regPrtBuffer) - index, "\n");
+            monitorResult.SetLength(monitorResult.GetLength() + strlen(regPrtBuffer));
+            memcpy(&monitorResult[monitorResult.GetLength() - strlen(regPrtBuffer)], regPrtBuffer, strlen(regPrtBuffer));
+        }
+
+        return monitorResult;
+    }
+
+    PCWSTR const GetSystemRegHandler(_In_ const memoryAccessType memType)
+    {
+        ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+        if (cfgData.IsSystemRegistersAvailable() &&
+            //  we can remove this checking once OpenOCD includes the full set of system registers in the xml target description file
+            !(m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs))
+        {
+            // Use the regular "p<register order>" command since the GDB server supports target register description.
+            return c_GetSystemRegisterFunctionHandler[0];
+        }
+        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs)
+        {
+            // Get the system registers by requesting a specific monitor command.
+            return c_GetSystemRegisterFunctionHandler[1];
+        }
+        else
+        {
+            // GDB server supports requesting registers via customized memory command (i.e. Trace32 GDB server)
+            return c_GetSystemRegisterFunctionHandler[2];
+        }
+    }
+
+    const_regIterator GdbSrvControllerImpl::FindRegisterVectorEntryEx(_In_ const std::string regName,
+                                                                      _In_ RegisterGroupType regGroup)
+    {
+        const_regIterator it;
+        for (it = RegistersBegin(regGroup); it != RegistersEnd(regGroup); ++it)
+        {
+            if (it->name == regName)
+            {
+                return it;
+            }
+        }
+        throw _com_error(E_INVALIDARG);
+    }
+
+    const_regIterator GdbSrvControllerImpl::FindRegisterVectorEntry(_In_ const std::string regName)
+    {
+        return FindRegisterVectorEntryEx(regName, CORE_REGS);
     }
 
     bool CheckProcessorCoreNumber(_In_ unsigned core)
@@ -2378,7 +2712,7 @@ class GdbSrvController::GdbSrvControllerImpl
 
         ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
         std::vector<std::wstring> coreConnections;
-        cfgData.GetGdbServerConnectionParameters(coreConnections);        
+        cfgData.GetGdbServerConnectionParameters(coreConnections);
         bool isAllCores = (core == C_ALLCORES) ? true : false;
         if (isAllCores)
         {
@@ -2387,7 +2721,7 @@ class GdbSrvController::GdbSrvControllerImpl
                 throw _com_error(E_ABORT);
             }
         }
-        else 
+        else
         {
             if (core > coreConnections.size())
             {
@@ -2402,28 +2736,28 @@ class GdbSrvController::GdbSrvControllerImpl
         ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
         std::vector<std::wstring> coreConnections;
         cfgData.GetGdbServerConnectionParameters(coreConnections);
-        return coreConnections[core];        
+        return coreConnections[core];
     }
 
-    const RegistersStruct * GdbSrvControllerImpl::FindRegisterEntryAndNumberOfElements(_In_ const std::string regName,
-                                                                                       _Out_ size_t &numberOfElements)
+    const_regIterator GdbSrvControllerImpl::FindRegisterVectorEntryAndNumberOfElements(_In_ const std::string regName,
+        _Out_ size_t& numberOfElements)
     {
-        const RegistersStruct * pRegisterArray = GetRegisterArrayTargetPtr(&numberOfElements);
-        if (pRegisterArray != nullptr)
+        const_regIterator it = FindRegisterVectorEntry(regName);
+        if (it != RegistersEnd())
         {
-            return FindRegisterEntry(regName);
+            numberOfElements = m_spRegisterVector->size();
         }
-        return pRegisterArray;
+        return it;
     }
 
-    void GdbSrvControllerImpl::FillNeonRegisterNameArrayEntry(_In_ const RegistersStruct * pRegEntry, 
-                                                              _Out_writes_bytes_(lengthArrayElem) char * pRegNameArray,
-                                                              _In_ size_t lengthArrayElem)
+    void GdbSrvControllerImpl::FillNeonRegisterNameArrayEntry(_In_ const_regIterator regIt,
+        _Out_writes_bytes_(lengthArrayElem) char* pRegNameArray,
+        _In_ size_t lengthArrayElem)
     {
-        assert(pRegEntry != nullptr && pRegNameArray != nullptr);
-        assert(strlen(pRegEntry->name.c_str()) < lengthArrayElem);
+        assert(pRegNameArray != nullptr);
+        assert(strlen(regIt->name.c_str()) < lengthArrayElem);
 
-        if (strcpy_s(pRegNameArray, lengthArrayElem, pRegEntry->name.c_str()) != 0)
+        if (strcpy_s(pRegNameArray, lengthArrayElem, regIt->name.c_str()) != 0)
         {
             throw _com_error(E_FAIL);
         }
@@ -2432,7 +2766,7 @@ class GdbSrvController::GdbSrvControllerImpl
     PCSTR GetReadMemoryCmd(_In_ memoryAccessType memType)
     {
         PCSTR pFormat = nullptr;
-        
+
         if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isPhysical)
         {
              pFormat = (Is64BitArchitecture()) ? "qtrace32.memory:a,%I64x,%x" : "qtrace32.memory:a,%x,%x";
@@ -2460,6 +2794,10 @@ class GdbSrvController::GdbSrvControllerImpl
                 assert(false);
             }
         }
+        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs)
+        {
+            pFormat = (Is64BitArchitecture()) ? "aarch64 mrs nsec %d %d %d %d %d" : "amd64 mrs nsec %d %d %d %d %d";
+        }
         else
         {
              pFormat = Is64BitArchitecture() ? "m%I64x,%x" : "m%x,%x";
@@ -2471,7 +2809,7 @@ class GdbSrvController::GdbSrvControllerImpl
     PCSTR GetWriteMemoryCmd(_In_ memoryAccessType const memType, _Out_ bool & isQ32GdbServerCmd)
     {
         PCSTR pFormat = nullptr;
-        
+
         isQ32GdbServerCmd = m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM);
         if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isPhysical)
         {
@@ -2500,6 +2838,10 @@ class GdbSrvController::GdbSrvControllerImpl
                 assert(false);
             }
         }
+        else if (m_pRspClient->IsFeatureEnabled(PACKET_WRITE_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs)
+        {
+            pFormat = (Is64BitArchitecture()) ? "aarch64 mrs nsec %d %d %d %d %d %x" : "amd64 mrs nsec %d %d %d %d %d %x";
+        }
         else
         {
              pFormat = Is64BitArchitecture() ? "M%I64x," : "M%x,";
@@ -2507,6 +2849,144 @@ class GdbSrvController::GdbSrvControllerImpl
         }
 
         return pFormat;
+    }
+
+    void RequestXmlFileDescriptionFeature(_In_ ConfigExdiGdbServerHelper & cfgData,
+                                          _In_ wstring const & wTargetFileName, 
+                                          _In_ const char * requestCmd, 
+                                          _In_ const char * startOffset,
+                                          _In_ const char * lengthToRead)
+    {
+        //  Process the target description file
+        const std::string sfileName(wTargetFileName.begin(), wTargetFileName.end());
+        char fileRegCmd[256] = { 0 };
+        sprintf_s(fileRegCmd, ARRAYSIZE(fileRegCmd), "%s%s:%s,%s", requestCmd, sfileName.c_str(), startOffset, lengthToRead);
+
+        bool isDone = false;
+        std::string descriptionFile;
+        descriptionFile.reserve(0xffff);
+        size_t fileOffset = 0;
+        do
+        {
+            const std::string reply = ExecuteCommand(fileRegCmd);
+            if (IsReplyError(reply) || reply.length() == 0)
+            {
+                throw _com_error(E_FAIL);
+            }
+
+            // Store the received files
+            std::size_t pos;
+            size_t recvLength = reply.length();
+            if (((pos = reply.find("m")) == 0 || (pos = reply.find("l")) == 0) && 
+                recvLength > 1)
+            {
+                descriptionFile += reply.substr(pos + 1);
+                if (reply[0] == 'l')
+                {
+                    isDone = true;
+                }
+                else
+                {
+                    fileOffset += (recvLength - 1);
+                    sprintf_s(fileRegCmd, ARRAYSIZE(fileRegCmd), "%s%s:%zx,%s", requestCmd, sfileName.c_str(), fileOffset, lengthToRead);
+                }
+            }
+            else if (reply.find("l") == 0 && recvLength == 1)
+            {
+                isDone = true;
+            }
+            else
+            {
+                isDone = true;
+            }
+        }
+        while (!isDone);
+
+        if (descriptionFile.empty())
+        {
+            throw _com_error(E_FAIL);
+        }
+
+        //  Parse the file target description
+        std::wstring wTargetFileBuffer(descriptionFile.begin(), descriptionFile.end());
+        //  @TODO: find a solution for xmlLite to handle "xi:include" tag, so for now
+        //  Replace xi:include with a custom tag, otherwise xmllite reader will fail
+        TargetArchitectureHelpers::ReplaceString(wTargetFileBuffer, L"xi:include", L"includeTarget");
+        cfgData.SetXmlBufferToParse(wTargetFileBuffer.c_str());
+    }
+
+    //
+    //  HandleTargetDescriptionPacket - Handles the target description xml file.
+    //  The QEMU target.xml has the following format:
+    //  <target>
+    //       <architecture>aarch64</architecture>
+    //       <xi:include href="aarch64-core.xml"/>
+    //       <xi:include href="aarch64-fpu.xml"/>
+    //       <xi:include href="system-registers.xml"/>
+    //   </target>
+    //
+    //  BMC-OpenOCD does not send a header target.xml file containing the list of
+    //  subsequent register xml files, and rather it starts with the register file description.
+    //
+    //  Steps to get the system registers out of the xml file that is sent by the GDB server.
+    //  Once we find the system-register.xml file, then extract the system registers described in this file.
+    //  If feature enable that means that qSupported response contains "qXfer:features:read+"
+    //  then do the following:
+    //  _ Send the request to read the target description xml file by "$qXfer:features:read:target.xml:0"
+    //  _ Set the xml buffer processing to parse the GDB response containing
+    //    the target.xml file (call SetXmlBufferToParse("targetxmlresponse")
+    //  - Parse the target.xml (need to be store in a separate config field in the Configspace table,
+    //  _ Once it's parsed, then read the system xml file (system-registers.xml) stored in the
+    //    config table field.
+    //  _ Send the request to read the system register xml file by $qXfer:features:read:system-registers.xml:0,f
+    //  _ Read the response into a buffer and then call to set the buffer to be parsed SetXmlBufferToParse("buffer response")
+    //  _ Read the xml system registers, and then stores here the vector system registers from the config table.
+    //
+    void GdbSrvControllerImpl::HandleTargetDescriptionPacket(_In_ ConfigExdiGdbServerHelper & cfgData)
+    {
+        std::wstring wFileName;
+        cfgData.GetTargetDescriptionFileName(wFileName);
+        if (wFileName.empty())
+        {
+            return;
+        }
+
+        //  Process the target description file
+        RequestXmlFileDescriptionFeature(cfgData, wFileName, g_RequestGdbReadFeatureFile, "0","ffb");
+
+        //  Validate that the group register included in the target file matches
+        //  with the current GDbserver target architecture configuration.
+        if (cfgData.GetRegisterGroupArchitecture() != cfgData.GetTargetArchitecture())
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+
+        //
+        //  Does the GDBserver sent a header target file, if so then
+        //  processes only the file with the system register group.
+        //
+        if (cfgData.IsRegisterGroupFileAvailable())
+        {
+            //  Get the system register file
+            cfgData.GetRegisterGroupFile(SYSTEM_REGS, wFileName);
+            if (wFileName.empty())
+            {
+                throw _com_error(E_INVALIDARG);
+            }
+
+            //  Process the system register description file
+            RequestXmlFileDescriptionFeature(cfgData, wFileName, g_RequestGdbReadFeatureFile, "0", "ffff");
+        }
+
+        //  Get the system register mapping file, since it needs to store each system register number,
+        //  so once the system register file has been received from the GDB server.
+        if (m_spSystemRegXmlFile != nullptr && cfgData.ReadConfigFile(m_spSystemRegXmlFile.get()))
+        {
+            cfgData.GetSystemRegistersMapAccessCode(&m_spSystemRegAccessCodeMap);
+        }
+
+        //  Get the actual system register vector from the table.
+        cfgData.GetGdbServerSystemRegisters(&m_spSystemRegisterVector);
     }
 };
 
@@ -2616,6 +3096,13 @@ std::string GdbSrvController::ExecuteCommand(_In_ LPCSTR pCommand)
     return m_pGdbSrvControllerImpl->ExecuteCommand(pCommand);
 }
 
+std::string GdbSrvController::GetResponseOnProcessor(_In_ size_t stringSize, _In_ unsigned processor)
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->GetResponseOnProcessor(stringSize, processor);
+}
+
+
 ULONGLONG GdbSrvController::ParseRegisterValue(_In_ const std::string &stringValue)
 {
     return GdbSrvControllerImpl::ParseRegisterValue(stringValue);
@@ -2655,10 +3142,26 @@ std::map<std::string, std::string> GdbSrvController::QueryRegisters(_In_ unsigne
     return m_pGdbSrvControllerImpl->QueryRegisters(processorNumber, registerNames, numberOfElements);
 }
 
+std::map<std::string, std::string> GdbSrvController::QueryRegistersByGroup(_In_ unsigned processorNumber, 
+                                                                           _In_ RegisterGroupType groupType,
+                                                                           _Out_ int & maxRegisterNameLength)
+{
+    {
+        assert(m_pGdbSrvControllerImpl != nullptr);
+        return m_pGdbSrvControllerImpl->QueryRegistersByGroup(processorNumber, groupType, maxRegisterNameLength);
+    }
+}
+
 SimpleCharBuffer GdbSrvController::ReadMemory(_In_ AddressType address, _In_ size_t size, _In_ const memoryAccessType memType)
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
     return m_pGdbSrvControllerImpl->ReadMemory(address, size, memType);
+}
+
+SimpleCharBuffer GdbSrvController::ReadSystemRegisters(_In_ AddressType address, _In_ size_t size, _In_ const memoryAccessType memType)
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->ReadSystemRegisters(address, size, memType);
 }
 
 bool GdbSrvController::WriteMemory(_In_ AddressType address, _In_ size_t size, _In_ const void * pRawBuffer, 
@@ -2741,6 +3244,18 @@ void GdbSrvController::SetKpcrOffset(_In_ unsigned processorNumber, _In_ Address
     m_pGdbSrvControllerImpl->SetKpcrOffset(processorNumber, kpcrOffset);
 }
 
+std::string GdbSrvController::GetTargetThreadId(_In_ unsigned processorNumber)
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->GetTargetThreadId(processorNumber);
+}
+
+DWORD GdbSrvController::GetProcessorNumberByThreadId(_In_ const std::string & threadId)
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->GetProcessorNumberByThreadId(threadId);
+}
+
 unsigned GdbSrvController::GetNumberOfRspConnections()
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
@@ -2805,6 +3320,19 @@ HRESULT GdbSrvController::ReadMsrRegister(_In_ DWORD dwProcessorNumber, _In_ DWO
 
 HRESULT GdbSrvController::WriteMsrRegister(_In_ DWORD dwProcessorNumber, _In_ DWORD dwRegisterIndex, _In_ ULONG64 value)
 {
-    assert(m_pGdbSrvControllerImpl != nullptr);    
+    assert(m_pGdbSrvControllerImpl != nullptr);
     return m_pGdbSrvControllerImpl->WriteMsrRegister(dwProcessorNumber, dwRegisterIndex, value);
 }
+
+void GdbSrvController::DisplayConsoleMessage(_In_ const std::string& message)
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->DisplayConsoleMessage(message);
+}
+
+void GdbSrvController::SetSystemRegisterXmlFile(PCWSTR pSystemRegFilePath)
+{
+    assert(m_pGdbSrvControllerImpl != nullptr && pSystemRegFilePath != nullptr);
+    m_pGdbSrvControllerImpl->SetSystemRegisterXmlFile(pSystemRegFilePath);
+}
+

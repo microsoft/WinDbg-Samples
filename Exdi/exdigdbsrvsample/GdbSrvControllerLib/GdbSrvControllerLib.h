@@ -50,6 +50,15 @@ namespace GdbSrvControllerLib
         TARGET_MARKER
     } TARGET_HALTED;
 
+    typedef enum 
+    {
+        CORE_REGS, 
+        FPU_REGS, 
+        SYSTEM_REGS, 
+    } RegisterGroupType;
+
+    typedef std::map<RegisterGroupType, std::wstring> targetDescriptionFilesMap;
+
     //  This structure indicates the register description for each architecture
     //  This will be used for processing the DbgServer register reply commands
     //  The order matches with the order how it is sent by the GdbServer stub.
@@ -61,10 +70,15 @@ namespace GdbSrvControllerLib
         std::string nameOrder;
         //  Register size in bytes
         size_t registerSize;
+        //  Register group
+        std::string group;
     };
-    typedef std::map<std::string, std::string> gdbRegisterMapOrder;
 
     typedef ULONGLONG AddressType;
+    typedef std::map<std::string, std::string> gdbRegisterMapOrder;
+    typedef std::pair<std::string, std::string> systemPairRegOrderNameType;
+    typedef std::pair<AddressType, systemPairRegOrderNameType> pairAccessCodeNameRegisterEntry;
+    typedef std::map<AddressType, systemPairRegOrderNameType> systemRegistersMapType;
 
     //  This structure indicates the fields of the stop reply reason response.
     typedef struct
@@ -77,11 +91,12 @@ namespace GdbSrvControllerLib
             WORD isSAAPacket: 1;    //  Set if the stop reply packet is S AA format
             WORD isTAAPacket: 1;    //  Set if the stop reply packet is T AA format
             WORD isWAAPacket: 1;    //  Set if the stop reply packet is W AA format
+            WORD isOXXPacket: 1;    //  set if the stop reply contains a console packet
             WORD isThreadFound: 1;  //  Set if the stop reply packet contains the 'thread' number (core processor number)
             WORD isPcRegFound: 1;   //  Set if the PC register was found in the response
             WORD isPowerDown: 1;    //  Set if the stop reply packet is 'S00' (Power down or target running).
             WORD isCoreRunning: 1;  //  Set if the stop reply packet is 'OK' (the Core is running or it's not unknown state)
-            WORD fUnUsed: 9;
+            WORD fUnUsed: 8;
         } status;
 
     } StopReplyPacketStruct;
@@ -99,6 +114,13 @@ namespace GdbSrvControllerLib
         WORD isHypervisor:1;       //  Set if the query is to access hypervisor memory.
         WORD fUnUsed: 11;
     } memoryAccessType;
+
+    //
+    //  Register iterator types
+    // 
+    typedef std::vector<RegistersStruct>::iterator regIterator;
+    typedef std::vector<RegistersStruct>::const_iterator const_regIterator;
+    typedef std::vector<std::string> vectorRegNamesType;
 
     //
     //  This class implements the High level functionality supported by the GdbServer stub.
@@ -128,6 +150,8 @@ namespace GdbSrvControllerLib
         virtual std::string ExecuteCommandOnProcessor(_In_ LPCSTR pCommand, _In_ bool isExecCmd, _In_ size_t stringSize, 
                                                       _In_ unsigned processor);
 
+        virtual std::string GetResponseOnProcessor(_In_ size_t stringSize, _In_ unsigned processor);
+
         //  Handle the responses for the asynchronous commnads (the stop reason reply responses).
         bool HandleAsynchronousCommandResponse(_In_ const std::string & cmdResponse,
                                                _Out_ StopReplyPacketStruct * pRspPacket);
@@ -148,22 +172,36 @@ namespace GdbSrvControllerLib
         AddressType GetKpcrOffset(_In_ unsigned processorNumber);
 
         //  Get the number of processors supported by the target.
-		unsigned GetProcessorCount();
-		
+        unsigned GetProcessorCount();
+
         //  Get the general GdbServer-RSP protocol response type. 
         RSP_Response_Packet GetRspResponse(_In_ const std::string & reply);
               
         //  Obtains the stored target architecture.
         TargetArchitecture GetTargetArchitecture();
 
+        // Get the target threadID token value that correspond to the logila processor number
+        std::string GetTargetThreadId(_In_ unsigned processorNumber);
+
+        // Get the processor core number as it is processed by the debugger client
+        DWORD GetProcessorNumberByThreadId(_In_ const std::string & threadId);
+
         //  Request the current value for all target CPU registers.
         std::map<std::string, std::string> QueryAllRegisters(_In_ unsigned processorNumber);
 
-        
+        //  Request the current set of register values for the specified register group type (core, fpu, system).
+        std::map<std::string, std::string> QueryAllRegistersEx(_In_ unsigned processorNumber,
+            _In_ RegisterGroupType groupType = CORE_REGS);
+
         //  Request a sub-set of all target CPU registers.
         std::map<std::string, std::string> QueryRegisters(_In_ unsigned processorNumber,
                                                           _In_reads_(numberOfElements) const char * registerNames[],
                                                           _In_ const size_t numberOfElements);
+
+        //  Request reading the full set of specific register group
+        std::map<std::string, std::string> QueryRegistersByGroup(_In_ unsigned processorNumber,
+                                                                 _In_ RegisterGroupType groupType,
+                                                                _Out_ int & maxRegisterNameLength);
 
         //  Utility function to get a 64 bit register value.
         static ULONGLONG ParseRegisterValue(_In_ const std::string &stringValue);
@@ -178,6 +216,9 @@ namespace GdbSrvControllerLib
 
         //  Read the target virtual memory.
         SimpleCharBuffer ReadMemory(_In_ AddressType address, _In_ size_t size, _In_ const memoryAccessType memType);
+
+        //  Read system registers 
+        SimpleCharBuffer ReadSystemRegisters(_In_ AddressType address, _In_ size_t maxSize, _In_ const memoryAccessType memType);
 
         //  Request the GDbServer supported features. 
         bool ReqGdbServerSupportedFeatures();
@@ -243,11 +284,17 @@ namespace GdbSrvControllerLib
         //  Check if the current architecture is 64 bits
         bool Is64BitArchitecture();
 
-        // Read the MSR registers
+        //  Read the MSR registers
         HRESULT ReadMsrRegister(_In_ DWORD dwProcessorNumber, _In_ DWORD dwRegisterIndex, _Out_ ULONG64 * pValue);
 
-        // Write to the MSR register
+        //  Write to the MSR register
         HRESULT WriteMsrRegister(_In_ DWORD dwProcessorNumber, _In_ DWORD dwRegisterIndex, _In_ ULONG64 value);
+
+        //  Display message to the console, it's used to show OXX stop reply packets.
+        void DisplayConsoleMessage(_In_ const std::string& message);
+
+        //  Set the system register map file path
+        void SetSystemRegisterXmlFile(_In_z_ PCWSTR pSystemRegFilePath);
 
     protected:
         bool IsReplyOK(_In_ const std::string & reply);

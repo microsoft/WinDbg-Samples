@@ -63,9 +63,10 @@ public:
           m_fDisplayCommData(false),
           m_fEnableSSEContext(false),
           m_lastPcAddress(0),
-          m_lastPSRvalue(0)
-	{
-	}
+          m_lastPSRvalue(0),
+          m_heuristicChunkSize(0)
+    {
+    }
 
     ~CLiveExdiGdbSrvSampleServer()
     {
@@ -297,6 +298,7 @@ public:
         bool m_fEnableSSEContext;
         ADDRESS_TYPE m_lastPcAddress;
         DWORD64 m_lastPSRvalue;
+        DWORD64 m_heuristicChunkSize;
 
         inline GdbSrvControllerLib::AsynchronousGdbSrvController * GetGdbSrvController() {return m_pGdbSrvController;}
         ADDRESS_TYPE GetCurrentExecutionAddress(_Out_ DWORD *pProcessorNumberOfLastEvent);
