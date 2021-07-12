@@ -94,7 +94,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetTargetInfo(
         return E_OUTOFMEMORY;
     }
     memset(&pgti->dbc, 0, sizeof(pgti->dbc));
-	return S_OK;
+    return S_OK;
 }
 
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetRunStatus( 
@@ -127,7 +127,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetRunStatus(
             *pCurrentExecAddress = GetCurrentExecutionAddress(pdwProcessorNumberOfLastEvent);
         }
 
-	    *pdwExceptionCode = 0;
+        *pdwExceptionCode = 0;
 
         return S_OK;
     }
@@ -275,7 +275,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::Reboot(void)
         //  This should reboot only the target machine.
         if (pController->RestartGdbSrvTarget())
         {
-            return S_OK;        
+            return S_OK;
         }
         return E_FAIL;
     }
@@ -316,9 +316,9 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::AddCodeBreakpoint(
     /* [in] */ DWORD dwTotalBypassCount,
     /* [out] */ IeXdiCodeBreakpoint3 **ppieXdiCodeBreakpoint)
 {
-	UNREFERENCED_PARAMETER(cbpk);
-	UNREFERENCED_PARAMETER(dwTotalBypassCount);
-	UNREFERENCED_PARAMETER(dwExecMode);
+    UNREFERENCED_PARAMETER(cbpk);
+    UNREFERENCED_PARAMETER(dwTotalBypassCount);
+    UNREFERENCED_PARAMETER(dwExecMode);
 
     if (ppieXdiCodeBreakpoint == nullptr)
     {
@@ -396,11 +396,11 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::AddDataBreakpoint(
 {
     //  Note that we do not have a way to to set these parameters with
     //  the GdbServer request commands.
-	UNREFERENCED_PARAMETER(AddressMask);
-	UNREFERENCED_PARAMETER(dwData);
-	UNREFERENCED_PARAMETER(dwDataMask);
-	UNREFERENCED_PARAMETER(bAddressSpace);
-	UNREFERENCED_PARAMETER(dwTotalBypassCount);
+    UNREFERENCED_PARAMETER(AddressMask);
+    UNREFERENCED_PARAMETER(dwData);
+    UNREFERENCED_PARAMETER(dwDataMask);
+    UNREFERENCED_PARAMETER(bAddressSpace);
+    UNREFERENCED_PARAMETER(dwTotalBypassCount);
 
     if (ppieXdiDataBreakpoint == nullptr)
     {
@@ -465,8 +465,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::DelDataBreakpoint(
     }
     return result;
 }
-        
-       
+
+
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::StartNotifyingRunChg( 
     /* [in] */ IeXdiClientNotifyRunChg3 *pieXdiClientNotifyRunChg,
     /* [out] */ DWORD *pdwConnectionCookie)
@@ -490,7 +490,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::StartNotifyingRunChg(
 
     return S_OK;
 }
-        
+
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::StopNotifyingRunChg( 
     /* [in] */ DWORD dwConnectionCookie)
 {
@@ -574,7 +574,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::WriteVirtualMemory(
         bool isWriteDone = pController->WriteMemory(Address, bufferSize, pRawBuffer, pdwBytesWritten, memType);
         if (isWriteDone)
         {
-    	    return S_OK;
+            return S_OK;
         }
         return E_FAIL;
     }
@@ -587,7 +587,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ReadPhysicalMemoryOrPerip
         /* [in] */ DWORD dwBytesToRead,
         /* [out] */ SAFEARRAY * *pReadBuffer)
 {
-	UNREFERENCED_PARAMETER(AddressSpace);
+    UNREFERENCED_PARAMETER(AddressSpace);
 
     try
     {
@@ -640,7 +640,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::WritePhysicalMemoryOrPeri
         bool isWriteDone = pController->WriteMemory(Address, bufferSize, pRawBuffer, pdwBytesWritten, memType);
         if (isWriteDone)
         {
-    	    return S_OK;
+            return S_OK;
         }
         return E_FAIL;
     }
@@ -652,13 +652,13 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::Ioctl(
         /* [in] */ DWORD dwBuffOutSize,
         /* [out] */ SAFEARRAY * *pOutputBuffer)
 {
-	AsynchronousGdbSrvController * pController = GetGdbSrvController();
-	if (pOutputBuffer == nullptr || pController == nullptr)
-	{
-		return E_POINTER;
-	}
+    AsynchronousGdbSrvController * pController = GetGdbSrvController();
+    if (pOutputBuffer == nullptr || pController == nullptr)
+    {
+        return E_POINTER;
+    }
 
-	HRESULT hr = E_INVALIDARG;
+    HRESULT hr = E_INVALIDARG;
     VARTYPE dataType;
     if (FAILED(SafeArrayGetVartype(pInputBuffer, &dataType)) || dataType != VT_UI1)
     {
@@ -671,67 +671,95 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::Ioctl(
         return hr;
     }
 
-    ULONG bufferSize = pInputBuffer->rgsabound[0].cElements;
-    const DBGENG_EXDI_IOCTL_CODE_V3_EX * pExdiV3 = reinterpret_cast<const DBGENG_EXDI_IOCTL_CODE_V3_EX *>(pRawBuffer);
-    DBGENG_EXDI_IOCTL_CODE_V3_EX ioctlCode = *pExdiV3;
-    switch(ioctlCode)
-	{
-        //  Store the KPCR value
-        case DBGENG_EXDI_IOCTL_V3_STORE_KPCR_VALUE:
+    try
+    {
+        ULONG bufferSize = pInputBuffer->rgsabound[0].cElements;
+        const DBGENG_EXDI_IOCTL_CODE_V3_EX * pExdiV3 = reinterpret_cast<const DBGENG_EXDI_IOCTL_CODE_V3_EX *>(pRawBuffer);
+        DBGENG_EXDI_IOCTL_CODE_V3_EX ioctlCode = *pExdiV3;
+        switch(ioctlCode)
         {
-            if (bufferSize == sizeof(DBGENG_EXDI_IOCTL_STORE_KPCR_V3_EX_IN))
+            //  Get additional gdb server info that will be used by the debugger engine
+            case DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO:
             {
-                const DBGENG_EXDI_IOCTL_STORE_KPCR_V3_EX_IN * pKPCRV3 = reinterpret_cast<const DBGENG_EXDI_IOCTL_STORE_KPCR_V3_EX_IN *>(pRawBuffer);
-                //  Extract the processor number
-                ULONG processorNumber = pKPCRV3->processorNumber;
-                //  Extract the processor block array offset
-                ULONG64 kpcrOffset = pKPCRV3->kpcrOffset;
-                if (kpcrOffset != 0)
-                { 
-                    pController->SetKpcrOffset(processorNumber, kpcrOffset);
-                    size_t bytesToCopy = min(dwBuffOutSize, sizeof(kpcrOffset));
-                    hr = SafeArrayFromByteArray(reinterpret_cast<const char *>(&kpcrOffset), bytesToCopy, pOutputBuffer);
+                if (bufferSize == sizeof(DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO_EX_IN))
+                {
+                    const DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO_EX_IN * pAdditionalInfo =
+                        reinterpret_cast<const DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO_EX_IN *>(pRawBuffer);
+                    if (pAdditionalInfo -> request.HeuristicChunkSize)
+                    {
+                        size_t bytesToCopy = min(dwBuffOutSize, sizeof(m_heuristicChunkSize));
+                        hr = SafeArrayFromByteArray(reinterpret_cast<const char *>(&m_heuristicChunkSize), bytesToCopy, pOutputBuffer);
+                    }
                 }
             }
-        }
-        break;
-        
-        //  This is not implemented by this COM server Exdi sample.
-        case DBGENG_EXDI_IOCTL_V3_GET_NT_BASE_ADDRESS_VALUE:
-        {
-            hr = E_NOTIMPL;
-        }
-        break;
+            break;
 
-        //  Read the special registers content Architecture specific.
-        case DBGENG_EXDI_IOCTL_V3_GET_SPECIAL_REGISTER_VALUE:
-        case DBGENG_EXDI_IOCTL_V3_GET_SUPERVISOR_MODE_MEM_VALUE:
-        case DBGENG_EXDI_IOCTL_V3_GET_HYPERVISOR_MODE_MEM_VALUE:
-        {
-            if (bufferSize == sizeof(DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN))
+            //  Store the KPCR value
+            case DBGENG_EXDI_IOCTL_V3_STORE_KPCR_VALUE:
             {
-                DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN * const pSpecialRegs = reinterpret_cast<DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN * const>(pRawBuffer);
-                memoryAccessType memoryType = {0};
-                if (ioctlCode == DBGENG_EXDI_IOCTL_V3_GET_SPECIAL_REGISTER_VALUE)
+                if (bufferSize == sizeof(DBGENG_EXDI_IOCTL_STORE_KPCR_V3_EX_IN))
                 {
+                    const DBGENG_EXDI_IOCTL_STORE_KPCR_V3_EX_IN * pKPCRV3 = reinterpret_cast<const DBGENG_EXDI_IOCTL_STORE_KPCR_V3_EX_IN *>(pRawBuffer);
+                    //  Extract the processor number
+                    ULONG processorNumber = pKPCRV3->processorNumber;
+                    //  Extract the processor block array offset
+                    ULONG64 kpcrOffset = pKPCRV3->kpcrOffset;
+                    if (kpcrOffset != 0)
+                    {
+                        pController->SetKpcrOffset(processorNumber, kpcrOffset);
+                        size_t bytesToCopy = min(dwBuffOutSize, sizeof(kpcrOffset));
+                        hr = SafeArrayFromByteArray(reinterpret_cast<const char *>(&kpcrOffset), bytesToCopy, pOutputBuffer);
+                    }
+                }
+            }
+            break;
+
+            //  This is not implemented by this COM server Exdi sample.
+            case DBGENG_EXDI_IOCTL_V3_GET_NT_BASE_ADDRESS_VALUE:
+            {
+                hr = E_NOTIMPL;
+            }
+            break;
+
+            //  Read the special registers content Architecture specific.
+            case DBGENG_EXDI_IOCTL_V3_GET_SPECIAL_REGISTER_VALUE:
+            {
+                if (bufferSize == sizeof(DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN))
+                {
+                    DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN* const pSpecialRegs = reinterpret_cast<DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN* const>(pRawBuffer);
+                    memoryAccessType memoryType = { 0 };
                     memoryType.isSpecialRegs = 1;
+                    SimpleCharBuffer buffer = pController->ReadSystemRegisters(pSpecialRegs->address, pSpecialRegs->bytesToRead, memoryType);
+                    hr = SafeArrayFromByteArray(buffer.GetInternalBuffer(), buffer.GetLength(), pOutputBuffer);
                 }
-                else if (ioctlCode == DBGENG_EXDI_IOCTL_V3_GET_HYPERVISOR_MODE_MEM_VALUE)
-                {
-                    memoryType.isHypervisor = 1;
-                }
-                else
-                {
-                    memoryType.isSupervisor = 1;
-                }
-
-                SimpleCharBuffer buffer = pController->ReadMemory(pSpecialRegs->address, pSpecialRegs->bytesToRead, memoryType);
-                hr = SafeArrayFromByteArray(buffer.GetInternalBuffer(), buffer.GetLength(), pOutputBuffer);
             }
+            break;
+
+            //  Read the special memory content Architecture specific.
+            case DBGENG_EXDI_IOCTL_V3_GET_SUPERVISOR_MODE_MEM_VALUE:
+            case DBGENG_EXDI_IOCTL_V3_GET_HYPERVISOR_MODE_MEM_VALUE:
+            {
+                if (bufferSize == sizeof(DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN))
+                {
+                    DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN * const pSpecialRegs = reinterpret_cast<DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN * const>(pRawBuffer);
+                    memoryAccessType memoryType = {0};
+                    if (ioctlCode == DBGENG_EXDI_IOCTL_V3_GET_HYPERVISOR_MODE_MEM_VALUE)
+                    {
+                        memoryType.isHypervisor = 1;
+                    }
+                    else
+                    {
+                        memoryType.isSupervisor = 1;
+                    }
+                    SimpleCharBuffer buffer = pController->ReadMemory(pSpecialRegs->address, pSpecialRegs->bytesToRead, memoryType);
+                    hr = SafeArrayFromByteArray(buffer.GetInternalBuffer(), buffer.GetLength(), pOutputBuffer);
+                }
+            }
+            break;
         }
-        break;
+        return hr;
     }
-    return hr;
+    CATCH_AND_RETURN_HRESULT;
 }
 
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetLastHitBreakpoint( 
@@ -747,27 +775,31 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetKPCRForProcessor(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out] */ ULONG64 *pKPCRPointer)
 {
-    AsynchronousGdbSrvController * pController = GetGdbSrvController();
-    if (pKPCRPointer == nullptr || pController == nullptr)
+    try
     {
-        return E_POINTER;
+        AsynchronousGdbSrvController * pController = GetGdbSrvController();
+        if (pKPCRPointer == nullptr || pController == nullptr)
+        {
+            return E_POINTER;
+        }
+        DWORD totalProcessors = 0;
+        HRESULT result = GetNumberOfProcessors(&totalProcessors);
+        if (FAILED(result))
+        {
+            return result;
+        }
+        if (dwProcessorNumber >= totalProcessors)
+        {
+            return E_INVALIDARG;
+        }
+        *pKPCRPointer = pController->GetKpcrOffset(dwProcessorNumber);
+        if (*pKPCRPointer == 0)
+        {
+            return E_NOTIMPL;
+        }
+        return S_OK;
     }
-    DWORD totalProcessors = 0;
-	HRESULT result = GetNumberOfProcessors(&totalProcessors);
-	if (FAILED(result))
-	{
-		return result;
-	}
-	if (dwProcessorNumber >= totalProcessors)
-	{
-		return E_INVALIDARG;
-	}
-	*pKPCRPointer = pController->GetKpcrOffset(dwProcessorNumber);
-    if (*pKPCRPointer == 0)
-    {
-        return E_NOTIMPL;
-    }
-	return S_OK;
+    CATCH_AND_RETURN_HRESULT;
 }
         
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ReadKdVersionBlock( 
@@ -784,14 +816,17 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ReadMSR(
     /* [in] */ DWORD dwRegisterIndex,
     /* [out] */ ULONG64 *pValue)
 {
-
-    AsynchronousGdbSrvController * pController = GetGdbSrvController();
-    if (pValue == nullptr || pController == nullptr)
+    try
     {
-        return E_POINTER;
-    }
+        AsynchronousGdbSrvController * pController = GetGdbSrvController();
+        if (pValue == nullptr || pController == nullptr)
+        {
+            return E_POINTER;
+        }
 
-    return pController->ReadMsrRegister(dwProcessorNumber, dwRegisterIndex, pValue);
+        return pController->ReadMsrRegister(dwProcessorNumber, dwRegisterIndex, pValue);
+    }
+    CATCH_AND_RETURN_HRESULT;
 }
         
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::WriteMSR( 
@@ -799,13 +834,17 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::WriteMSR(
     /* [in] */ DWORD dwRegisterIndex,
     /* [in] */ ULONG64 value)
 {
-    AsynchronousGdbSrvController * pController = GetGdbSrvController();
-    if (pController == nullptr)
+    try
     {
-        return E_POINTER;
-    }
+        AsynchronousGdbSrvController * pController = GetGdbSrvController();
+        if (pController == nullptr)
+        {
+            return E_POINTER;
+        }
 
-    return pController->WriteMsrRegister(dwProcessorNumber, dwRegisterIndex, value);
+        return pController->WriteMsrRegister(dwProcessorNumber, dwRegisterIndex, value);
+    }
+    CATCH_AND_RETURN_HRESULT;
 }
 
 
@@ -816,14 +855,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_ARM4 pContext)
 {
-	return GetContextEx(dwProcessorNumber, pContext);
+    return GetContextEx(dwProcessorNumber, pContext);
 }
         
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContext( 
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_ARM4 Context)
 {
-	return SetContextEx(dwProcessorNumber, &Context);
+    return SetContextEx(dwProcessorNumber, &Context);
 }
 
 // ------------------------------------------------------------------------------
@@ -832,14 +871,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_X86_64 pContext)
 {
-	return GetContextEx(dwProcessorNumber, pContext);
+    return GetContextEx(dwProcessorNumber, pContext);
 }
         
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContext( 
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_X86_64 Context)
 {
-	return SetContextEx(dwProcessorNumber, &Context);
+    return SetContextEx(dwProcessorNumber, &Context);
 }
 
 // ------------------------------------------------------------------------------
@@ -848,14 +887,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_X86_EX pContext)
 {
-	return GetContextEx(dwProcessorNumber, pContext);
+    return GetContextEx(dwProcessorNumber, pContext);
 }
         
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContext( 
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_X86_EX Context)
 {
-	return SetContextEx(dwProcessorNumber, &Context);
+    return SetContextEx(dwProcessorNumber, &Context);
 }
 
 // ------------------------------------------------------------------------------
@@ -864,14 +903,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_ARMV8ARCH64 pContext)
 {
-	return GetContextEx(dwProcessorNumber, pContext);
+    return GetContextEx(dwProcessorNumber, pContext);
 }
         
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContext( 
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_ARMV8ARCH64 context)
 {
-	return SetContextEx(dwProcessorNumber, &context);
+    return SetContextEx(dwProcessorNumber, &context);
 }
 
 // ------------------------------------------------------------------------------
@@ -956,23 +995,23 @@ void CLiveExdiGdbSrvSampleServer::FinalRelease()
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetNumberOfProcessors( 
     /* [out] */ DWORD *pdwNumberOfProcessors)
 {
-	if (pdwNumberOfProcessors == nullptr)
-	{
-		return E_POINTER;
-	}
-	try
-	{
+    if (pdwNumberOfProcessors == nullptr)
+    {
+        return E_POINTER;
+    }
+    try
+    {
         AsynchronousGdbSrvController * pController = GetGdbSrvController();
         if (pController == nullptr)
         {
             return E_POINTER;
         }
 
-		*pdwNumberOfProcessors = pController->GetProcessorCount();
+        *pdwNumberOfProcessors = pController->GetProcessorCount();
 
-		return S_OK;
-	}
-	CATCH_AND_RETURN_HRESULT;
+        return S_OK;
+    }
+    CATCH_AND_RETURN_HRESULT;
 }
 
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContextEx(_In_ DWORD processorNumber, _Inout_ PCONTEXT_ARM4 pContext)
@@ -1310,6 +1349,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContextEx(_In_ DWORD p
         {
             return E_POINTER;
         }
+        pController->StopTargetAtRun();
         memset(pContext, 0, sizeof(CONTEXT_ARMV8ARCH64));
 
         std::map<std::string, std::string> registers = pController->QueryAllRegisters(processorNumber);
@@ -1348,6 +1388,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContextEx(_In_ DWORD p
         {
             return E_POINTER;
         }
+        pController->StopTargetAtRun();
+
         std::map<std::string, ULONGLONG> registers;
         if (pContext->RegGroupSelection.fIntegerRegs)
         {
@@ -1421,15 +1463,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::OnAsynchronousCommandComp
     {
         HALT_REASON_TYPE haltReason = hrUnknown;
 
-        m_targetIsRunning = false;
         DWORD eventProcessor = 0;
         ADDRESS_TYPE currentAddress = ParseAsynchronousCommandResult(&eventProcessor, &haltReason);
-
         if (m_lastResumingCommandWasStep)
         {
             haltReason = hrStep;
         }
 
+        m_targetIsRunning = false;
         if (currentAddress != 0)
         {
             m_pRunNotificationListener->NotifyRunStateChange(rsHalted, haltReason, currentAddress, 0, eventProcessor);
@@ -1445,7 +1486,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::PerformKeepaliveChecks(vo
     {
         return S_FALSE;
     }
-    
+
     AsynchronousGdbSrvController * pController = GetGdbSrvController();
     if (pController == nullptr)
     {
@@ -1464,7 +1505,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::PerformKeepaliveChecks(vo
             isGdbServerDown = true;
         }
     }
-    
+
     HRESULT result = m_pKeepaliveInterface->IsDebugSessionAlive();
     if (FAILED(result) || isGdbServerDown)
     {
@@ -1504,6 +1545,7 @@ HRESULT CLiveExdiGdbSrvSampleServer::SetGdbServerParameters()
         m_detectedProcessorFamily = cfgData.GetTargetFamily();
         m_fDisplayCommData = cfgData.GetDisplayCommPacketsCharacters();
         m_fEnableSSEContext = cfgData.GetIntelSseContext();
+        m_heuristicChunkSize = cfgData.GetHeuristicScanMemorySize();
         unsigned numberOfCores = cfgData.GetNumberOfCores();
         std::vector<std::wstring> coreConnections;
         cfgData.GetGdbServerConnectionParameters(coreConnections);
@@ -1513,11 +1555,28 @@ HRESULT CLiveExdiGdbSrvSampleServer::SetGdbServerParameters()
                        _T("EXDI-GdbServer"), MB_ICONERROR);
             return E_ABORT;
         }
-             
+
         m_pGdbSrvController = AsynchronousGdbSrvController::Create(coreConnections);
-        m_pGdbSrvController->SetTextHandler(new CommandLogger(true));
         m_pGdbSrvController->SetTargetArchitecture(m_targetProcessorArch);
-        
+        if (m_fDisplayCommData)
+        {
+            m_pGdbSrvController->SetTextHandler(new CommandLogger(true));
+        }
+
+        WCHAR systemRegMapXmlFile[MAX_PATH + 1];
+        fileNameLength = GetEnvironmentVariable(_T("EXDI_SYSTEM_REGISTERS_MAP_XML_FILE"),
+            systemRegMapXmlFile, _countof(systemRegMapXmlFile));
+        if (fileNameLength != 0)
+        {
+            m_pGdbSrvController->SetSystemRegisterXmlFile(systemRegMapXmlFile);
+        }
+        else
+        {
+            MessageBox(0, _T("Error: the EXDI_SYSTEM_REGISTERS_MAP_XML_FILE environment variable is not defined.\n")
+                _T("rdmsr/wrmsr functions won't work at this point.\n")
+                _T("Please set the full path to the SYSTEMREGISTERS.XML file."), _T("EXDI-GdbServer"), MB_ICONERROR);
+        }
+
         return S_OK;
     }
     CATCH_AND_RETURN_HRESULT;
@@ -1531,7 +1590,7 @@ DWORD CALLBACK CLiveExdiGdbSrvSampleServer::NotificationThreadBody(LPVOID p)
 
     HRESULT result = CoInitialize(nullptr);
     assert(SUCCEEDED(result));
-	UNREFERENCED_PARAMETER(result);
+    UNREFERENCED_PARAMETER(result);
 
     ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
     DWORD waitTimeout = (cfgData.GetMultiCoreGdbServer()) ? INFINITE : 6000;  
@@ -1546,9 +1605,9 @@ DWORD CALLBACK CLiveExdiGdbSrvSampleServer::NotificationThreadBody(LPVOID p)
         }
 
         assert(pServer->m_pSelfReferenceForNotificationThread != nullptr);
-        
+
         IAsynchronousCommandNotificationReceiver *pReceiver  =
-            pServer->m_pSelfReferenceForNotificationThread->TryUnmarshalInterfaceForCurrentThread();        
+            pServer->m_pSelfReferenceForNotificationThread->TryUnmarshalInterfaceForCurrentThread();
 
         if (!pServer->m_terminating)
         {
@@ -1580,10 +1639,10 @@ DWORD CALLBACK CLiveExdiGdbSrvSampleServer::NotificationThreadBody(LPVOID p)
 
 VOID CALLBACK CLiveExdiGdbSrvSampleServer::SampleTimerCallback(_In_  HWND hwnd, _In_  UINT uMsg, _In_  UINT_PTR idEvent, _In_  DWORD dwTime)
 {
-	UNREFERENCED_PARAMETER(hwnd);
-	UNREFERENCED_PARAMETER(uMsg);
-	UNREFERENCED_PARAMETER(idEvent);
-	UNREFERENCED_PARAMETER(dwTime);
+    UNREFERENCED_PARAMETER(hwnd);
+    UNREFERENCED_PARAMETER(uMsg);
+    UNREFERENCED_PARAMETER(idEvent);
+    UNREFERENCED_PARAMETER(dwTime);
     //  If your JTAG hardware supports polling mode rather than asynchronous notification mode, use this
     //  method to poll whether the target has stopped on an event and send a notification to debugging engine
     //  by calling m_pRunNotificationListener->NotifyRunStateChange().
@@ -1603,7 +1662,7 @@ HRESULT CLiveExdiGdbSrvSampleServer::SetGdbServerConnection(void)
         if (!pController->ConfigureGdbSrvCommSession(m_fDisplayCommData, C_ALLCORES))
         {
             //  Failed configuring the session.
-			MessageBox(0, _T("Error: Unable to configure the GdbServer session."), _T("EXDI-GdbServer"), MB_ICONERROR);
+            MessageBox(0, _T("Error: Unable to configure the GdbServer session."), _T("EXDI-GdbServer"), MB_ICONERROR);
             return E_ABORT;
         }
 
@@ -1611,9 +1670,9 @@ HRESULT CLiveExdiGdbSrvSampleServer::SetGdbServerConnection(void)
         if (!pController->ConnectGdbSrv())
         {
             //  Failed connecting to the GdbServer.
-			MessageBox(0, _T("Error: Unable to establish a connection with the GdbServer.")
-						  _T("Please verify the connection string <hostname/ip>:portnumber."),
-						  _T("EXDI-GdbServer"), MB_ICONERROR);
+            MessageBox(0, _T("Error: Unable to establish a connection with the GdbServer.")
+                          _T("Please verify the connection string <hostname/ip>:portnumber."),
+                          _T("EXDI-GdbServer"), MB_ICONERROR);
             return E_ABORT;
         }
 
@@ -1643,77 +1702,94 @@ ADDRESS_TYPE CLiveExdiGdbSrvSampleServer::ParseAsynchronousCommandResult(_Out_ D
     ADDRESS_TYPE currentPcAddress = 0;
     if (pController->GetAsynchronousCmdStopReplyPacket())
     {
-        StopReplyPacketStruct stopReply;
-        bool isParsed = pController->HandleAsynchronousCommandResponse(pController->GetCommandResult(), &stopReply);
-        if (isParsed)
+        int attempts = 0;
+        bool isWaitingOnStopReply = false;
+        do
         {
-            //  Is it a T packket?
-            if (stopReply.status.isTAAPacket)
+            StopReplyPacketStruct stopReply;
+            const std::string reply = pController->GetCommandResult();
+            bool isParsed = pController->HandleAsynchronousCommandResponse(reply, &stopReply);
+            if (isParsed)
             {
-                if (stopReply.status.isPcRegFound)
+                //  Is it a OXX console packet?
+                if (stopReply.status.isOXXPacket)
                 {
-                    assert(stopReply.currentAddress != 0);
-                    currentPcAddress = m_lastPcAddress = stopReply.currentAddress;
+                    //  Try to display the GDB server ouput message if there is an attached text console.
+                    pController->DisplayConsoleMessage(reply);
+                    //  Post another receive request on the packet buffer
+                    pController->ContinueWaitingOnStopReplyPacket();
+                    Sleep(100);
+                    isWaitingOnStopReply = true;
                 }
-                else
+                //  Is it a T packet?
+                else if (stopReply.status.isTAAPacket)
                 {
-                    // the packet didn't contain the PC, but we'd better find out what it is, so we can inform the debugger
-                    DWORD dummy;
-                    currentPcAddress = m_lastPcAddress = GetCurrentExecutionAddress(&dummy);
-                }
-
-                if (stopReply.status.isThreadFound)
-                {
-                    //  Adjust the processor number.
-                    assert(stopReply.processorNumber != static_cast<ULONG>(-1));
-                    if (stopReply.processorNumber <= pController->GetProcessorCount())
+                    if (stopReply.status.isPcRegFound)
                     {
-                        if (pController->GetFirstThreadIndex() > 0)
-                        {
-                            *pProcessorNumberOfLastEvent = stopReply.processorNumber - 1;
-                        }
-                        else
+                        assert(stopReply.currentAddress != 0);
+                        currentPcAddress = m_lastPcAddress = stopReply.currentAddress;
+                    }
+                    else
+                    {
+                        //  The packet didn't contain the PC, but we'd better find out what it is, so we can inform the debugger
+                        DWORD pcAddressRequest;
+                        currentPcAddress = m_lastPcAddress = GetCurrentExecutionAddress(&pcAddressRequest);
+                    }
+
+                    if (stopReply.status.isThreadFound)
+                    {
+                        assert(stopReply.processorNumber != static_cast<ULONG>(-1));
+                        if (stopReply.processorNumber <= pController->GetProcessorCount())
                         {
                             *pProcessorNumberOfLastEvent = stopReply.processorNumber;
                         }
                     }
+                    else
+                    {
+                        *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
+                    }
+                    isWaitingOnStopReply = false;
                 }
-                else
+                //  Is it a S AA packet?
+                else if (stopReply.status.isSAAPacket)
                 {
+                    //  There is a no any processor number or pc adddress in the response
+                    if (stopReply.status.isPowerDown)
+                    {
+                        MessageBox(0, _T("The Target is running or it is in a power down state."),nullptr, MB_ICONERROR);                    
+                    }
+                    stopReply.currentAddress = m_lastPcAddress;
                     *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
+                    isWaitingOnStopReply = false;
                 }
-            }
-            //   Is it a S AA packet
-            else if (stopReply.status.isSAAPacket)
-            {
-                //  There is anot any processor number or pc adddress in the response
-                if (stopReply.status.isPowerDown)
+
+                if (!isWaitingOnStopReply)
                 {
-                    MessageBox(0, _T("The Target is running or it is in a power down state."),nullptr, MB_ICONERROR);                    
+                    //  Convert the stop reason code
+                    switch (stopReply.stopReason) 
+                    {
+                    case TARGET_BREAK_SIGINT:
+                       *pHaltReason = hrUser;
+                       break;
+                    case TARGET_BREAK_SIGTRAP:
+                       *pHaltReason = hrBp;
+                       break;
+                    default:
+                       *pHaltReason = hrUnknown;
+                    }
+                    pController->ResetAsynchronousCmdStopReplyPacket();
                 }
-                stopReply.currentAddress = m_lastPcAddress;
-                *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
             }
-
-            // convert the stop reason code
-            switch (stopReply.stopReason) 
+            else
             {
-            case TARGET_BREAK_SIGINT:
-                *pHaltReason = hrUser;
-                break;
-            case TARGET_BREAK_SIGTRAP:
-                *pHaltReason = hrBp;
-                break;
-            default:
-                *pHaltReason = hrUnknown;
+                Sleep(100);
             }
-
-            pController->ResetAsynchronousCmdStopReplyPacket();
         }
+        while (isWaitingOnStopReply && attempts++ < c_attemptsWaitingOnPendingResponse);
     }
     else
     {
-        //  This only can happens if there was previously handled a Halt event.
+        //  This can happen only if there was a previously handled Halt event.
         currentPcAddress = m_lastPcAddress;
     }
     return currentPcAddress;
@@ -1934,12 +2010,12 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ExecuteExdiComponentFunct
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ LPCWSTR pFunctionToExecute)
 {
-	try
-	{
-	    if (pFunctionToExecute == nullptr)
-	    {
-		    return E_POINTER;
-	    }
+    try
+    {
+        if (pFunctionToExecute == nullptr)
+        {
+            return E_POINTER;
+        }
         if (type != exdiComponentSession)
         {
             return E_INVALIDARG;
@@ -1953,9 +2029,9 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ExecuteExdiComponentFunct
         {
             return E_FAIL;
         }
-		return S_OK;
-	}
-	CATCH_AND_RETURN_HRESULT;
+        return S_OK;
+    }
+    CATCH_AND_RETURN_HRESULT;
 }
 
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ExecuteTargetEntityFunction( 
@@ -1964,12 +2040,12 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ExecuteTargetEntityFuncti
     /* [in] */ LPCWSTR pFunctionToExecute,
     /* [out] */ SAFEARRAY ** pFunctionResponseBuffer)
 {
-	try
-	{
-	    if (pFunctionToExecute == nullptr)
-	    {
-		    return E_POINTER;
-	    }
+    try
+    {
+        if (pFunctionToExecute == nullptr)
+        {
+            return E_POINTER;
+        }
         if (type != exdiTargetEntity || dwProcessorNumber == C_ALLCORES)
         {
             return E_INVALIDARG;
@@ -1981,6 +2057,6 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::ExecuteTargetEntityFuncti
         }
         SimpleCharBuffer buffer = pController->ExecuteExdiGdbSrvMonitor(dwProcessorNumber, pFunctionToExecute);
         return SafeArrayFromByteArray(buffer.GetInternalBuffer(), buffer.GetLength(), pFunctionResponseBuffer);
-	}
-	CATCH_AND_RETURN_HRESULT;
+    }
+    CATCH_AND_RETURN_HRESULT;
 }

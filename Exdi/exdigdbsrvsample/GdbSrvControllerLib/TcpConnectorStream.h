@@ -98,6 +98,14 @@ namespace GdbSrvControllerLib
             return setsockopt(m_socket, level, optionName, pOptionVal, optionLength); 
         }
 
+        int SetWSAIoctl(_In_ unsigned int dwIoControlCode, _In_reads_(inputLength) void * pInputBuffer,
+                        _In_ unsigned int inputLength, _Out_writes_opt_(outLength) void * pOutBuffer,
+                        _Out_ unsigned int outLength, long unsigned int * pBytesReturned) const
+        {
+            return WSAIoctl(m_socket, dwIoControlCode, pInputBuffer, inputLength, pOutBuffer, outLength, 
+                            pBytesReturned, nullptr, nullptr); 
+        }
+
         int GetOptions(_In_ int level, _In_ int optionName, _Out_writes_(*pOptionLength)char * pOptionVal,
                        _Inout_ int * pOptionLength) const
         {

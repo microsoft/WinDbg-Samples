@@ -12,6 +12,7 @@
 #include "stdafx.h"
 #include <exception>
 #include <assert.h>
+#include <mstcpip.h>
 #include "ExceptionHelpers.h"
 #include "GdbSrvRspclient.h"
 #include <regex>
@@ -35,6 +36,8 @@ using namespace GdbSrvControllerLib;
 #define GET_FEATURE_ENTRY(feature)              (GdbSrvRspClient<TConnectStream>::s_RspProtocolFeatures[feature])
 
 #define GET_FEATURE_NAME(feature)               (GdbSrvRspClient<TConnectStream>::s_RspProtocolFeatures[feature].name)
+
+#define SET_FEATURE_ENABLE(feature, enable)     (GdbSrvRspClient<TConnectStream>::s_RspProtocolFeatures[feature].isEnabled = enable)
 
 //  Returns true if the interrupt event has been set
 #define IS_INTERRUPT_EVENT_SET(interruptEvent)  (WaitForSingleObject(interruptEvent, 0) == WAIT_OBJECT_0)
@@ -65,6 +68,9 @@ PacketConfig GdbSrvRspClient<TConnectStream>::s_RspProtocolFeatures[MAX_FEATURES
     {false, 2048,   "PacketSize"},
     {false, 0,      "qtrace32.memory"},
     {false, 0,      "Qtrace32.memory"},
+    {false, 0,      "read.mrs"},
+    {false, 0,      "write.mrs"},
+    {false, 0,      "qXfer:features:read"},
 };
 
 //  List of command packets that do not require Acknowledgment packet
@@ -419,8 +425,8 @@ bool IsValidRspPacket(_In_ TcpIpStream * const pStream, _In_ unsigned int checkS
 {
     assert(pStream != nullptr);
     bool isDone = false;
-    unsigned char checkSumL;
-    unsigned char checkSumR;
+    unsigned char checkSumL = 0;
+    unsigned char checkSumR = 0;
 
     //  Verify the checksum
     int readStatus = ReceiveInternal(0, pStream, false, reinterpret_cast<char *>(&checkSumL));
@@ -846,6 +852,15 @@ bool GdbSrvRspClient<TcpConnectorStream>::ConfigRspSession(_In_ const RSP_CONFIG
                 break;
             }
 
+            unsigned char ackFrequency = 1;
+            long unsigned int bytesReturned = 0;
+            if (pStream->SetWSAIoctl(SIO_TCP_SET_ACK_FREQUENCY, &ackFrequency, 
+                                     sizeof(ackFrequency), nullptr, 0, &bytesReturned) == SOCKET_ERROR)
+            {
+                configDone = false;
+                break;
+            }
+
             //  Enable TCP keep alive packets, so we can check if the GdbServer is alive
             DWORD isKeepAlive = 1;
             if (pStream->SetOptions(SOL_SOCKET, SO_KEEPALIVE, reinterpret_cast<const char *>(&isKeepAlive),
@@ -875,6 +890,7 @@ bool GdbSrvRspClient<TcpConnectorStream>::ConfigRspSession(_In_ const RSP_CONFIG
                 configDone = false;
                 break;
             }
+
         }
     }
     return configDone;
@@ -1324,7 +1340,6 @@ void GdbSrvRspClient<TcpConnectorStream>::DiscardResponse(_In_ unsigned activeCo
     }
 }
 
-
 //
 //  IsFeatureEnabled    Check if the feature is enabled.
 //  
@@ -1339,6 +1354,21 @@ bool GdbSrvRspClient<TcpConnectorStream>::IsFeatureEnabled(_In_ unsigned feature
 {
     return IS_FEATURE_ENABLED(feature);
 }
+
+//
+//  IsFeatureEnable     Set enable the feature.
+//  
+//  Parameters:
+//  feature             Feature to check
+//
+//  Return:
+//  Nothing.
+//
+void GdbSrvRspClient<TcpConnectorStream>::SetFeatureEnable(_In_ unsigned feature)
+{
+    SET_FEATURE_ENABLE(feature, true);
+}
+
 
 //
 //  GetNumberOfStreamConnections    Get the number of ongoing connections

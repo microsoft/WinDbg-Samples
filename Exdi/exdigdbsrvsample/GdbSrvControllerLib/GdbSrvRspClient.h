@@ -55,6 +55,9 @@ namespace GdbSrvControllerLib
         PACKET_SIZE,
         PACKET_READ_TRACE32_SPECIAL_MEM,
         PACKET_WRITE_TRACE32_SPECIAL_MEM,
+        PACKET_READ_OPENOCD_SPECIAL_REGISTER,
+        PACKET_WRITE_OPENOCD_SPECIAL_REGISTER,
+        PACKET_TARGET_DESCRIPTION,
         MAX_FEATURES
     } RSP_FEATURES;
 
@@ -125,14 +128,14 @@ namespace GdbSrvControllerLib
         bool SendRspPacket(_In_ const string & command, _In_ unsigned activeCore);
 
         //  Receives a RSP packet from the GdbServer
-	    bool ReceiveRspPacket(_Out_ string & response, _In_ unsigned activeCore, _In_ bool isWaitForever)
-	    {
+         bool ReceiveRspPacket(_Out_ string & response, _In_ unsigned activeCore, _In_ bool isWaitForever)
+         {
             bool IsPollingChannelMode = false;
             return ReceiveRspPacketEx(response, activeCore, isWaitForever, IsPollingChannelMode, true);
-	    }
+         }
 
-        bool ReceiveRspPacketEx(_Out_ string & response, _In_ unsigned activeCore, _In_ bool isWaitForever, _Inout_ bool & IsPollingChannelMode,
-                                _In_ bool fReset);
+        bool ReceiveRspPacketEx(_Out_ string & response, _In_ unsigned activeCore, _In_ bool isWaitForever, 
+                                _Inout_ bool & IsPollingChannelMode, _In_ bool fReset);
 
         //  Send an interrupt message (CTRL-C)
         bool SendRspInterrupt()
@@ -175,6 +178,9 @@ namespace GdbSrvControllerLib
 
         //  Check if the GDB Server feature is enabled
         bool IsFeatureEnabled(_In_ unsigned feature);
+
+        // Set Feature option enable
+        void SetFeatureEnable(_In_ unsigned feature);
 
 	    private:
         ValidHandleWrapper m_interruptEvent;

@@ -55,6 +55,8 @@ typedef enum
     DBGENG_EXDI_IOCTL_V3_GET_SUPERVISOR_MODE_MEM_VALUE,
     //  Get Hypervisor mode memory content
     DBGENG_EXDI_IOCTL_V3_GET_HYPERVISOR_MODE_MEM_VALUE,
+    //  Get additional GDB server info
+    DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO,
 
     DBGENG_EXDI_IOCTL_V3_LAST
 } DBGENG_EXDI_IOCTL_CODE_V3_EX;
@@ -74,6 +76,17 @@ typedef struct
     ADDRESS_TYPE address; 
     ULONG bytesToRead;
 } DBGENG_EXDI_IOCTL_READ_SPECIAL_MEMORY_EX_IN;
+
+//  Additional info input structure
+typedef struct
+{
+    DBGENG_EXDI_IOCTL_CODE_V3_EX code;
+    struct
+    {
+        ULONG   HeuristicChunkSize:1;
+        ULONG   Reserved:31;
+    } request;
+} DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO_EX_IN;
 
 //
 // Basic Ioctl containing only a code for the Ioctl input.
