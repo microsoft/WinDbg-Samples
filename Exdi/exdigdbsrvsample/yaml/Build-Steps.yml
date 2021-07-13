@@ -11,23 +11,8 @@ steps:
     restoreSolution: 'Exdi/**/*.sln'
 
 - task: VSBuild@1
-  displayName: 'Build x86'
-  inputs:
-    platform: 'x86'
-    solution: 'Exdi/**/*.sln'
-    configuration: '${{ parameters.BuildConfiguration }}'
-
-- task: VSBuild@1
   displayName: 'Build x64'
   inputs:
     platform: 'x64'
     solution: 'Exdi/**/*.sln'
     configuration: '${{ parameters.BuildConfiguration }}'
-
-- task: VSBuild@1
-  displayName: 'Build arm64'
-  inputs:
-    platform: 'ARM64'
-    solution: 'Exdi/**/*.sln'
-    configuration: '${{ parameters.BuildConfiguration }}'
-
