@@ -238,6 +238,11 @@
       <Command>
       </Command>
     </PreBuildEvent>
+    <PostBuildEvent>
+      <Command>copy "$(SolutionDir)\GdbSrvControllerLib\exdiConfigData.xml" "$(TargetDir)\exdiConfigData.xml"
+copy "$(SolutionDir)\GdbSrvControllerLib\systemregisters.xml" "$(TargetDir)\systemregisters.xml"
+</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
