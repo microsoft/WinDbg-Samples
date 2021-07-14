@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>Microsoft.Debugging.KDNet.kdnet-dev-ext</id>
+        <version>1.0.0</version>
+        <description>This package contains kdnet-dev-ext.dll, which is an extension for kdnet.exe to give it additional functionality for specific devices.</description>
+        <authors>Microsoft</authors>
+    </metadata>
+    <files>
+        <file src="x64\ExdiGdbSrvSample.dll" target="tools\x64\"/>
+        <file src="x64\exdiConfigData.xml" target="tools\x64\"/>
+        <file src="x64\systemregisters.xml" target="tools\x64\"/>
+    </files>
+</package>
