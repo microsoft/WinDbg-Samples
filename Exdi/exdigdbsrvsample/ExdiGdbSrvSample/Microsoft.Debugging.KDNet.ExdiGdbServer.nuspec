@@ -1,9 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
     <metadata>
-        <id>Microsoft.Debugging.KDNet.kdnet-dev-ext</id>
+        <id>Microsoft.Debugging.KDNet.ExdiGdbServer</id>
         <version>1.0.0</version>
-        <description>This package contains kdnet-dev-ext.dll, which is an extension for kdnet.exe to give it additional functionality for specific devices.</description>
+        <description>This package contains the Exdi GDB server extension module, which gives WinDbg and related debuggers the ability to connect to various GDB servers provided by hardware level debugging tools.</description>
         <authors>Microsoft</authors>
     </metadata>
     <files>
