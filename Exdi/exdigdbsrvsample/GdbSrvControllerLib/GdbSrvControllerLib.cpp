@@ -18,7 +18,6 @@
 #include <string>
 #include <memory>
 #include "TargetArchitectureHelpers.h"
-#include "Arm64SystemRegistersMap.h"
 
 using namespace GdbSrvControllerLib;
 
