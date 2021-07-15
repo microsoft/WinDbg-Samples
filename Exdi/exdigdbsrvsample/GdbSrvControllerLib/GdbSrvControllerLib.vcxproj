@@ -190,6 +190,14 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrvSample.h" /W1 /I"..\ExdiGdb
     <ClCompile Include="TcpConnectorStream.cpp" />
     <ClCompile Include="XmlDataHelpers.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="exdiConfigData.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="systemregisters.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
