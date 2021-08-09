@@ -1,6 +1,6 @@
 //----------------------------------------------------------------------------
 //
-// GdbSrvController.cpp
+// GdbSrvControllerLib.cpp
 //
 // This module implements a class that runs a GdbServer client that services 
 // the DbgEng-Exdi debugger requests.
@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <string>
 #include <memory>
+#include <locale>
+#include <codecvt>
 #include "TargetArchitectureHelpers.h"
 
 using namespace GdbSrvControllerLib;
@@ -44,30 +46,6 @@ const PCWSTR exdiComponentFunctionList[] =
 //  It's use to request reading xml registers target file.
 // 
 LPCSTR const g_RequestGdbReadFeatureFile = "qXfer:features:read:";
-
-//
-//  Type indicates the different ways that are used to read the system
-//  registers for this client.
-//
-const PCWSTR c_GetSystemRegisterFunctionHandler[] =
-{
-    //  QueryRegCmd - means that the GDB client uses the regular register GDB request to get the reg. value. 
-    //                That also means that the client also stored a copy of the system registers
-    //                sent by the GDb server (xml target description file was processed).
-    //                (i.e. QEMU supports, OpenOCD also supports it, but don't send a small amount of system registers)
-    L"QueryRegCmd",
-
-    //  GDBMonitorCmd - means that client obtains the system registers by the GDB protocol Monitor command.
-    //                  (i.e. BMC-OpenOCD supports this method for reading all system registers).
-    L"GDBMonitorCmd",
-
-    //  MemoryCustomizedCmd - means that the GDB client obtains the reg. values via specific customized
-    //                        memory commands (GDB protocol "m" apcket with some additional attributes).
-    //                        i.e. Trace32 GDB server supports this method for reading all type of memory 
-    //                        and system registers
-    //
-    L"MemoryCustomizedCmd"
-};
 
 //
 //  Set of internal Exdi commands that are not sent to the GDB server,
@@ -107,6 +85,7 @@ public:
         m_TargetHaltReason(TARGET_HALTED::TARGET_UNKNOWN),
         m_displayCommands(true),
         m_targetProcessorArch(UNKNOWN_ARCH),
+        m_targetProcessorFamilyArch(PROCESSOR_FAMILY_UNK),
         m_ThreadStartIndex(-1),
         m_pRspClient(std::unique_ptr <GdbSrvRspClient<TcpConnectorStream>>
             (new (std::nothrow) GdbSrvRspClient<TcpConnectorStream>(coreNumberConnectionParameters)))
@@ -491,23 +470,24 @@ public:
 
         //  Send the Q<agent string> packet if it's set in the configuration file
         ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+        using convert_type = std::codecvt_utf8<wchar_t>;
+        std::wstring_convert<convert_type, wchar_t> converter;
         std::wstring wAgentName;
         cfgData.GetExdiComponentAgentNamePacket(wAgentName);
         if (!wAgentName.empty())
         {
-            const std::string sAgentName(wAgentName.begin(), wAgentName.end());
+            const std::string sAgentName = converter.to_bytes(wAgentName);
             const std::string reply = ExecuteCommand(sAgentName.c_str());
             if (IsReplyError(reply))
             {
                 return false;
             }
-
         }
 
         //  Send the "qSupported" packet
         wstring wQSupportedConfigPacket;
         cfgData.GetRequestQSupportedPacket(wQSupportedConfigPacket);
-        const string sQSupportedConfigPacket(wQSupportedConfigPacket.begin(), wQSupportedConfigPacket.end());
+        const std::string sQSupportedConfigPacket = converter.to_bytes(wQSupportedConfigPacket);
         const char * qSupported = (sQSupportedConfigPacket.empty()) ? "qSupported" : sQSupportedConfigPacket.c_str();
         string cmdResponse = ExecuteCommand(qSupported);
 
@@ -1444,8 +1424,7 @@ public:
     //
     SimpleCharBuffer GdbSrvControllerImpl::ReadSystemRegisters(_In_ AddressType address, _In_ size_t maxSize, _In_ const memoryAccessType memType)
     {
-        std::map<PCWSTR, ReadSystemRegisterFunctions>::const_iterator itFunction =
-            m_ReadSystemRegisterFunctions.find(GetSystemRegHandler(memType));
+        auto itFunction = m_ReadSystemRegisterFunctions.find(GetSystemRegHandler(memType));
         if (itFunction == m_ReadSystemRegisterFunctions.end())
         {
             //  Unsupported function
@@ -1478,7 +1457,7 @@ public:
         _Out_ DWORD* pdwBytesWritten, _In_ const memoryAccessType memType,
         _In_ bool fReportWriteError)
     {
-        std::map<PCWSTR, WriteSystemRegisterFunctions>::const_iterator itFunction =
+        auto itFunction =
             m_WriteSystemRegisterFunctions.find(GetSystemRegHandler(memType));
         if (itFunction == m_WriteSystemRegisterFunctions.end())
         {
@@ -1870,13 +1849,7 @@ public:
         }
         else if (m_targetProcessorArch == AMD64_ARCH)
         {
-            // !!! The amd64 code is not tested, so try enabling the below code !!!
-            //  pRegisterArray = amd64RegisterArray;
-            //  if (pNumberOfElements != nullptr)
-            //  {
-            //      *pNumberOfElements = MAX_REG_AMD64_NUMBER;
-            //  }
-            assert(false);
+            it = FindRegisterVectorEntry("rip");
         }
         else if (m_targetProcessorArch == ARM32_ARCH || m_targetProcessorArch == ARM64_ARCH)
         {
@@ -2251,7 +2224,29 @@ public:
         m_targetProcessorArch = targetArch;
     }
 
+    inline void GdbSrvControllerImpl::SetTargetProcessorFamilyByTargetArch(_In_ TargetArchitecture targetArch) 
+    {
+        if (targetArch == X86_ARCH || targetArch == AMD64_ARCH)
+        {
+            m_targetProcessorFamilyArch = PROCESSOR_FAMILY_X86;
+        }
+        else if (targetArch == ARM64_ARCH)
+        {
+            m_targetProcessorFamilyArch = PROCESSOR_FAMILY_ARMV8ARCH64;
+        }
+        else if (targetArch == ARM32_ARCH)
+        {
+            m_targetProcessorFamilyArch = PROCESSOR_FAMILY_ARM;
+        }
+        else
+        {
+            m_targetProcessorFamilyArch = PROCESSOR_FAMILY_UNK;
+        }
+    }
+
     inline TargetArchitecture GdbSrvControllerImpl::GetTargetArchitecture() {return m_targetProcessorArch;}
+
+    inline DWORD GdbSrvControllerImpl::GetProcessorFamilyArchitecture() {return m_targetProcessorFamilyArch;}
 
     inline unsigned GdbSrvControllerImpl::GetLastKnownActiveCpu() {return m_lastKnownActiveCpu;}
     inline void GdbSrvControllerImpl::SetLastKnownActiveCpu(_In_ unsigned cpu) {m_lastKnownActiveCpu = cpu;}
@@ -2324,7 +2319,6 @@ public:
                 processorStatusRegValue, &memType);
             if (hr == S_OK)
             {
-                assert(memType.isSpecialRegs);
                 *pValue = 0;
                 SimpleCharBuffer buffer = ReadSystemRegisters(dwRegisterIndex, sizeof(*pValue), memType);
                 size_t copySize = std::min<size_t>(buffer.GetLength(), sizeof(*pValue));
@@ -2421,6 +2415,7 @@ public:
     TARGET_HALTED m_TargetHaltReason;
     bool m_displayCommands;
     TargetArchitecture m_targetProcessorArch;
+    DWORD m_targetProcessorFamilyArch;
     std::vector<AddressType> m_cachedKPCRStartAddress;
     int m_ThreadStartIndex;
     std::unique_ptr <GdbSrvRspClient<TcpConnectorStream>> m_pRspClient;
@@ -2429,12 +2424,12 @@ public:
     bool m_IsThrowExceptionEnabled;
     std::vector<std::string> m_targetProcessorIds;
     typedef std::function <SimpleCharBuffer (AddressType, size_t, const memoryAccessType)> ReadSystemRegisterFunctions;
-    typedef map<PCWSTR, ReadSystemRegisterFunctions> ReadSystemRegisterFunctionsMap;
+    typedef map<SystemRegistersAccessCommand, ReadSystemRegisterFunctions> ReadSystemRegisterFunctionsMap;
     ReadSystemRegisterFunctionsMap m_ReadSystemRegisterFunctions;
     typedef std::function <bool (_In_ AddressType address, _In_ size_t size, _In_ const void * pRawBuffer,
         _Out_ DWORD* pdwBytesWritten, _In_ const memoryAccessType memType,
         _In_ bool fReportWriteError)> WriteSystemRegisterFunctions;
-    typedef map<PCWSTR, WriteSystemRegisterFunctions> WriteSystemRegisterFunctionsMap;
+    typedef map<SystemRegistersAccessCommand, WriteSystemRegisterFunctions> WriteSystemRegisterFunctionsMap;
     WriteSystemRegisterFunctionsMap m_WriteSystemRegisterFunctions;
     typedef std::function <SimpleCharBuffer()> InternalGdbClientFunctions;
     typedef map<wstring, InternalGdbClientFunctions> InternalGdbMapFunctions;
@@ -2458,32 +2453,31 @@ public:
         // Initialize function adapters for reading system regs.
         m_ReadSystemRegisterFunctions = [this]()->auto {
             ReadSystemRegisterFunctionsMap _m_ReadSystemRegisterFunctions;
-            _m_ReadSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[0]] =
+            _m_ReadSystemRegisterFunctions.insert({ SystemRegistersAccessCommand::QueryRegCmd,
                 std::bind(&GdbSrvControllerImpl::ReadSysRegByQueryRegGdbCmd,
-                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-            _m_ReadSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[1]] =
+                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)});
+            _m_ReadSystemRegisterFunctions.insert({ SystemRegistersAccessCommand::GDBMonitorCmd,
                 std::bind(&GdbSrvControllerImpl::ReadSystemRegistersFromGdbMonitor,
-                this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-            _m_ReadSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[2]] =
+                this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)});
+            _m_ReadSystemRegisterFunctions.insert({ SystemRegistersAccessCommand::MemoryCustomizedCmd,
                 std::bind(&GdbSrvControllerImpl::ReadMemory,
-                    this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
-            return _m_ReadSystemRegisterFunctions;
+                this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3)});
+            return move(_m_ReadSystemRegisterFunctions);
         }();
 
         // Initialize function adapters for writing system regs.
         m_WriteSystemRegisterFunctions = [this]()->auto {
             WriteSystemRegisterFunctionsMap _m_WriteSystemRegisterFunctions;
-            _m_WriteSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[0]] =
+            _m_WriteSystemRegisterFunctions.insert({SystemRegistersAccessCommand::QueryRegCmd,
                 std::bind(&GdbSrvControllerImpl::WriteSystemRegBySetRegisterGdbCmd,
                     this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-                    std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
-            _m_WriteSystemRegisterFunctions[c_GetSystemRegisterFunctionHandler[1]] =
+                    std::placeholders::_4, std::placeholders::_5, std::placeholders::_6)});
+            _m_WriteSystemRegisterFunctions.insert({ SystemRegistersAccessCommand::GDBMonitorCmd,
                 std::bind(&GdbSrvControllerImpl::WriteMemory,
                     this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
-                    std::placeholders::_4, std::placeholders::_5, std::placeholders::_6);
-            return _m_WriteSystemRegisterFunctions;
+                    std::placeholders::_4, std::placeholders::_5, std::placeholders::_6)});
+            return move(_m_WriteSystemRegisterFunctions);
         }();
-
     }
 
     inline void InitializeInternalGdbClientFunctionMap()
@@ -2518,7 +2512,9 @@ public:
         size_t gdbSrvStrTypeLength;
         wstring wGdbServerTarget;
         cfgData.GetGdbServerTargetName(wGdbServerTarget);
-        const std::string sGdbServerTarget(wGdbServerTarget.begin(), wGdbServerTarget.end());
+        using convert_type = std::codecvt_utf8<wchar_t>;
+        std::wstring_convert<convert_type, wchar_t> converter;
+        const std::string sGdbServerTarget = converter.to_bytes(wGdbServerTarget);
         if (!sGdbServerTarget.empty())
         {
             pStrGdbSrvType = sGdbServerTarget.c_str();
@@ -2539,6 +2535,11 @@ public:
 
     inline AddressType GetAccessCodeByRegisterNumber(_In_ const string & regOrder)
     {
+        if (m_spSystemRegAccessCodeMap->empty())
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+
         for (auto it = m_spSystemRegAccessCodeMap->cbegin();
             it != m_spSystemRegAccessCodeMap->cend();
             ++it)
@@ -2553,6 +2554,11 @@ public:
 
     inline const char * GetSystemRegNamebyAccessCode(_In_ AddressType regAccess)
     {
+        if (m_spSystemRegAccessCodeMap->empty())
+        {
+            throw _com_error(E_INVALIDARG);
+        }
+
         auto it = m_spSystemRegAccessCodeMap->find(regAccess);
         if (it != m_spSystemRegAccessCodeMap->end())
         {
@@ -2664,25 +2670,25 @@ public:
         return monitorResult;
     }
 
-    PCWSTR const GetSystemRegHandler(_In_ const memoryAccessType memType)
+    SystemRegistersAccessCommand GetSystemRegHandler(_In_ const memoryAccessType memType)
     {
         ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
-        if (cfgData.IsSystemRegistersAvailable() &&
+        if (m_spSystemRegisterVector != nullptr && !m_spSystemRegisterVector->empty() &&
             //  we can remove this checking once OpenOCD includes the full set of system registers in the xml target description file
             !(m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs))
         {
             // Use the regular "p<register order>" command since the GDB server supports target register description.
-            return c_GetSystemRegisterFunctionHandler[0];
+            return SystemRegistersAccessCommand::QueryRegCmd;
         }
         else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs)
         {
             // Get the system registers by requesting a specific monitor command.
-            return c_GetSystemRegisterFunctionHandler[1];
+            return SystemRegistersAccessCommand::GDBMonitorCmd;
         }
         else
         {
             // GDB server supports requesting registers via customized memory command (i.e. Trace32 GDB server)
-            return c_GetSystemRegisterFunctionHandler[2];
+            return SystemRegistersAccessCommand::MemoryCustomizedCmd;
         }
     }
 
@@ -2857,7 +2863,10 @@ public:
                                           _In_ const char * lengthToRead)
     {
         //  Process the target description file
-        const std::string sfileName(wTargetFileName.begin(), wTargetFileName.end());
+        using convert_type = std::codecvt_utf8<wchar_t>;
+        std::wstring_convert<convert_type, wchar_t> converter;
+        const std::string sfileName = converter.to_bytes(wTargetFileName);
+
         char fileRegCmd[256] = { 0 };
         sprintf_s(fileRegCmd, ARRAYSIZE(fileRegCmd), "%s%s:%s,%s", requestCmd, sfileName.c_str(), startOffset, lengthToRead);
 
@@ -2914,6 +2923,30 @@ public:
         cfgData.SetXmlBufferToParse(wTargetFileBuffer.c_str());
     }
 
+    void ValidateTargetArchitecture(_Inout_ ConfigExdiGdbServerHelper& cfgData)
+    {
+        //  Validate that the group register included in the target file matches
+        //  with the current GDbserver target architecture configuration.
+        if (cfgData.GetRegisterGroupArchitecture() != cfgData.GetTargetArchitecture())
+        {
+            if (cfgData.GetRegisterGroupArchitecture() != UNKNOWN_ARCH)
+            {
+                //  Set the current saved target architecture
+                cfgData.SetTargetArchitecture(cfgData.GetRegisterGroupArchitecture());
+                SetTargetArchitecture(cfgData.GetRegisterGroupArchitecture());
+                SetTargetProcessorFamilyByTargetArch(cfgData.GetRegisterGroupArchitecture());
+                //  Re-Read the core registers since the target GDB architecture changed 
+                //  by the GDB server target description file
+                cfgData.GetGdbServerRegisters(&m_spRegisterVector);
+            }
+            else
+            {
+                throw _com_error(E_INVALIDARG);
+            }
+        }
+
+    }
+
     //
     //  HandleTargetDescriptionPacket - Handles the target description xml file.
     //  The QEMU target.xml has the following format:
@@ -2955,16 +2988,14 @@ public:
 
         //  Validate that the group register included in the target file matches
         //  with the current GDbserver target architecture configuration.
-        if (cfgData.GetRegisterGroupArchitecture() != cfgData.GetTargetArchitecture())
-        {
-            throw _com_error(E_INVALIDARG);
-        }
+        ValidateTargetArchitecture(cfgData);
 
         //
         //  Does the GDBserver sent a header target file, if so then
         //  processes only the file with the system register group.
         //
-        if (cfgData.IsRegisterGroupFileAvailable())
+        bool checkSystemRegFile = false;
+        if (cfgData.IsRegisterGroupFileAvailable(SYSTEM_REGS))
         {
             //  Get the system register file
             cfgData.GetRegisterGroupFile(SYSTEM_REGS, wFileName);
@@ -2975,17 +3006,26 @@ public:
 
             //  Process the system register description file
             RequestXmlFileDescriptionFeature(cfgData, wFileName, g_RequestGdbReadFeatureFile, "0", "ffff");
-        }
 
-        //  Get the system register mapping file, since it needs to store each system register number,
-        //  so once the system register file has been received from the GDB server.
-        if (m_spSystemRegXmlFile != nullptr && cfgData.ReadConfigFile(m_spSystemRegXmlFile.get()))
+            checkSystemRegFile = true;
+        }
+        //  Check the case when system registers are not defined by the 
+        //  GDB server target xml file, so the core register set contains the system registers
+        else if (cfgData.IsSystemRegistersAvailable())
         {
-            cfgData.GetSystemRegistersMapAccessCode(&m_spSystemRegAccessCodeMap);
+            checkSystemRegFile = true;
         }
+        
+        if (checkSystemRegFile)
+        {
+            if (m_spSystemRegXmlFile != nullptr && cfgData.ReadConfigFile(m_spSystemRegXmlFile.get()))
+            {
+                cfgData.GetSystemRegistersMapAccessCode(&m_spSystemRegAccessCodeMap);
+            }
 
-        //  Get the actual system register vector from the table.
-        cfgData.GetGdbServerSystemRegisters(&m_spSystemRegisterVector);
+            //  Get the actual system register vector from the table.
+            cfgData.GetGdbServerSystemRegisters(&m_spSystemRegisterVector);
+        }
     }
 };
 
@@ -3213,12 +3253,23 @@ void GdbSrvController::SetTargetArchitecture(_In_ TargetArchitecture targetArch)
     m_pGdbSrvControllerImpl->SetTargetArchitecture(targetArch);
 }
 
+void GdbSrvController::SetTargetProcessorFamilyByTargetArch(_In_ TargetArchitecture targetArch) 
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    m_pGdbSrvControllerImpl->SetTargetProcessorFamilyByTargetArch(targetArch);
+}
+
 TargetArchitecture GdbSrvController::GetTargetArchitecture()
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
     return m_pGdbSrvControllerImpl->GetTargetArchitecture();
 }
 
+DWORD GdbSrvController::GetProcessorFamilyArchitecture()
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->GetProcessorFamilyArchitecture();
+}
 unsigned GdbSrvController::GetLastKnownActiveCpu()
 {
     assert(m_pGdbSrvControllerImpl != nullptr);

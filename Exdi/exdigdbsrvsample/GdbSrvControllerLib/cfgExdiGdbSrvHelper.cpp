@@ -7,7 +7,6 @@
 // Copyright (c) Microsoft. All rights reserved.
 //----------------------------------------------------------------------------
 
-#include "ExdiGdbSrvSample.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -96,9 +95,18 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         fileName = it->second;
     }
 
-    inline bool ConfigExdiGdbServerHelperImpl::IsRegisterGroupFileAvailable()
+    inline bool ConfigExdiGdbServerHelperImpl::IsRegisterGroupFileAvailable(_In_ RegisterGroupType fileType)
     {
-        return (m_ExdiGdbServerData.file.registerGroupFiles.get() != nullptr) ? true : false;
+        if (m_ExdiGdbServerData.file.registerGroupFiles.get() == nullptr)
+        {
+            return false;
+        }
+        auto it = m_ExdiGdbServerData.file.registerGroupFiles->find(fileType);
+        if (it == m_ExdiGdbServerData.file.registerGroupFiles->end())
+        {
+            return false;
+        }
+        return true;
     }
 
     inline TargetArchitecture ConfigExdiGdbServerHelperImpl::GetRegisterGroupArchitecture()
@@ -134,6 +142,11 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
     inline TargetArchitecture ConfigExdiGdbServerHelperImpl::GetTargetArchitecture()
     {
         return m_ExdiGdbServerData.target.targetArchitecture;
+    }
+
+    inline void ConfigExdiGdbServerHelperImpl::SetTargetArchitecture(_In_ TargetArchitecture targetArch)
+    {
+        m_ExdiGdbServerData.target.targetArchitecture = targetArch;
     }
 
     inline DWORD ConfigExdiGdbServerHelperImpl::GetTargetFamily()
@@ -191,27 +204,62 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         return m_ExdiGdbServerData.component.fExceptionThrowEnabled;
     }
 
-    inline TargetArchitecture ConfigExdiGdbServerHelperImpl::GetGdbServerRegisterArchitecture() const 
+    inline TargetArchitecture ConfigExdiGdbServerHelperImpl::GetLastGdbServerRegisterArchitecture() const 
     {
-        return m_ExdiGdbServerData.gdbServerRegisters.registerSet;
+        return m_ExdiGdbServerData.gdbServerRegisters.registerSet.back();
     }
 
     inline void ConfigExdiGdbServerHelperImpl::GetGdbServerRegisters(_Out_ unique_ptr<vector<RegistersStruct>> * spRegisters)
     {
-        *spRegisters = move(m_ExdiGdbServerData.gdbServerRegisters.spRegisterCoreSet);
-    }
+        for (auto const & arch : m_ExdiGdbServerData.gdbServerRegisters.registerSet)
+        {
+            if (arch == m_ExdiGdbServerData.target.targetArchitecture)
+            {
+                auto it = m_ExdiGdbServerData.gdbServerRegisters.spRegisterCoreSet->find(arch);
+                if (it == m_ExdiGdbServerData.gdbServerRegisters.spRegisterCoreSet->end())
+                {
+                    break;
+                }
+                *spRegisters = move(it->second);
+                break;
+            }
+        }
+   }
 
     inline void ConfigExdiGdbServerHelperImpl::GetGdbServerSystemRegisters(
         _Out_ unique_ptr<vector<RegistersStruct>> * spRegisters)
     {
-        *spRegisters = move(m_ExdiGdbServerData.gdbServerRegisters.spRegisterSystemSet);
+
+        for (auto const& arch : m_ExdiGdbServerData.gdbServerRegisters.registerSet)
+        {
+            if (arch == m_ExdiGdbServerData.target.targetArchitecture)
+            {
+                auto it = m_ExdiGdbServerData.gdbServerRegisters.spRegisterSystemSet->find(arch);
+                if (it == m_ExdiGdbServerData.gdbServerRegisters.spRegisterSystemSet->end())
+                {
+                    break;
+                }
+                *spRegisters = move(it->second);
+                break;
+            }
+        }
     }
 
     inline bool ConfigExdiGdbServerHelperImpl::IsSystemRegistersAvailable()
     {
-        if (m_ExdiGdbServerData.file.registerGroupArchitecture ==  m_ExdiGdbServerData.target.targetArchitecture)
+        if (m_ExdiGdbServerData.gdbServerRegisters.spRegisterSystemSet != nullptr)
         {
-            return true;
+            for (auto const& arch : m_ExdiGdbServerData.gdbServerRegisters.registerSet)
+            {
+                if (arch == m_ExdiGdbServerData.target.targetArchitecture)
+                {
+                    auto it = m_ExdiGdbServerData.gdbServerRegisters.spRegisterSystemSet->find(arch);
+                    if (it != m_ExdiGdbServerData.gdbServerRegisters.spRegisterSystemSet->end())
+                    {
+                        return true;
+                    }
+                }
+            }
         }
         return false;
     }
@@ -265,7 +313,20 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
     inline void ConfigExdiGdbServerHelperImpl::GetSystemRegistersMapAccessCode(
         _Out_ unique_ptr<systemRegistersMapType> * spMapSystemRegs)
     {
-        *spMapSystemRegs = move(m_ExdiGdbServerData.systemRegisterMap.spSysRegisterMap);
+
+        for (auto const& arch : m_ExdiGdbServerData.systemRegisterMap.systemRegArchitecture)
+        {
+            if (arch == m_ExdiGdbServerData.target.targetArchitecture)
+            {
+                auto it = m_ExdiGdbServerData.systemRegisterMap.spSysRegisterMap->find(arch);
+                if (it == m_ExdiGdbServerData.systemRegisterMap.spSysRegisterMap->end())
+                {
+                    break;
+                }
+                *spMapSystemRegs = move(it->second);
+                break;
+            }
+        }
     }
 
     private:
@@ -686,10 +747,10 @@ void ConfigExdiGdbServerHelper::GetGdbServerSystemRegisters(_Out_ unique_ptr<vec
     m_pConfigExdiGdbServerHelperImpl->GetGdbServerSystemRegisters(spSystemRegisters);
 }
 
-TargetArchitecture ConfigExdiGdbServerHelper::GetGdbServerRegisterArchitecture()
+TargetArchitecture ConfigExdiGdbServerHelper::GetLastGdbServerRegisterArchitecture()
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
-    return m_pConfigExdiGdbServerHelperImpl->GetGdbServerRegisterArchitecture();
+    return m_pConfigExdiGdbServerHelperImpl->GetLastGdbServerRegisterArchitecture();
 }
 
 void ConfigExdiGdbServerHelper::GetGdbServerTargetName(_Out_ wstring& targetName)
@@ -761,10 +822,10 @@ bool ConfigExdiGdbServerHelper::ReadConfigFile(_In_ PCWSTR pXmlConfigFile)
     return true;
 }
 
-bool ConfigExdiGdbServerHelper::IsRegisterGroupFileAvailable()
+bool ConfigExdiGdbServerHelper::IsRegisterGroupFileAvailable(_In_ RegisterGroupType fileType)
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
-    return m_pConfigExdiGdbServerHelperImpl->IsRegisterGroupFileAvailable();
+    return m_pConfigExdiGdbServerHelperImpl->IsRegisterGroupFileAvailable(fileType);
 }
 
 void ConfigExdiGdbServerHelper::GetRegisterGroupFile(_In_ RegisterGroupType fileType, _Out_ wstring & fileName)
@@ -789,4 +850,10 @@ void ConfigExdiGdbServerHelper::GetSystemRegistersMapAccessCode(_Out_ unique_ptr
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
     m_pConfigExdiGdbServerHelperImpl->GetSystemRegistersMapAccessCode(spMapSystemRegs);
+}
+
+void ConfigExdiGdbServerHelper::SetTargetArchitecture(_In_ TargetArchitecture targetArch)
+{
+    assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
+    m_pConfigExdiGdbServerHelperImpl->SetTargetArchitecture(targetArch);
 }

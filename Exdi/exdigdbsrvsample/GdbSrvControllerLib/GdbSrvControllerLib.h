@@ -123,6 +123,30 @@ namespace GdbSrvControllerLib
     typedef std::vector<std::string> vectorRegNamesType;
 
     //
+    //  Type indicates the different ways that are used to read the system
+    //  registers for this client.
+    //
+    typedef enum
+    {
+        //  QueryRegCmd - means that the GDB client uses the regular register GDB request to get the reg. value. 
+        //                That also means that the client also stored a copy of the system registers
+        //                sent by the GDb server (xml target description file was processed).
+        //                (i.e. QEMU supports, OpenOCD also supports it, but sends a small set of system registers).
+        QueryRegCmd,
+
+        //  GDBMonitorCmd - means that client obtains the system registers by the GDB protocol Monitor command.
+        //                  (i.e. BMC-OpenOCD supports this method for reading all system registers).
+        GDBMonitorCmd,
+
+        //  MemoryCustomizedCmd - means that the GDB client obtains the reg. values via specific customized
+        //                        memory commands (GDB protocol "m" packet with some additional attributes).
+        //                        i.e. Trace32 GDB server supports this method for reading all type of memory 
+        //                        and system registers.
+        //
+        MemoryCustomizedCmd
+    } SystemRegistersAccessCommand;
+
+    //
     //  This class implements the High level functionality supported by the GdbServer stub.
     //  Basically, it translates the DbgEng-Exdi requested functionality to GdbServer commands.
     //
@@ -179,6 +203,9 @@ namespace GdbSrvControllerLib
               
         //  Obtains the stored target architecture.
         TargetArchitecture GetTargetArchitecture();
+
+        //  Obtains the stored target architecture.
+        DWORD GetProcessorFamilyArchitecture();
 
         // Get the target threadID token value that correspond to the logila processor number
         std::string GetTargetThreadId(_In_ unsigned processorNumber);
@@ -241,6 +268,9 @@ namespace GdbSrvControllerLib
 
         //  Stores the target architecture.
         void SetTargetArchitecture(_In_ TargetArchitecture targetArch);
+
+        //  Store the processor family architecture by target architecture
+        void SetTargetProcessorFamilyByTargetArch(_In_ TargetArchitecture targetArch);
 
         //  Stores the pointer of the text logging class.
         void SetTextHandler(_In_ IGdbSrvTextHandler * pHandler);

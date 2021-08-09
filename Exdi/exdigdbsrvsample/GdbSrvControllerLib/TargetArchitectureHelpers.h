@@ -48,6 +48,10 @@ const DWORD C_EL1HCPSRREG = 5;
 const DWORD C_EL2TCPSRREG = 8;
 const DWORD C_EL2HCPSRREG = 9;
 
+// Kernel & User mode detection masks (Intel x86 & Amd64)
+const ULONG c_CPL_MODE_BIT = 0;
+const ULONG c_CPL_MODE_MASK = 1;
+
 // Invalid Address type value
 const AddressType c_InvalidAddress = static_cast<AddressType>(-1);
 
@@ -65,6 +69,17 @@ typedef struct
     ULONG  InstructionSize : 1;
     ULONG  ExceptionCode : 6;
 } SystemRegister;
+
+//  These constants should match with the exdi3.idl constant
+//  Please do not change the values w/o checking the exdi3.idl
+#ifndef PROCESSOR_FAMILY_UNK 
+
+#define PROCESSOR_FAMILY_X86            0
+#define PROCESSOR_FAMILY_ARM            4
+#define PROCESSOR_FAMILY_ARMV8ARCH64    9
+#define PROCESSOR_FAMILY_UNK            0xffffffff
+
+#endif
 
 // ************************************************************************************
 //
@@ -117,6 +132,11 @@ public:
         {
             return ARM64_ENCODING_SYSREG(op0, op1, crn, crm, op2);
         }
+        else if (arch == AMD64_ARCH)
+        {
+            //  The op0 value should contain the access code w/o any encoding.
+            return op0;
+        }
         else
         {
             MessageBox(0, _T("Target architecture is not supported"), _T("EXDI-GdbServer"), MB_ICONERROR);
@@ -130,6 +150,10 @@ public:
         if (arch == ARM64_ARCH)
         {
             pStatusRegister = "cpsr";
+        }
+        else if (arch == AMD64_ARCH)
+        {
+            pStatusRegister = "cs";
         }
         return pStatusRegister;
     }
@@ -173,8 +197,8 @@ public:
         }
     }
 
-    static HRESULT SetSystemRegister(_In_ TargetArchitecture arch, _In_ AddressType encodeRegIndex, 
-        _Out_ SystemRegister * pSystemReg)
+    static HRESULT SetSystemRegister(_In_ TargetArchitecture arch, _In_ AddressType encodeRegIndex,
+        _Out_ SystemRegister* pSystemReg)
     {
         HRESULT hr = E_NOTIMPL;
         if (arch == ARM64_ARCH)
@@ -219,12 +243,32 @@ public:
         return hr;
     }
 
-    static HRESULT SetSpecialMemoryPacketType(_In_ TargetArchitecture arch, _In_ ULONGLONG cpsrReg, _Out_ memoryAccessType* pMemType)
+    static HRESULT SetSpecialMemoryPacketTypeAMD64(_In_ ULONGLONG regValue, _Out_ memoryAccessType* pMemType)
+    {
+        assert(pMemType != nullptr);
+
+        if ((regValue & c_CPL_MODE_MASK) == c_CPL_MODE_BIT)
+        {
+            pMemType->isSupervisor = 1;
+        }
+        else
+        {
+            pMemType->isData = 1;
+        }
+
+        return S_OK;
+    }
+
+    static HRESULT SetSpecialMemoryPacketType(_In_ TargetArchitecture arch, _In_ ULONGLONG regValue, _Out_ memoryAccessType* pMemType)
     {
         HRESULT hr = E_NOTIMPL;
         if (arch == ARM64_ARCH)
         {
-            hr = TargetArchitectureHelpers::SetSpecialMemoryPacketTypeARM64(cpsrReg, pMemType);
+            hr = TargetArchitectureHelpers::SetSpecialMemoryPacketTypeARM64(regValue, pMemType);
+        }
+        else if (arch == AMD64_ARCH)
+        {
+            hr = TargetArchitectureHelpers::SetSpecialMemoryPacketTypeAMD64(regValue, pMemType);
         }
         return hr;
     }
@@ -305,7 +349,9 @@ public:
     }
 
     static void TokenizeAccessCode(_In_ const std::wstring& value, 
-        _In_z_ const wchar_t * delimiters, _Out_ std::vector<int>* pTokens)
+        _In_z_ const wchar_t* delimiters,
+        _In_z_ const wchar_t* format,
+        _Out_ std::vector<int>* pTokens)
     {
         wchar_t * pData = const_cast<wchar_t *>(value.data());
         wchar_t* next_token = nullptr;
@@ -314,12 +360,32 @@ public:
         while (token != nullptr)
         {
             int tokenValue;
-            if (swscanf_s(token, L"%d", &tokenValue) != 1)
+            if (swscanf_s(token, format, &tokenValue) != 1)
             {
                 throw _com_error(E_FAIL);
             }
             pTokens->push_back(tokenValue);
             token = wcstok_s(nullptr, delimiters, &next_token);
+        }
+    }
+
+    static void TokenizeAccessCodeByArch(
+        _In_ TargetArchitecture arch,
+        _In_ const std::wstring& value,
+        _In_z_ const wchar_t* delimiters, 
+        _Out_ std::vector<int>* pTokens)
+    {
+        if (arch == ARM64_ARCH)
+        {
+            return TokenizeAccessCode(value, delimiters, L"%d", pTokens);
+        }
+        else if (arch == AMD64_ARCH)
+        {
+            return TokenizeAccessCode(value, delimiters, L"%x", pTokens);
+        }
+        else
+        {
+            MessageBox(0, _T("Target architecture is not supported"), _T("EXDI-GdbServer"), MB_ICONERROR);
         }
     }
 

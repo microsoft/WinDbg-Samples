@@ -42,10 +42,15 @@ class ConfigExdiGdbServerHelper final
         void GetGdbServerConnectionParameters(_Out_ vector<wstring> & coreConnections);
         void GetExdiComponentAgentNamePacket(_Out_ wstring & agentName);
         void GetRequestQSupportedPacket(_Out_ wstring& requestPacket);
-        bool IsExceptionThrowEnabled();
-        TargetArchitecture GetGdbServerRegisterArchitecture();
+        TargetArchitecture GetLastGdbServerRegisterArchitecture();
         void GetGdbServerTargetName(_Out_ wstring& agentName);
         void GetTargetDescriptionFileName(_Out_ wstring & fileName);
+        void GetRegisterGroupFile(_In_ RegisterGroupType fileType, _Out_ wstring& fileName);
+        TargetArchitecture GetRegisterGroupArchitecture();
+        void GetGdbServerRegisters(_Out_ unique_ptr<vector<RegistersStruct>>* spRegisters);
+        void GetGdbServerSystemRegisters(_Out_ unique_ptr<vector<RegistersStruct>>* spSystemRegisters);
+        void GetSystemRegistersMapAccessCode(_Out_ unique_ptr<systemRegistersMapType>* spMapSystemRegs);
+        bool IsExceptionThrowEnabled();
         bool IsSupportedSpecialMemoryCommand();
         bool IsSupportedPhysicalMemoryCommand();
         bool IsSupportedSupervisorMemoryCommand();
@@ -53,15 +58,11 @@ class ConfigExdiGdbServerHelper final
         bool IsSupportedSpecialMemoryRegister();
         bool IsSupportedSystemRegistersGdbMonitor();
         bool IsSupportedSystemRegisterDecoding();
-        void SetXmlBufferToParse(_In_ PCWSTR pXmlConfigFile);
-        bool ReadConfigFile(_In_ PCWSTR pXmlConfigFile);
-        void GetRegisterGroupFile(_In_ RegisterGroupType fileType, _Out_ wstring & fileName);
-        TargetArchitecture GetRegisterGroupArchitecture();
         bool IsSystemRegistersAvailable();
-        bool IsRegisterGroupFileAvailable();
-        void GetGdbServerRegisters(_Out_ unique_ptr<vector<RegistersStruct>> * spRegisters);
-        void GetGdbServerSystemRegisters(_Out_ unique_ptr<vector<RegistersStruct>> * spSystemRegisters);
-        void GetSystemRegistersMapAccessCode(_Out_ unique_ptr<systemRegistersMapType> * spMapSystemRegs);
+        bool IsRegisterGroupFileAvailable(_In_ RegisterGroupType fileType);
+        bool ReadConfigFile(_In_ PCWSTR pXmlConfigFile);
+        void SetXmlBufferToParse(_In_ PCWSTR pXmlConfigFile);
+        void SetTargetArchitecture(_In_ TargetArchitecture targetArch);
 
     private:
         ConfigExdiGdbServerHelper(_In_opt_ PCWSTR pXmlConfigFile);

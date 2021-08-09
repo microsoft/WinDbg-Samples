@@ -63,6 +63,11 @@ const DWORD s_ConnectionCookie = 'SMPL';
 const char * s_sseRegList[] = {"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7"};
 //  Number of SSE registers
 const int s_numberOfSseRegisters = (ARRAYSIZE(s_sseRegList));
+//  SSE x64 register list
+const char* s_sseX64RegList[] = { "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
+                                  "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15" };
+//  Number of SSE registers
+const int s_numberOfSseX64Registers = (ARRAYSIZE(s_sseX64RegList));
 
 //  80387 coprocessor register info.
 const int s_numberOfCoprocessorRegisters = 8;
@@ -1184,26 +1189,66 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::GetContextEx(_In_ DWORD p
         pContext->R13 = GdbSrvController::ParseRegisterValue(registers["r13"]);
         pContext->R14 = GdbSrvController::ParseRegisterValue(registers["r14"]);
         pContext->R15 = GdbSrvController::ParseRegisterValue(registers["r15"]);
-        pContext->EFlags = GdbSrvController::ParseRegisterValue(registers["Eflags"]);
+        pContext->EFlags = GdbSrvController::ParseRegisterValue32(registers["eflags"]);
+        pContext->RegGroupSelection.fIntegerRegs = TRUE;
 
         pContext->ModeFlags = AMD64_CONTEXT_AMD64 | AMD64_CONTEXT_CONTROL | 
                               AMD64_CONTEXT_INTEGER | AMD64_CONTEXT_SEGMENTS;
 
+        //  Segment registers
         pContext->SegCs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cs"]));
         pContext->SegSs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["ss"]));
         pContext->SegDs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["ds"]));
         pContext->SegEs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["es"]));
         pContext->SegFs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["fs"]));
         pContext->SegGs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gs"]));
-
-
-        pContext->RegGroupSelection.fFloatingPointRegs = FALSE;
-        pContext->RegGroupSelection.fDebugRegs = FALSE;
-        pContext->RegGroupSelection.fSSERegisters = FALSE;
-        pContext->RegGroupSelection.fSystemRegisters = FALSE;
-
-        pContext->RegGroupSelection.fIntegerRegs = TRUE;
         pContext->RegGroupSelection.fSegmentRegs = TRUE;
+
+        //   Control registers (System registers)
+        pContext->RegCr0 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr0"]));
+        pContext->RegCr2 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr2"]));
+        pContext->RegCr3 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr3"]));
+        pContext->RegCr4 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr4"]));
+        pContext->RegCr8 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr8"]));
+        pContext->RegGroupSelection.fSystemRegisters = TRUE;
+
+        //  get all floating point registers (FPU)
+        pContext->ControlWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fctrl"]));
+        pContext->StatusWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fstat"]));
+        pContext->TagWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["ftag"]));
+        pContext->ErrorOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fioff"]));
+        pContext->ErrorSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fiseg"]));
+        pContext->DataOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fooff"]));
+        pContext->DataSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["foseg"]));
+
+        //  x87 registers (FPU)
+        for (int index = 0; index < s_numberFPRegList; ++index)
+        {
+            std::string regName(s_fpRegList[index]);
+            GdbSrvController::ParseRegisterVariableSize(registers[regName],
+                reinterpret_cast<BYTE*>(&pContext->RegisterArea[index * s_numberOfBytesCoprocessorRegister]),
+                s_numberOfBytesCoprocessorRegister);
+        }
+        pContext->RegGroupSelection.fFloatingPointRegs = TRUE;
+
+        //  Get X64 SSE registers if the x64 SSE context enabled?
+        if (m_fEnableSSEContext)
+        {
+            registers = pController->QueryRegisters(processorNumber, s_sseX64RegList, s_numberOfSseX64Registers);
+            const int numberOfBytesSseX64Registers = sizeof(pContext->RegSSE[0]);
+            for (int index = 0; index < s_numberOfSseX64Registers; ++index)
+            {
+                std::string regName(s_sseX64RegList[index]);
+                GdbSrvController::ParseRegisterVariableSize(registers[regName],
+                    reinterpret_cast<BYTE*>(&pContext->RegSSE[index]),
+                    numberOfBytesSseX64Registers);
+            }
+            pContext->RegMXCSR = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["mxcsr"]));
+            pContext->RegGroupSelection.fSSERegisters = TRUE;
+        }
+
+        pContext->RegGroupSelection.fSegmentDescriptors = FALSE;
+        pContext->RegGroupSelection.fDebugRegs = FALSE;
 
         return S_OK;
     }
@@ -1245,6 +1290,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContextEx(_In_ DWORD p
             registers["r13"] = pContext->R13;
             registers["r14"] = pContext->R14;
             registers["r15"] = pContext->R15;
+            registers["eflags"] = pContext->EFlags;
         }
 
         if (pContext->RegGroupSelection.fSegmentRegs)
@@ -1257,7 +1303,51 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::SetContextEx(_In_ DWORD p
             registers["gs"] = pContext->SegGs;
         }
 
+        if (pContext->RegGroupSelection.fSystemRegisters)
+        {
+            registers["fctrl"] = pContext->ControlWord;
+            registers["fstat"] = pContext->StatusWord;
+            registers["ftag"] = pContext->TagWord;
+            registers["fioff"] = pContext->ErrorOffset;
+            registers["fiseg"] = pContext->ErrorSelector;
+            registers["fooff"] = pContext->DataOffset;
+            registers["foseg"] = pContext->DataSelector;
+        }
+
+        //  Control registers
+        if (pContext->RegGroupSelection.fSystemRegisters)
+        {
+            //  Control registers (System registers)
+            registers["cr0"] = pContext->RegCr0;
+            registers["cr2"] = pContext->RegCr2;
+            registers["cr3"] = pContext->RegCr3;
+            registers["cr4"] = pContext->RegCr4;
+            registers["cr8"] = pContext->RegCr8;
+        }
         pController->SetRegisters(processorNumber, registers, false);
+
+        //  Floating point registers
+        if (pContext->RegGroupSelection.fFloatingPointRegs)
+        {
+            for (int index = 0; index < s_numberFPRegList; ++index)
+            {
+                std::string regName(s_fpRegList[index]);
+                registers[regName] = reinterpret_cast<ULONGLONG>(&pContext->RegisterArea[index * s_numberOfBytesCoprocessorRegister]);
+            }
+            pController->SetRegisters(processorNumber, registers, true);
+        }
+
+        //  SSE x64 registers
+        if (m_fEnableSSEContext)
+        {
+            for (int index = 0; index < s_numberOfSseX64Registers; ++index)
+            {
+                std::string regName(s_sseX64RegList[index]);
+                registers[regName] = reinterpret_cast<ULONGLONG>(&pContext->RegSSE[index]);
+            }
+            pController->SetRegisters(processorNumber, registers, true);
+        }
+
         return S_OK;
     }
     CATCH_AND_RETURN_HRESULT;
@@ -1558,6 +1648,7 @@ HRESULT CLiveExdiGdbSrvSampleServer::SetGdbServerParameters()
 
         m_pGdbSrvController = AsynchronousGdbSrvController::Create(coreConnections);
         m_pGdbSrvController->SetTargetArchitecture(m_targetProcessorArch);
+        m_pGdbSrvController->SetTargetProcessorFamilyByTargetArch(m_targetProcessorArch);
         if (m_fDisplayCommData)
         {
             m_pGdbSrvController->SetTextHandler(new CommandLogger(true));
@@ -1682,6 +1773,9 @@ HRESULT CLiveExdiGdbSrvSampleServer::SetGdbServerConnection(void)
         //  Request the set of features supported by the GdbServer
         if (pController->ReqGdbServerSupportedFeatures())
         {
+            //  Ensure that the target architecture matches with the current GDB server
+            m_targetProcessorArch = m_pGdbSrvController->GetTargetArchitecture();
+            m_detectedProcessorFamily = m_pGdbSrvController->GetProcessorFamilyArchitecture();
             //  Is the target broken because the GdbServer sends a break request?
             if (pController->IsTargetHalted())
             {
