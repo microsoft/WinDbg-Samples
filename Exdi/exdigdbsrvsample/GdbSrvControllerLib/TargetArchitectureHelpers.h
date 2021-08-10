@@ -350,7 +350,7 @@ public:
 
     static void TokenizeAccessCode(_In_ const std::wstring& value, 
         _In_z_ const wchar_t* delimiters,
-        _In_z_ const wchar_t* format,
+        _In_z_ _Scanf_s_format_string_ const wchar_t* format,
         _Out_ std::vector<int>* pTokens)
     {
         wchar_t * pData = const_cast<wchar_t *>(value.data());

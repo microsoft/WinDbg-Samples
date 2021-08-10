@@ -2437,7 +2437,7 @@ public:
     unique_ptr <WCHAR[]> m_spSystemRegXmlFile;
     unique_ptr<vector<RegistersStruct>> m_spRegisterVector;
     unique_ptr<vector<RegistersStruct>> m_spSystemRegisterVector;
-    unique_ptr<systemRegistersMapType> m_spSystemRegAccessCodeMap;
+    unique_ptr<SystemRegistersMapType> m_spSystemRegAccessCodeMap;
 
     const_regIterator RegistersBegin(_In_ RegisterGroupType type = CORE_REGS) const {return (type == CORE_REGS) ? m_spRegisterVector->begin() : m_spSystemRegisterVector->begin();}
     const_regIterator RegistersEnd(_In_ RegisterGroupType type = CORE_REGS) const {return (type == CORE_REGS) ? m_spRegisterVector->end() : m_spSystemRegisterVector->end();}

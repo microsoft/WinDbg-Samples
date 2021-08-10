@@ -75,10 +75,8 @@ namespace GdbSrvControllerLib
     };
 
     typedef ULONGLONG AddressType;
-    typedef std::map<std::string, std::string> gdbRegisterMapOrder;
-    typedef std::pair<std::string, std::string> systemPairRegOrderNameType;
-    typedef std::pair<AddressType, systemPairRegOrderNameType> pairAccessCodeNameRegisterEntry;
-    typedef std::map<AddressType, systemPairRegOrderNameType> systemRegistersMapType;
+    typedef std::pair<std::string, std::string> SystemPairRegOrderNameType;
+    typedef std::map<AddressType, SystemPairRegOrderNameType> SystemRegistersMapType;
 
     //  This structure indicates the fields of the stop reply reason response.
     typedef struct

@@ -49,7 +49,7 @@ class ConfigExdiGdbServerHelper final
         TargetArchitecture GetRegisterGroupArchitecture();
         void GetGdbServerRegisters(_Out_ unique_ptr<vector<RegistersStruct>>* spRegisters);
         void GetGdbServerSystemRegisters(_Out_ unique_ptr<vector<RegistersStruct>>* spSystemRegisters);
-        void GetSystemRegistersMapAccessCode(_Out_ unique_ptr<systemRegistersMapType>* spMapSystemRegs);
+        void GetSystemRegistersMapAccessCode(_Out_ unique_ptr<SystemRegistersMapType>* spMapSystemRegs);
         bool IsExceptionThrowEnabled();
         bool IsSupportedSpecialMemoryCommand();
         bool IsSupportedPhysicalMemoryCommand();

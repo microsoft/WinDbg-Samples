@@ -878,7 +878,7 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     pConfigTable->gdbServerRegisters.registerSet.push_back(move(GetTargetGdbServerArchitecture(registerExdiGdbData.RegisterArchitecture)));
                     if (pConfigTable->gdbServerRegisters.featureNameSupported == nullptr)
                     {
-                        pConfigTable->gdbServerRegisters.featureNameSupported.reset(new(std::nothrow) mapGdbServerRegFeatureSupported());
+                        pConfigTable->gdbServerRegisters.featureNameSupported.reset(new(std::nothrow) GdbServerRegFeatureSupportedMap());
                         if (pConfigTable->gdbServerRegisters.featureNameSupported == nullptr)
                         {
                             throw _com_error(E_OUTOFMEMORY);
@@ -891,7 +891,7 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
 
                     if (pConfigTable->gdbServerRegisters.spRegisterCoreSet.get() == nullptr)
                     {
-                        pConfigTable->gdbServerRegisters.spRegisterCoreSet.reset(new(std::nothrow) mapGdbServerRegister());
+                        pConfigTable->gdbServerRegisters.spRegisterCoreSet.reset(new(std::nothrow) GdbServerRegisterMap());
                         if (pConfigTable->gdbServerRegisters.spRegisterCoreSet == nullptr)
                         {
                             throw _com_error(E_OUTOFMEMORY);
@@ -899,7 +899,7 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     }
                     pConfigTable->gdbServerRegisters.spRegisterCoreSet->emplace(
                         pConfigTable->gdbServerRegisters.registerSet.back(),
-                        new(std::nothrow) vectorRegister());
+                        new(std::nothrow) RegisterVector());
 
                     //  Are system registers available via Core registers?
                     if (registerExdiGdbData.SystemRegistersStart != nullptr &&
@@ -909,14 +909,14 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     {
                         if (pConfigTable->gdbServerRegisters.spRegisterSystemSet.get() == nullptr)
                         {
-                            pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) mapGdbServerRegister());
+                            pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) GdbServerRegisterMap());
                             if (pConfigTable->gdbServerRegisters.spRegisterSystemSet == nullptr)
                             {
                                 throw _com_error(E_OUTOFMEMORY);
                             }
                             pConfigTable->gdbServerRegisters.spRegisterSystemSet->emplace(
                                 pConfigTable->gdbServerRegisters.registerSet.back(),
-                                new(std::nothrow) vectorRegister());
+                                new(std::nothrow) RegisterVector());
 
                             m_spSystemRegsRange.reset(new(std::nothrow) vector<size_t>());
                             if (m_spSystemRegsRange == nullptr)
@@ -1134,14 +1134,14 @@ bool XmlDataGdbServerRegisterFile::SetRegistersByTargetFile(_In_ TAG_ATTR_LIST* 
                 pConfigTable->gdbServerRegisters.featureName = registerFileData.featureName;
             }
 
-            pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) mapGdbServerRegister());
+            pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) GdbServerRegisterMap());
             if (pConfigTable->gdbServerRegisters.spRegisterSystemSet == nullptr)
             {
                 throw _com_error(E_OUTOFMEMORY);
             }
             pConfigTable->gdbServerRegisters.spRegisterSystemSet->emplace(
                 pConfigTable->file.registerGroupArchitecture,
-                new(std::nothrow) vectorRegister());
+                new(std::nothrow) RegisterVector());
 
             isSet = true;
         }
@@ -1340,14 +1340,14 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
 
             if (pConfigTable->systemRegisterMap.spSysRegisterMap.get() == nullptr)
             {
-                pConfigTable->systemRegisterMap.spSysRegisterMap.reset(new(std::nothrow) mapSystemRegCodeMap());
+                pConfigTable->systemRegisterMap.spSysRegisterMap.reset(new(std::nothrow) SystemRegCodeMap());
                 if (pConfigTable->systemRegisterMap.spSysRegisterMap == nullptr)
                 {
                     throw _com_error(E_OUTOFMEMORY);
                 }
                 pConfigTable->systemRegisterMap.spSysRegisterMap->emplace(
                     pConfigTable->systemRegisterMap.systemRegArchitecture.back(),
-                    new(std::nothrow) systemRegistersMapType());
+                    new(std::nothrow) SystemRegistersMapType());
             }
             isDone = true;
         }
@@ -1397,7 +1397,7 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             }
 
             //  Generate the map entry pair taking into account the Register order as well
-            systemPairRegOrderNameType regNameOrder = {};
+            SystemPairRegOrderNameType regNameOrder = {};
             regNameOrder.second = string(nameBuf);
             auto itVector = pConfigTable->gdbServerRegisters.spRegisterSystemSet->find(pConfigTable->systemRegisterMap.systemRegArchitecture.back());
             if (itVector == pConfigTable->gdbServerRegisters.spRegisterSystemSet->end())
@@ -1434,7 +1434,7 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
 }
 
 inline bool XmlDataSystemRegister::IsRegisterPresent(_In_ const string& regOrder,
-    _In_ std::unique_ptr <systemRegistersMapType>& spSysRegisterMap)
+    _In_ std::unique_ptr <SystemRegistersMapType>& spSysRegisterMap)
 {
     for (auto it = spSysRegisterMap->cbegin();
         it != spSysRegisterMap->cend();

@@ -311,7 +311,7 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
     }
 
     inline void ConfigExdiGdbServerHelperImpl::GetSystemRegistersMapAccessCode(
-        _Out_ unique_ptr<systemRegistersMapType> * spMapSystemRegs)
+        _Out_ unique_ptr<SystemRegistersMapType> * spMapSystemRegs)
     {
 
         for (auto const& arch : m_ExdiGdbServerData.systemRegisterMap.systemRegArchitecture)
@@ -846,7 +846,7 @@ bool ConfigExdiGdbServerHelper::IsSystemRegistersAvailable()
     return m_pConfigExdiGdbServerHelperImpl->IsSystemRegistersAvailable();
 }
 
-void ConfigExdiGdbServerHelper::GetSystemRegistersMapAccessCode(_Out_ unique_ptr<systemRegistersMapType> * spMapSystemRegs)
+void ConfigExdiGdbServerHelper::GetSystemRegistersMapAccessCode(_Out_ unique_ptr<SystemRegistersMapType> * spMapSystemRegs)
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
     m_pConfigExdiGdbServerHelperImpl->GetSystemRegistersMapAccessCode(spMapSystemRegs);
