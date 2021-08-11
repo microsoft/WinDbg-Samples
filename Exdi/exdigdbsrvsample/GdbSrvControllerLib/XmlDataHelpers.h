@@ -93,7 +93,7 @@ namespace GdbSrvControllerLib
     } ConfigGdbServerMemoryCommands;
 
     //  Type describes the vector Register structure
-    typedef std::vector<RegistersStruct> RegisterVector ;
+    typedef std::vector<RegistersStruct> RegisterVector;
     //  Type describes the map Register (key:architecture, value:register vector)
     typedef std::map<TargetArchitecture, std::unique_ptr<RegisterVector>> GdbServerRegisterMap;
     //  Type describes the map Feature Name Supported (key: target architecture, value: name of the additional register set supported)
