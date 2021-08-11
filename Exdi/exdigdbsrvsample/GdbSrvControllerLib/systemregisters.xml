@@ -1,7 +1,8 @@
 <SystemRegisterMap>
+  <!-- ARM64 System registers mapping -->
   <SystemRegisters Architecture = "ARM64" >
       <!-- system core registers -->
-    <register Name ="SPSR_EL1"   AccessCode = "3, 0,  4, 0, 0" />
+        <register Name ="SPSR_EL1"   AccessCode = "3, 0,  4, 0, 0" />
         <register Name ="SPSR_EL2"   AccessCode = "3, 4,  4, 0, 0" />
         <register Name ="SPSR_EL3"   AccessCode = "3, 6,  4, 0, 0" />
         <register Name ="ELR_EL1"    AccessCode = "3, 0,  4, 0, 1" />
@@ -167,6 +168,12 @@
         <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 1, 7" />
         <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 2, 7" />
         <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 3, 7" />
-
   </SystemRegisters>
+
+  <!-- x64 System registers mapping -->
+  <SystemRegisters Architecture = "X64" >
+    <!-- system core registers -->
+    <register Name ="efer"   AccessCode = "0xc0000080, 0, 0, 0, 0" />
+  </SystemRegisters>
+
 </SystemRegisterMap>

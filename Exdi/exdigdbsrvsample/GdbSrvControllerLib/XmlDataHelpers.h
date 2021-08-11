@@ -93,21 +93,27 @@ namespace GdbSrvControllerLib
     } ConfigGdbServerMemoryCommands;
 
     //  Type describes the vector Register structure
-    typedef std::vector<RegistersStruct> vectorRegister;
+    typedef std::vector<RegistersStruct> RegisterVector ;
+    //  Type describes the map Register (key:architecture, value:register vector)
+    typedef std::map<TargetArchitecture, std::unique_ptr<RegisterVector>> GdbServerRegisterMap;
+    //  Type describes the map Feature Name Supported (key: target architecture, value: name of the additional register set supported)
+    typedef std::map<TargetArchitecture, std::unique_ptr<std::wstring>> GdbServerRegFeatureSupportedMap;
+    //  Type describes the map System register map (key:architecture, value:map systemRegistersMapType)
+    typedef std::map<TargetArchitecture, std::unique_ptr<SystemRegistersMapType>> SystemRegCodeMap;
 
     //  This type indicates the GDB server registers
     typedef struct
     {
-        TargetArchitecture registerSet; //  The register set architecture.
-        std::unique_ptr<std::wstring> featureNameSupported;  //  Identifier for the feature name supported, so we can avoid failing
+        vector<TargetArchitecture> registerSet; //  The register set architecture.
+        std::unique_ptr<GdbServerRegFeatureSupportedMap> featureNameSupported;  //  Identifier for the feature name supported, so we can avoid failing
                                             //  processing in case that there is an item that is not supported in the feature
                                             //  registers, all - means all feature tags will be processed, other
                                             //  sys/banked - process only system register feature, this matches with the name
                                             //  populated in the feature name sent by the GDB server file.
         std::wstring featureName;       //  This field will be filled only for register files sent by the GDB server.
                                         //  and this describe the name of the GDBserver-entity-arch-reg.type
-        std::unique_ptr <vectorRegister> spRegisterCoreSet; //  Vector containing the target architecture core registers
-        std::unique_ptr <vectorRegister> spRegisterSystemSet; //  Vector containing the target architecture system registers
+        std::unique_ptr <GdbServerRegisterMap> spRegisterCoreSet; //  Map containing the target architecture core registers
+        std::unique_ptr <GdbServerRegisterMap> spRegisterSystemSet; //  Map containing the target architecture system registers
     } ConfigExdiGdServerRegisters;
 
     //
@@ -116,8 +122,8 @@ namespace GdbSrvControllerLib
     //
     typedef struct
     {
-        TargetArchitecture systemRegArchitecture; //  The register set architecture.
-        std::unique_ptr <systemRegistersMapType> spSysRegisterMap; //  Map containing the system register mapping to reg. access code
+        vector<TargetArchitecture> systemRegArchitecture; //  The register set architecture.
+        std::unique_ptr <SystemRegCodeMap> spSysRegisterMap; //  Map containing the system register mapping to reg. access code
     } ConfigSystemRegMapAccessCode;
 
     //  Type describe the target description xml file
@@ -210,6 +216,10 @@ namespace GdbSrvControllerLib
             _Out_writes_bytes_(maxSizeOfOutStructData) void* pOutData);
         static HRESULT HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAttrList,
             _Out_ ConfigExdiGdbSrvData* pConfigTable);
+
+    private:
+        static unique_ptr<vector<size_t>> m_spSystemRegsRange;
+
     };
 
     //  Functions to process tag & attributes for GDB server received xml register related files
@@ -240,7 +250,7 @@ namespace GdbSrvControllerLib
     private:
         static const ULONG c_numberOfAccessCodeFields = 5;
         static inline bool IsRegisterPresent(_In_ const std::string& regOrder,
-            _In_ std::unique_ptr <systemRegistersMapType>& spSysRegisterMap);
+            _In_ std::unique_ptr <SystemRegistersMapType>& spSysRegisterMap);
     };
 }
 #pragma endregion

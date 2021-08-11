@@ -8,7 +8,6 @@
 //----------------------------------------------------------------------------
 
 #pragma once
-#include "ExdiGdbSrvSample.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
@@ -77,7 +76,12 @@ typedef struct
     WCHAR RegisterArchitecture[C_MAX_ATTR_LENGTH];      //  The architecture of the set of registers that follows
     WCHAR FeatureNameSupported[C_MAX_ATTR_LENGTH];      //  The feature identifier : all-all feature files, 
                                                         //  sys/banked-system registers, core/general-main set of core registers, 
-    //  simdfp/float-floating point
+    WCHAR SystemRegistersStart[C_MAX_ATTR_LENGTH];      //  First Core Register order/number that identifies a System register
+                                                        //  used to create the system register map for
+                                                        //  GDB server that sends the System register together with Core registers
+    WCHAR SystemRegistersEnd[C_MAX_ATTR_LENGTH];        //  Last Core Register order/number that identifies the last System register
+                                                        //  The System registers would be grouped in order in the core register layout.
+                                                        //  simdfp/float-floating point
     WCHAR RegisterName[C_MAX_ATTR_LENGTH];              //  Register name
     WCHAR RegisterOrder[C_MAX_ATTR_LENGTH];             //  Register order
     WCHAR RegisterSize[C_MAX_ATTR_LENGTH];              //  Register size
@@ -154,6 +158,9 @@ typedef struct
     WCHAR AccessCode[C_MAX_ATTR_LENGTH];                //  Register access code
 } ConfigSystemRegMapAccessCodeEntry;
 
+//  Temporal buffer
+unique_ptr<vector<size_t>> XmlDataHelpers::m_spSystemRegsRange;
+
 //  Xml file tags and Attributes 
 const WCHAR exdiTargets[] = L"ExdiTargets";
 const WCHAR exdiTarget[] = L"ExdiTarget";
@@ -184,6 +191,8 @@ const WCHAR receivePacketTimeout[] = L"ReceivePacketTimeout";
 const WCHAR gdbServerRegisters[] = L"ExdiGdbServerRegisters";
 const WCHAR gdbRegisterArchitecture[] = L"Architecture";
 const WCHAR gdbFeatureNameSupported[] = L"FeatureNameSupported";
+const WCHAR gdbSystemRegistersStart[] = L"SystemRegistersStart";
+const WCHAR gdbSystemRegistersEnd[] = L"SystemRegistersEnd";
 const WCHAR gdbRegisterEntry[] = L"Entry";
 const WCHAR registerName[] = L"Name";
 const WCHAR registerOrder[] = L"Order";
@@ -216,7 +225,6 @@ const WCHAR tagSystemRegisterMap[] = L"SystemRegisterMap";
 const WCHAR tagSystemRegisters[] = L"SystemRegisters";
 const WCHAR tagRegisterEntry[] = L"register";
 const WCHAR attributeAccessCode[] = L"AccessCode";
-
 
 //  Target that needs to be selected - handler map
 const XML_ATTRNAME_HANDLER_STRUCT attrExdiTargetsHandlerMap[] =
@@ -280,6 +288,8 @@ const XML_ATTRNAME_HANDLER_STRUCT attrGdbServerRegisters[] =
 {
     {gdbServerRegisters, gdbRegisterArchitecture,  XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, RegisterArchitecture), C_MAX_ATTR_LENGTH},
     {gdbServerRegisters, gdbFeatureNameSupported,  XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, FeatureNameSupported), C_MAX_ATTR_LENGTH},
+    {gdbServerRegisters, gdbSystemRegistersStart,  XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, SystemRegistersStart), C_MAX_ATTR_LENGTH},
+    {gdbServerRegisters, gdbSystemRegistersEnd,    XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, SystemRegistersEnd), C_MAX_ATTR_LENGTH},
     {gdbRegisterEntry,   registerName,             XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, RegisterName), C_MAX_ATTR_LENGTH},
     {gdbRegisterEntry,   registerOrder,            XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, RegisterOrder), C_MAX_ATTR_LENGTH},
     {gdbRegisterEntry,   registerSize,             XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiGdServerRegistersEntry, RegisterSize), C_MAX_ATTR_LENGTH},
@@ -612,7 +622,7 @@ TargetArchitecture XmlDataHelpers::GetTargetGdbServerArchitecture(_In_ PCWSTR pD
     }
     else if (_wcsicmp(pDataString, L"X64") == 0)
     {
-        assert(false);
+        targetData = AMD64_ARCH;
     }
     else if (_wcsicmp(pDataString, L"ARM") == 0)
     {
@@ -643,7 +653,7 @@ DWORD XmlDataHelpers::GetTargetGdbServerFamily(_In_ PCWSTR pDataString)
     }
     else if (_wcsicmp(pDataString, L"ProcessorFamilyX64") == 0)
     {
-        assert(false);
+        targetData = PROCESSOR_FAMILY_X86;
     }
     else if (_wcsicmp(pDataString, L"ProcessorFamilyARM") == 0)
     {
@@ -865,17 +875,68 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     sizeof(ConfigExdiGdServerRegistersEntry), static_cast<void*>(&registerExdiGdbData));
                 if (SUCCEEDED(hr))
                 {
-                    pConfigTable->gdbServerRegisters.registerSet = GetTargetGdbServerArchitecture(registerExdiGdbData.RegisterArchitecture);
+                    pConfigTable->gdbServerRegisters.registerSet.push_back(move(GetTargetGdbServerArchitecture(registerExdiGdbData.RegisterArchitecture)));
                     if (pConfigTable->gdbServerRegisters.featureNameSupported == nullptr)
                     {
-                        pConfigTable->gdbServerRegisters.featureNameSupported.reset(new(std::nothrow) wstring());
+                        pConfigTable->gdbServerRegisters.featureNameSupported.reset(new(std::nothrow) GdbServerRegFeatureSupportedMap());
                         if (pConfigTable->gdbServerRegisters.featureNameSupported == nullptr)
                         {
                             throw _com_error(E_OUTOFMEMORY);
                         }
 
                     }
-                    pConfigTable->gdbServerRegisters.featureNameSupported->assign(registerExdiGdbData.FeatureNameSupported);
+                    pConfigTable->gdbServerRegisters.featureNameSupported->emplace(
+                        pConfigTable->gdbServerRegisters.registerSet.back(),
+                        new(std::nothrow) wstring(registerExdiGdbData.FeatureNameSupported));
+
+                    if (pConfigTable->gdbServerRegisters.spRegisterCoreSet.get() == nullptr)
+                    {
+                        pConfigTable->gdbServerRegisters.spRegisterCoreSet.reset(new(std::nothrow) GdbServerRegisterMap());
+                        if (pConfigTable->gdbServerRegisters.spRegisterCoreSet == nullptr)
+                        {
+                            throw _com_error(E_OUTOFMEMORY);
+                        }
+                    }
+                    pConfigTable->gdbServerRegisters.spRegisterCoreSet->emplace(
+                        pConfigTable->gdbServerRegisters.registerSet.back(),
+                        new(std::nothrow) RegisterVector());
+
+                    //  Are system registers available via Core registers?
+                    if (registerExdiGdbData.SystemRegistersStart != nullptr &&
+                        registerExdiGdbData.SystemRegistersEnd != nullptr &&
+                        registerExdiGdbData.SystemRegistersStart[0] != '\x0' &&
+                        registerExdiGdbData.SystemRegistersEnd[0] != '\x0')
+                    {
+                        if (pConfigTable->gdbServerRegisters.spRegisterSystemSet.get() == nullptr)
+                        {
+                            pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) GdbServerRegisterMap());
+                            if (pConfigTable->gdbServerRegisters.spRegisterSystemSet == nullptr)
+                            {
+                                throw _com_error(E_OUTOFMEMORY);
+                            }
+                            pConfigTable->gdbServerRegisters.spRegisterSystemSet->emplace(
+                                pConfigTable->gdbServerRegisters.registerSet.back(),
+                                new(std::nothrow) RegisterVector());
+
+                            m_spSystemRegsRange.reset(new(std::nothrow) vector<size_t>());
+                            if (m_spSystemRegsRange == nullptr)
+                            {
+                                throw _com_error(E_OUTOFMEMORY);
+                            }
+                            size_t rangeStart;
+                            if (swscanf_s(registerExdiGdbData.SystemRegistersStart, L"%zx", &rangeStart) != 1)
+                            {
+                                throw _com_error(E_INVALIDARG);
+                            }
+                            size_t rangeEnd;
+                            if (swscanf_s(registerExdiGdbData.SystemRegistersEnd, L"%zx", &rangeEnd) != 1)
+                            {
+                                throw _com_error(E_INVALIDARG);
+                            }
+                            m_spSystemRegsRange->push_back(rangeStart);
+                            m_spSystemRegsRange->push_back(rangeEnd);
+                        }
+                    }
                     isSet = true;
                 }
             }
@@ -900,22 +961,45 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                         throw _com_error(E_INVALIDARG);
                     }
 
-                    if (pConfigTable->gdbServerRegisters.spRegisterCoreSet.get() == nullptr)
-                    {
-                        pConfigTable->gdbServerRegisters.spRegisterCoreSet.reset(new(std::nothrow) vectorRegister());
-                        if (pConfigTable->gdbServerRegisters.spRegisterCoreSet == nullptr)
-                        {
-                            throw _com_error(E_OUTOFMEMORY);
-                        }
-                    }
-
                     RegistersStruct registerSet = {};
                     registerSet.name = nameBuf;
                     registerSet.nameOrder = nameOrderBuf;
                     registerSet.registerSize = static_cast<size_t>(_wtoi(registerData.RegisterSize));
                     registerSet.group = "core";
-                    pConfigTable->gdbServerRegisters.spRegisterCoreSet->push_back(move(registerSet));
+                    auto it = pConfigTable->gdbServerRegisters.spRegisterCoreSet->find(pConfigTable->gdbServerRegisters.registerSet.back());
+                    if (it == pConfigTable->gdbServerRegisters.spRegisterCoreSet->end())
+                    {
+                        throw _com_error(E_INVALIDARG);
+                    }
+                    it->second->push_back(move(registerSet));
 
+                    //  check if there is a core register that needs to be reported as
+                    //  system register
+                    if (pConfigTable->gdbServerRegisters.spRegisterSystemSet != nullptr &&
+                        m_spSystemRegsRange != nullptr)
+                    {
+                        auto itSystem = pConfigTable->gdbServerRegisters.spRegisterSystemSet->find(pConfigTable->gdbServerRegisters.registerSet.back());
+                        if (itSystem != pConfigTable->gdbServerRegisters.spRegisterSystemSet->end())
+                        {
+                            size_t coreRegister;
+                            if (swscanf_s(registerData.RegisterOrder, L"%zx", &coreRegister) != 1)
+                            {
+                                throw _com_error(E_INVALIDARG);
+                            }
+
+                            size_t rangeLow = (*m_spSystemRegsRange.get())[0];
+                            size_t rangeHigh = (*m_spSystemRegsRange.get())[1];
+                            if (rangeLow <= coreRegister && coreRegister <= rangeHigh)
+                            {
+                                RegistersStruct systemRegisterSet = {};
+                                systemRegisterSet.name = nameBuf;
+                                systemRegisterSet.nameOrder = nameOrderBuf;
+                                systemRegisterSet.registerSize = static_cast<size_t>(_wtoi(registerData.RegisterSize));
+                                systemRegisterSet.group = "system";
+                                itSystem->second->push_back(move(systemRegisterSet));
+                            }
+                        }
+                    }
                     isSet = true;
                 }
             }
@@ -1003,9 +1087,11 @@ bool XmlDataGdbServerRegisterFile::SetFileTargetArchitecture(_In_ PCWSTR pTagVal
     {
         pConfigTable->file.registerGroupArchitecture = ARM64_ARCH;
     }
-    else if (_wcsicmp(pTagValue, L"x86-x64") == 0)
+    else if (_wcsicmp(pTagValue, L"x86-x64") == 0 ||
+             _wcsicmp(pTagValue, L"i386:x86-64") == 0 ||
+             _wcsicmp(pTagValue, L"X64") == 0)
     {
-        pConfigTable->file.registerGroupArchitecture = ARM64_ARCH;
+        pConfigTable->file.registerGroupArchitecture = AMD64_ARCH;
     }
     else if (_wcsicmp(pTagValue, L"ARM") == 0)
     {
@@ -1036,12 +1122,27 @@ bool XmlDataGdbServerRegisterFile::SetRegistersByTargetFile(_In_ TAG_ATTR_LIST* 
         if (SUCCEEDED(hr))
         {
             //  Check if the feature is supported
-            if ((pConfigTable->gdbServerRegisters.featureNameSupported->compare(L"all") == 0) ||
-                (wcsstr(registerFileData.featureName,
-                    pConfigTable->gdbServerRegisters.featureNameSupported->c_str()) != nullptr))
+            auto it = pConfigTable->gdbServerRegisters.featureNameSupported->find(pConfigTable->file.registerGroupArchitecture);
+            if (it == pConfigTable->gdbServerRegisters.featureNameSupported->end())
+            {
+                throw _com_error(E_INVALIDARG);
+            }
+
+            if ((it->second->compare(L"all") == 0) ||
+                (wcsstr(registerFileData.featureName, it->second->c_str()) != nullptr))
             {
                 pConfigTable->gdbServerRegisters.featureName = registerFileData.featureName;
             }
+
+            pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) GdbServerRegisterMap());
+            if (pConfigTable->gdbServerRegisters.spRegisterSystemSet == nullptr)
+            {
+                throw _com_error(E_OUTOFMEMORY);
+            }
+            pConfigTable->gdbServerRegisters.spRegisterSystemSet->emplace(
+                pConfigTable->file.registerGroupArchitecture,
+                new(std::nothrow) RegisterVector());
+
             isSet = true;
         }
     }
@@ -1078,21 +1179,18 @@ bool XmlDataGdbServerRegisterFile::SetRegistersByTargetFile(_In_ TAG_ATTR_LIST* 
                 throw _com_error(E_INVALIDARG);
             }
 
-            if (pConfigTable->gdbServerRegisters.spRegisterSystemSet.get() == nullptr)
-            {
-                pConfigTable->gdbServerRegisters.spRegisterSystemSet.reset(new(std::nothrow) vectorRegister());
-                if (pConfigTable->gdbServerRegisters.spRegisterSystemSet == nullptr)
-                {
-                    throw _com_error(E_OUTOFMEMORY);
-                }
-            }
-
             RegistersStruct registerSet = {};
             registerSet.name = nameBuf;
             registerSet.nameOrder = nameOrderBuf;
             registerSet.registerSize = registerSize;
             registerSet.group = groupBuf;
-            pConfigTable->gdbServerRegisters.spRegisterSystemSet->push_back(move(registerSet));
+            auto it = pConfigTable->gdbServerRegisters.spRegisterSystemSet->find(pConfigTable->file.registerGroupArchitecture);
+            if (it == pConfigTable->gdbServerRegisters.spRegisterSystemSet->end())
+            {
+                throw _com_error(E_INVALIDARG);
+            }
+            it->second->push_back(move(registerSet));
+
             isSet = true;
         }
     }
@@ -1141,7 +1239,8 @@ bool XmlDataGdbServerRegisterFile::HandleTargetFileTags(_In_ TAG_ATTR_LIST* cons
             }
 
             isDone = true;
-            if (wcsstr(targetFileData.registerFile, L"core") != nullptr || wcsstr(targetFileData.registerFile, L"general") != nullptr)
+            if (wcsstr(targetFileData.registerFile, L"core") != nullptr || wcsstr(targetFileData.registerFile, L"general") != nullptr ||
+                wcsstr(targetFileData.registerFile, L"i386-64") != nullptr)
             {
                 pConfigTable->file.registerGroupFiles->insert({ RegisterGroupType::CORE_REGS, move(targetFileData.registerFile) });
             }
@@ -1222,8 +1321,34 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             sizeof(ConfigSystemRegMapAccessCodeEntry), static_cast<void*>(&systemRegMapData));
         if (SUCCEEDED(hr))
         {
-            pConfigTable->systemRegisterMap.systemRegArchitecture =
-                XmlDataHelpers::GetTargetGdbServerArchitecture(systemRegMapData.RegisterArchitecture);
+            TargetArchitecture arch = XmlDataHelpers::GetTargetGdbServerArchitecture(systemRegMapData.RegisterArchitecture);
+            //  Process only map for architecture with the system registers have been created
+            if (pConfigTable->gdbServerRegisters.spRegisterSystemSet == nullptr ||
+                pConfigTable->gdbServerRegisters.spRegisterSystemSet->empty())
+            {
+                return isDone;
+            }
+
+            auto itVector = pConfigTable->gdbServerRegisters.spRegisterSystemSet->find(arch);
+            if (itVector == pConfigTable->gdbServerRegisters.spRegisterSystemSet->end())
+            {
+                //  This is not the architecture of the current built system register map.
+                return true;
+            }
+
+            pConfigTable->systemRegisterMap.systemRegArchitecture.push_back(arch);
+
+            if (pConfigTable->systemRegisterMap.spSysRegisterMap.get() == nullptr)
+            {
+                pConfigTable->systemRegisterMap.spSysRegisterMap.reset(new(std::nothrow) SystemRegCodeMap());
+                if (pConfigTable->systemRegisterMap.spSysRegisterMap == nullptr)
+                {
+                    throw _com_error(E_OUTOFMEMORY);
+                }
+                pConfigTable->systemRegisterMap.spSysRegisterMap->emplace(
+                    pConfigTable->systemRegisterMap.systemRegArchitecture.back(),
+                    new(std::nothrow) SystemRegistersMapType());
+            }
             isDone = true;
         }
     }
@@ -1233,13 +1358,11 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             sizeof(ConfigSystemRegMapAccessCodeEntry), static_cast<void*>(&systemRegMapData));
         if (SUCCEEDED(hr))
         {
-            if (pConfigTable->systemRegisterMap.spSysRegisterMap == nullptr)
+            if (pConfigTable->systemRegisterMap.spSysRegisterMap.get() == nullptr ||
+                pConfigTable->systemRegisterMap.systemRegArchitecture.empty())
             {
-                pConfigTable->systemRegisterMap.spSysRegisterMap.reset(new(std::nothrow) systemRegistersMapType());
-                if (pConfigTable->systemRegisterMap.spSysRegisterMap == nullptr)
-                {
-                    throw _com_error(E_OUTOFMEMORY);
-                }
+                //  Ignore since the map has not been created for the current architecture
+                return true;
             }
 
             char nameBuf[128] = {};
@@ -1251,7 +1374,9 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             }
 
             std::vector<int> accessCodeVector;
-            TargetArchitectureHelpers::TokenizeAccessCode(systemRegMapData.AccessCode,
+            TargetArchitectureHelpers::TokenizeAccessCodeByArch(
+                pConfigTable->systemRegisterMap.systemRegArchitecture.back(),
+                systemRegMapData.AccessCode,
                 L",", &accessCodeVector);
             if (accessCodeVector.size() != c_numberOfAccessCodeFields)
             {
@@ -1260,7 +1385,7 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
 
             //  Encode accesscode 
             AddressType encodedValue = TargetArchitectureHelpers::EncodeAccessCode(
-                pConfigTable->systemRegisterMap.systemRegArchitecture,
+                pConfigTable->systemRegisterMap.systemRegArchitecture.back(),
                 accessCodeVector[0],
                 accessCodeVector[1],
                 accessCodeVector[2],
@@ -1272,13 +1397,25 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             }
 
             //  Generate the map entry pair taking into account the Register order as well
-            systemPairRegOrderNameType regNameOrder = {};
+            SystemPairRegOrderNameType regNameOrder = {};
             regNameOrder.second = string(nameBuf);
-            for (auto it = pConfigTable->gdbServerRegisters.spRegisterSystemSet->cbegin();
-                it != pConfigTable->gdbServerRegisters.spRegisterSystemSet->cend(); ++it)
+            auto itVector = pConfigTable->gdbServerRegisters.spRegisterSystemSet->find(pConfigTable->systemRegisterMap.systemRegArchitecture.back());
+            if (itVector == pConfigTable->gdbServerRegisters.spRegisterSystemSet->end())
+            {
+                throw _com_error(E_INVALIDARG);
+            }
+
+            auto itMap = pConfigTable->systemRegisterMap.spSysRegisterMap->find(pConfigTable->systemRegisterMap.systemRegArchitecture.back());
+            if (itMap == pConfigTable->systemRegisterMap.spSysRegisterMap->end())
+            {
+                throw _com_error(E_INVALIDARG);
+            }
+
+            for (auto it = itVector->second->cbegin();
+                 it != itVector->second->cend(); ++it)
             {
                 if (it->name == regNameOrder.second &&
-                    !IsRegisterPresent(it->nameOrder, pConfigTable->systemRegisterMap.spSysRegisterMap))
+                    !IsRegisterPresent(it->nameOrder, itMap->second))
                 {
                     regNameOrder.first = string(it->nameOrder);
                     break;
@@ -1289,7 +1426,7 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             {
                 regNameOrder.first = string("n/a");
             }
-            pConfigTable->systemRegisterMap.spSysRegisterMap->insert({encodedValue, move(regNameOrder)});
+            itMap->second->insert({(encodedValue & 0xffffffff), move(regNameOrder)});
             isDone = true;
         }
     }
@@ -1297,7 +1434,7 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
 }
 
 inline bool XmlDataSystemRegister::IsRegisterPresent(_In_ const string& regOrder,
-    _In_ std::unique_ptr <systemRegistersMapType>& spSysRegisterMap)
+    _In_ std::unique_ptr <SystemRegistersMapType>& spSysRegisterMap)
 {
     for (auto it = spSysRegisterMap->cbegin();
         it != spSysRegisterMap->cend();

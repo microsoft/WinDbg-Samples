@@ -179,12 +179,15 @@
   <!-- QEMU SW simulator GDB server configuration -->
   <ExdiTarget Name = "QEMU">
     <ExdiGdbServerConfigData agentNamePacket = "" uuid = "72d4aeda-9723-4972-b89a-679ac79810ef" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386">
-      <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xfffe" targetDescriptionFile = "target.xml" />
+      <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xffe" targetDescriptionFile = "target.xml" />
       <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
         <Value HostNameAndPort="LocalHost:1234" />
       </GdbServerConnectionParameters>
       <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "no" SystemRegisterDecoding = "no">
       </ExdiGdbServerMemoryCommands>
+
+      <!-- ARM64 GDB server core resgisters -->
+
       <ExdiGdbServerRegisters Architecture = "ARM64" FeatureNameSupported = "sys">
         <Entry Name ="X0"  Order = "0" Size = "8" />
         <Entry Name ="X1"  Order = "1" Size = "8" />
@@ -254,6 +257,189 @@
         <Entry Name ="V31" Order = "3f" Size = "16" />
         <Entry Name ="fpsr" Order = "40" Size = "4" />
         <Entry Name ="fpcr" Order = "41" Size = "4" />
+      </ExdiGdbServerRegisters>
+
+      <!-- x64 GDB server core resgisters -->
+
+      <ExdiGdbServerRegisters Architecture = "X64" FeatureNameSupported = "sys" SystemRegistersStart = "18" SystemRegistersEnd = "20" >
+        <Entry Name ="rax" Order = "0" Size ="8" />
+        <Entry Name ="rbx" Order = "1" Size ="8" />
+        <Entry Name ="rcx" Order = "2" Size ="8" />
+        <Entry Name ="rdx" Order = "3" Size ="8" />
+        <Entry Name ="rsi" Order = "4" Size ="8" />
+        <Entry Name ="rdi" Order = "5" Size ="8" />
+        <Entry Name ="rbp" Order = "6" Size ="8" />
+        <Entry Name ="rsp" Order = "7" Size ="8" />
+        <Entry Name ="r8"  Order = "8" Size ="8" />
+        <Entry Name ="r9"  Order = "9" Size ="8" />
+        <Entry Name ="r10" Order = "a" Size ="8" />
+        <Entry Name ="r11" Order = "b" Size ="8" />
+        <Entry Name ="r12" Order = "c" Size ="8" />
+        <Entry Name ="r13" Order = "d" Size ="8" />
+        <Entry Name ="r14" Order = "e" Size ="8" />
+        <Entry Name ="r15" Order = "f" Size ="8" />
+        <Entry Name ="rip" Order = "10" Size ="8" />
+        <!-- <flags id="x64_eflags" size="4">
+              <field name="" start="22" end="31"/>
+              <field name="ID" start="21" end="21"/>
+              <field name="VIP" start="20" end="20"/>
+              <field name="VIF" start="19" end="19"/>
+              <field name="AC" start="18" end="18"/>
+              <field name="VM" start="17" end="17"/>
+              <field name="RF" start="16" end="16"/>
+              <field name="" start="15" end="15"/>
+              <field name="NT" start="14" end="14"/>
+              <field name="IOPL" start="12" end="13"/>
+              <field name="OF" start="11" end="11"/>
+              <field name="DF" start="10" end="10"/>
+              <field name="IF" start="9" end="9"/>
+              <field name="TF" start="8" end="8"/>
+              <field name="SF" start="7" end="7"/>
+              <field name="ZF" start="6" end="6"/>
+              <field name="" start="5" end="5"/>
+              <field name="AF" start="4" end="4"/>
+              <field name="" start="3" end="3"/>
+              <field name="PF" start="2" end="2"/>
+              <field name="" start="1" end="1"/>
+              <field name="CF" start="0" end="0"/>
+          </flags> -->
+        <Entry Name ="eflags" Order = "11" Size ="4" />
+
+        <!-- Segment registers -->
+        <Entry Name ="cs" Order = "12" Size ="4" />
+        <Entry Name ="ss" Order = "13" Size ="4" />
+        <Entry Name ="ds" Order = "14" Size ="4" />
+        <Entry Name ="es" Order = "15" Size ="4" />
+        <Entry Name ="fs" Order = "16" Size ="4" />
+        <Entry Name ="gs" Order = "17" Size ="4" />
+
+        <!-- Segment descriptor caches and TLS base MSRs -->
+        <!--Entry Name ="cs_base" Order = "18" Size="8"/
+        <Entry Name ="ss_base" Order = "18" Size ="8" />
+        <Entry Name ="ds_base" Order = "19" Size ="8" />
+        <Entry Name ="es_base" Order = "1a" Size ="8" /> -->
+        <Entry Name ="fs_base" Order = "18" Size ="8" />
+        <Entry Name ="gs_base" Order = "19" Size ="8" />
+        <Entry Name ="k_gs_base" Order = "1a" Size ="8" />
+
+        <!-- Control registers -->
+        <!-- the cr0 register format fields:
+         <flags id="x64_cr0" size="8">
+          <field name="PG" start="31" end="31"/>
+          <field name="CD" start="30" end="30"/>
+          <field name="NW" start="29" end="29"/>
+          <field name="AM" start="18" end="18"/>
+          <field name="WP" start="16" end="16"/>
+          <field name="NE" start="5" end="5"/>
+          <field name="ET" start="4" end="4"/>
+          <field name="TS" start="3" end="3"/>
+          <field name="EM" start="2" end="2"/>
+          <field name="MP" start="1" end="1"/>
+          <field name="PE" start="0" end="0"/>
+         </flags> -->
+        <Entry Name ="cr0" Order = "1b" Size ="8" />
+        <Entry Name ="cr2" Order = "1c" Size ="8" />
+
+        <!-- the cr3 register format fields:
+          <flags id="x64_cr3" size="8">
+            <field name="PDBR" start="12" end="63"/>
+            <field name="PCID" start="0" end="11"/>
+         </flags> -->
+        <Entry Name ="cr3" Order = "1d" Size ="8" />
+
+        <!-- the cr4 register format fields:
+          <flags id="x64_cr4" size="8">
+            <field name="PKE" start="22" end="22"/>
+            <field name="SMAP" start="21" end="21"/>
+            <field name="SMEP" start="20" end="20"/>
+            <field name="OSXSAVE" start="18" end="18"/>
+            <field name="PCIDE" start="17" end="17"/>
+            <field name="FSGSBASE" start="16" end="16"/>
+            <field name="SMXE" start="14" end="14"/>
+            <field name="VMXE" start="13" end="13"/>
+            <field name="LA57" start="12" end="12"/>
+            <field name="UMIP" start="11" end="11"/>
+            <field name="OSXMMEXCPT" start="10" end="10"/>
+            <field name="OSFXSR" start="9" end="9"/>
+            <field name="PCE" start="8" end="8"/>
+            <field name="PGE" start="7" end="7"/>
+            <field name="MCE" start="6" end="6"/>
+            <field name="PAE" start="5" end="5"/>
+            <field name="PSE" start="4" end="4"/>
+            <field name="DE" start="3" end="3"/>
+            <field name="TSD" start="2" end="2"/>
+            <field name="PVI" start="1" end="1"/>
+            <field name="VME" start="0" end="0"/>
+         </flags> -->
+        <Entry Name ="cr4" Order = "1e" Size ="8" />
+        <Entry Name ="cr8" Order = "1f" Size ="8" />
+
+        <!-- the efer register format fields:
+        <flags id="x64_efer" size="8">
+           <field name="TCE" start="15" end="15"/>
+           <field name="FFXSR" start="14" end="14"/>
+           <field name="LMSLE" start="13" end="13"/>
+           <field name="SVME" start="12" end="12"/>
+           <field name="NXE" start="11" end="11"/>
+           <field name="LMA" start="10" end="10"/>
+           <field name="LME" start="8" end="8"/>
+           <field name="SCE" start="0" end="0"/>
+         </flags> -->
+        <Entry Name ="efer" Order = "20" Size ="8"/>
+
+        <!-- x87 FPU -->
+        <Entry Name ="st0" Order = "21" Size ="10" />
+        <Entry Name ="st1" Order = "22" Size ="10" />
+        <Entry Name ="st2" Order = "23" Size ="10" />
+        <Entry Name ="st3" Order = "24" Size ="10" />
+        <Entry Name ="st4" Order = "25" Size ="10" />
+        <Entry Name ="st5" Order = "26" Size ="10" />
+        <Entry Name ="st6" Order = "27" Size ="10" />
+        <Entry Name ="st7" Order = "28" Size ="10" />
+        <Entry Name ="fctrl" Order = "29" Size ="4" />
+        <Entry Name ="fstat" Order = "2a" Size ="4" />
+        <Entry Name ="ftag"  Order = "2b" Size ="4" />
+        <Entry Name ="fiseg" Order = "2c" Size ="4" />
+        <Entry Name ="fioff" Order = "2d" Size ="4" />
+        <Entry Name ="foseg" Order = "2e" Size ="4" />
+        <Entry Name ="fooff" Order = "2f" Size ="4" />
+        <Entry Name ="fop" Order = "30" Size ="4" />
+        <Entry Name ="xmm0" Order = "31" Size ="16"  />
+        <Entry Name ="xmm1" Order = "32" Size ="16"  />
+        <Entry Name ="xmm2" Order = "33" Size ="16"  />
+        <Entry Name ="xmm3" Order = "34" Size ="16"  />
+        <Entry Name ="xmm4" Order = "35" Size ="16"  />
+        <Entry Name ="xmm5" Order = "36" Size ="16"  />
+        <Entry Name ="xmm6" Order = "37" Size ="16"  />
+        <Entry Name ="xmm7" Order = "38" Size ="16"  />
+        <Entry Name ="xmm8" Order = "39" Size ="16"  />
+        <Entry Name ="xmm9" Order = "3a" Size ="16"  />
+        <Entry Name ="xmm10" Order = "3b" Size ="16"  />
+        <Entry Name ="xmm11" Order = "3c" Size ="16"  />
+        <Entry Name ="xmm12" Order = "3d" Size ="16"  />
+        <Entry Name ="xmm13" Order = "3e" Size ="16"  />
+        <Entry Name ="xmm14" Order = "3f" Size ="16"  />
+        <Entry Name ="xmm15" Order = "40" Size ="16"  />
+
+        <!-- the mxcsr register format fields:
+          <flags id="x64_mxcsr" size="4">
+             <field name="IE" start="0" end="0"/>
+             <field name="DE" start="1" end="1"/>
+             <field name="ZE" start="2" end="2"/>
+             <field name="OE" start="3" end="3"/>
+             <field name="UE" start="4" end="4"/>
+             <field name="PE" start="5" end="5"/>
+             <field name="DAZ" start="6" end="6"/>
+             <field name="IM" start="7" end="7"/>
+             <field name="DM" start="8" end="8"/>
+             <field name="ZM" start="9" end="9"/>
+             <field name="OM" start="10" end="10"/>
+             <field name="UM" start="11" end="11"/>
+             <field name="PM" start="12" end="12"/>
+             <field name="FZ" start="15" end="15"/>
+          </flags> -->
+        <Entry Name ="mxcsr" Order = "41" Size ="4" />
+
       </ExdiGdbServerRegisters>
     </ExdiGdbServerConfigData>
   </ExdiTarget>
