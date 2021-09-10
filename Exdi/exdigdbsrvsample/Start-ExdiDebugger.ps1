@@ -1,11 +1,11 @@
 ﻿<#
 .Synopsis
-  Installs and launches exdi debugger (automating xml file editing)
+    Installs and launches exdi debugger (automating xml file editing)
 
 .Description
-  This script will install ExdiGdbSrvSample.dll if required, configure the xml settings
-  files, check for running dllhost.exe processes, and launch the debugger to connect to
-  an already running gdb server hardware debugging target.
+    This script will install ExdiGdbSrvSample.dll if required, configure the xml settings
+    files, check for running dllhost.exe processes, and launch the debugger to connect to
+    an already running gdb server hardware debugging target.
 
 .Parameter ExdiTarget
     Type of target to connect to. This corresponds to a specific section in the settings xml file
@@ -41,7 +41,7 @@
 
 .Example
     >---------------- MSFT Internal usage (first run) ------------<
-    .\Start-ExdiDebugger.ps1 -ExdiTarget "QEMU" -GdbPort 1234 -Architecture x64 -ExdiDropPath "\dbg\privates\daily\latest\uncompressed\amd64\exdi"
+    .\Start-ExdiDebugger.ps1 -ExdiTarget "QEMU" -GdbPort 1234 -Architecture x64 -ExdiDropPath "\\dbg\privates\daily\latest\uncompressed\amd64\exdi"
 
 .Example
     PS>.\Start-ExdiDebugger.ps1 -ExdiTarget "QEMU" -GdbPort 1234 -Architecture x64
@@ -70,7 +70,7 @@ param
     $ExdiDropPath,
 
     [string]
-    $DebuggerPath = "$env:LOCALAPPDATA\DBG\UI\WindbgX.exe",
+    $DebuggerPath,
 
     [string[]]
     $ExtraDebuggerArgs = @(),
@@ -88,7 +88,22 @@ $ErrorActionPreference = "Stop"
 
 Function Test-Admin
 {
-    ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]“Administrator”)
+    ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]"Administrator")
+}
+
+Function Find-PathToWindbgX
+{
+    $InternalWindbgXPath = "$env:LOCALAPPDATA\DBG\UI\WindbgX.exe"
+    $ExternalWindbgXPath = "$env:LOCALAPPDATA\Microsoft\WindowsApps\WinDbgX.exe"
+
+    if (Test-Path $InternalWindbgXPath -PathType Leaf)
+    {
+        return $InternalWindbgXPath
+    }
+    elseif (Test-Path $ExternalWindbgXPath -PathType Leaf)
+    {
+        return $ExternalWindbgXPath
+    }
 }
 
 Function Test-ParameterValidation
@@ -100,27 +115,13 @@ Function Test-ParameterValidation
         Get-Variable -Name $Parameter.Values.Name -ErrorAction SilentlyContinue | Out-String | Write-Verbose
     }
 
-    if (-not (Test-Path $DebuggerPath -PathType Leaf))
+    if (-not $DebuggerPath)
     {
-        if ($DebuggerPath -eq "$env:LOCALAPPDATA\DBG\UI\WindbgX.exe")
-        {
-            Write-Verbose "Internal Windbg not installed"
-            $externalWindbg = Get-AppxPackage -Name Microsoft.WinDbg
-            if ($externalWindbg -ne $null)
-            {
-                Write-Verbose "External Windbg installation found"
-                $script:DebuggerPath = Join-Path -Path "$($externalWindbg.InstallLocation)" -ChildPath "DbgX.Shell.exe"
-                Write-Verbose "DebuggerPath = $DebuggerPath"
-            }
-            else
-            {            
-                throw "Windbg not installed."
-            }
-        }
-        else
-        {
-            throw "DebuggerPath param ($DebuggerPath) does not point to a debugger."
-        }
+        throw "WindbgX is not installed"
+    }
+    elseif (-not (Test-Path $DebuggerPath -PathType Leaf))
+    {
+        throw "DebuggerPath param ($DebuggerPath) does not point to a debugger."
     }
 
     # Searching for loaded instances of ExdiGdbSrvSample.dll in dllhost.exe requires elevation
@@ -253,6 +254,12 @@ Function Stop-ExdiContainingDllHosts
 
 #region Script
 
+# Apply defaults for $DebuggerPath before Parameter validation
+if (-not $DebuggerPath)
+{
+    $DebuggerPath = Find-PathToWindbgX
+}
+
 Test-ParameterValidation
 
 # look clean up dllhost.exe early since it can hold a lock on files which
@@ -269,15 +276,7 @@ if (-not $(Test-ExdiServerInstalled))
         throw "ExdiServer is not installed and -ExdiDropPath is not valid"
     }
 
-    if ($DebuggerPath -like "*DbgX.Shell.exe")
-    {
-        # Cannot install exdi server in appx dir so use localappdata
-        $ExdiInstallDir = "$env:LOCALAPPDATA\DBG\exdi"
-    }
-    else
-    {
-        $ExdiInstallDir = Join-Path -Path "$([System.IO.Path]::GetDirectoryName($DebuggerPath))" -ChildPath "exdi"
-    }
+    $ExdiInstallDir = Join-Path -Path "$([System.IO.Path]::GetDirectoryName($DebuggerPath))" -ChildPath "exdi"
     Install-ExdiServer -InstallFrom "$ExdiDropPath" -InstallTo "$ExdiInstallDir"
 }
 
