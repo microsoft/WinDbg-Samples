@@ -337,12 +337,12 @@ public:
         while (token != nullptr)
         {
             int tokenValue;
-            if (sscanf_s(token, "%d", &tokenValue) != 1)
+            if (sscanf_s(token, "%x", &tokenValue) != 1)
             {
                 throw _com_error(E_FAIL);
             }
             char tokenStr[256] = { 0 };
-            sprintf_s(tokenStr, _countof(tokenStr), "%d", tokenValue);
+            sprintf_s(tokenStr, _countof(tokenStr), "%x", tokenValue);
             pTokens->push_back(tokenStr);
             token = strtok_s(nullptr, delimiters, &next_token);
         }
