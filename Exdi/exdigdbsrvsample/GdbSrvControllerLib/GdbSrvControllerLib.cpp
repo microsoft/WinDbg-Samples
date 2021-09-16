@@ -27,7 +27,7 @@ using namespace GdbSrvControllerLib;
 // Private data definitions
 //=============================================================================    
 //  Maximum monitor command buffer
-const DWORD C_MAX_MONITOR_CMD_BUFFER = 4096;
+const DWORD C_MAX_MONITOR_CMD_BUFFER = 8192;
 
 //  Maximum size of register name string
 const DWORD C_MAX_REGISTER_NAME_ARRAY_ELEM = 32;
