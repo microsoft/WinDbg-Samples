@@ -13,7 +13,10 @@
 
 namespace GdbSrvControllerLib
 {
-    const int c_attemptsWaitingOnPendingResponse = 30;
+    //  Waiting times, to handle GDB servers over slow HW debugger interfaces.
+    const int c_attemptsWaitingOnPendingResponse = 690; // 15 seconds to finish break/step command (150 * 20ms wait)
+    const int c_asyncResponsePauseMs = 20;              // milliseconds to sleep when waiting async packet arrival
+    const int c_maximumReplyPacketsInResponse = 1000;   // when halting, GDB server may send per core console data (OpenOCD does this)
     class AsynchronousGdbSrvController : public GdbSrvController
     {
     public:

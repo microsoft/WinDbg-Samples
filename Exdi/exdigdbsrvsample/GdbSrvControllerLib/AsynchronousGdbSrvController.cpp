@@ -561,12 +561,22 @@ void AsynchronousGdbSrvController::StartStepCommand(unsigned processorNumber)
             MessageBox(0, _T("Unable to set processor number or the GdbServer is not ready continue on any thread"), nullptr, MB_ICONERROR);
         }
     }
-    StartAsynchronousCommand("s", false, true);
+
+    //  Step by using the new command:
+    //      vCont[;s[:thread-id]]…
+    //  Use resume the inferior thread, specifying different actions for each thread.
+    //  For each inferior thread, the leftmost action with a matching thread - id is applied.
+    //  Threads that don’t match any action remain in their current state.
+    //  An action ('s') with no thread - id matches all threads.
+    //  Specifying no actions is an error.
+    char stepCommand[256] = "vCont;s:";
+    _snprintf_s(stepCommand, _TRUNCATE, "%s%s", stepCommand, GetTargetThreadId(processorNumber).c_str());
+    StartAsynchronousCommand(stepCommand, false, true);
 }
 
 void AsynchronousGdbSrvController::StartRunCommand()
 {
-    StartAsynchronousCommand("c", false, true);
+    StartAsynchronousCommand("vCont;c", false, true);
 }
 
 bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * pPcAddress, _Out_ DWORD * pProcessorNumber,
@@ -576,11 +586,20 @@ bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * p
 
     bool isBreakDone = false;
     *pEventNotification = false;
+
+    // check of the asyc recv is still active
+    if (!IsAsynchronousCommandInProgress())
+    {
+        StartAsynchronousCommand("", true, false);
+    }
+
     if (GdbSrvController::InterruptTarget())
     {
-        isBreakDone = true;
-        StopReplyPacketStruct stopReply;
         ULONG attempts = 0;
+        StopReplyPacketStruct stopReply;
+        ULONG totalPackets = 0;
+
+        isBreakDone = true;
         do
         {
             std::string reply = GetCommandResult();
@@ -589,9 +608,18 @@ bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * p
                 //  Verify the previously asynchronous response
                 GdbSrvController::HandleAsynchronousCommandResponse(reply, &stopReply);
                 HandleStopReply(reply, stopReply, pPcAddress, pProcessorNumber, pEventNotification);
+                // rest attempts on each valid packet
+                attempts = 0;
+            }
+            else
+            {
+                // wait a little longer for a reply packet
+                Sleep(c_asyncResponsePauseMs);
             }
         }
-        while (!*pEventNotification && attempts++ != c_attemptsWaitingOnPendingResponse);
+        while (!*pEventNotification &&
+            (attempts++ < c_attemptsWaitingOnPendingResponse) &&
+            (totalPackets++ < c_maximumReplyPacketsInResponse));
 
         if (!*pEventNotification)
         {
@@ -640,7 +668,7 @@ void AsynchronousGdbSrvController::HandleStopReply(_In_ const std::string reply,
         GdbSrvController::DisplayConsoleMessage(reply);
         //  Post another receive request on the packet buffer
         ContinueWaitingOnStopReplyPacket();
-        Sleep(100);
+        Sleep(20);
     }
     else if (stopReply.status.isTAAPacket &&
         (stopReply.stopReason == TARGET_BREAK_SIGINT || 

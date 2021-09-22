@@ -761,6 +761,11 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvSampleServer::Ioctl(
                 }
             }
             break;
+
+            default:
+            {
+                hr = E_NOTIMPL;
+            }
         }
         return hr;
     }
@@ -1798,6 +1803,7 @@ ADDRESS_TYPE CLiveExdiGdbSrvSampleServer::ParseAsynchronousCommandResult(_Out_ D
     {
         int attempts = 0;
         bool isWaitingOnStopReply = false;
+        ULONG totalPackets = 0;
         do
         {
             StopReplyPacketStruct stopReply;
@@ -1805,6 +1811,7 @@ ADDRESS_TYPE CLiveExdiGdbSrvSampleServer::ParseAsynchronousCommandResult(_Out_ D
             bool isParsed = pController->HandleAsynchronousCommandResponse(reply, &stopReply);
             if (isParsed)
             {
+                attempts = 0;
                 //  Is it a OXX console packet?
                 if (stopReply.status.isOXXPacket)
                 {
@@ -1812,7 +1819,6 @@ ADDRESS_TYPE CLiveExdiGdbSrvSampleServer::ParseAsynchronousCommandResult(_Out_ D
                     pController->DisplayConsoleMessage(reply);
                     //  Post another receive request on the packet buffer
                     pController->ContinueWaitingOnStopReplyPacket();
-                    Sleep(100);
                     isWaitingOnStopReply = true;
                 }
                 //  Is it a T packet?
@@ -1876,10 +1882,12 @@ ADDRESS_TYPE CLiveExdiGdbSrvSampleServer::ParseAsynchronousCommandResult(_Out_ D
             }
             else
             {
-                Sleep(100);
+                Sleep(c_asyncResponsePauseMs);
             }
         }
-        while (isWaitingOnStopReply && attempts++ < c_attemptsWaitingOnPendingResponse);
+        while (isWaitingOnStopReply &&
+            (attempts++ < c_attemptsWaitingOnPendingResponse) &&
+            (totalPackets < c_maximumReplyPacketsInResponse));
     }
     else
     {
