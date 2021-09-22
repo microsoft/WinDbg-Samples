@@ -563,10 +563,10 @@ void AsynchronousGdbSrvController::StartStepCommand(unsigned processorNumber)
     }
 
     //  Step by using the new command:
-    //      vCont[;s[:thread-id]]…
+    //      vCont[;s[:thread-id]]ï¿½
     //  Use resume the inferior thread, specifying different actions for each thread.
     //  For each inferior thread, the leftmost action with a matching thread - id is applied.
-    //  Threads that don’t match any action remain in their current state.
+    //  Threads that donï¿½t match any action remain in their current state.
     //  An action ('s') with no thread - id matches all threads.
     //  Specifying no actions is an error.
     char stepCommand[256] = "vCont;s:";
@@ -590,6 +590,8 @@ bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * p
     // check of the asyc recv is still active
     if (!IsAsynchronousCommandInProgress())
     {
+        // try to get a new pending response sent by GDBserver
+        // that was not processed in the previous request.
         StartAsynchronousCommand("", true, false);
     }
 
