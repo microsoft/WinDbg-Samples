@@ -590,6 +590,7 @@ bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * p
     // check of the asyc recv is still active
     if (!IsAsynchronousCommandInProgress())
     {
+        // try to get a new pending response.
         StartAsynchronousCommand("", true, false);
     }
 
