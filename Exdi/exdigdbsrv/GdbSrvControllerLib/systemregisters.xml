@@ -1,0 +1,179 @@
+<SystemRegisterMap>
+  <!-- ARM64 System registers mapping -->
+  <SystemRegisters Architecture = "ARM64" >
+      <!-- system core registers -->
+        <register Name ="SPSR_EL1"   AccessCode = "3, 0,  4, 0, 0" />
+        <register Name ="SPSR_EL2"   AccessCode = "3, 4,  4, 0, 0" />
+        <register Name ="SPSR_EL3"   AccessCode = "3, 6,  4, 0, 0" />
+        <register Name ="ELR_EL1"    AccessCode = "3, 0,  4, 0, 1" />
+        <register Name ="ELR_EL2"    AccessCode = "3, 4,  4, 0, 1" />
+        <register Name ="ELR_EL3"    AccessCode = "3, 6,  4, 0, 1" />
+        <register Name ="SP_EL0"     AccessCode = "3, 0,  4, 1, 0" />
+        <register Name ="SP_EL1"     AccessCode = "3, 4,  4, 1, 0" />
+        <register Name ="SP_EL2"     AccessCode = "3, 6,  4, 1, 0" />
+        <register Name ="FPSR"       AccessCode = "3, 3,  4, 4, 1" />
+        <register Name ="FPCR"       AccessCode = "3, 3,  4, 4, 0" />
+        <register Name ="SPSR_ABT"   AccessCode = "3, 4,  4, 3, 1" />
+        <register Name ="IFSR32_EL2" AccessCode = "3, 4,  5, 0, 1" />
+
+        <!-- ID and feature registers -->
+        <register Name ="VPIDR_EL2"        AccessCode = "3, 4,  0, 0, 0" />
+        <register Name ="ARM64_REVIDR_EL1" AccessCode = "3, 0,  0, 0, 6" />
+        <register Name ="CTR_EL0"          AccessCode = "3, 3,  0, 0, 1" />
+        <register Name ="ARM64_VMPIDR_EL2" AccessCode = "3, 4,  0, 0, 5" />
+        <register Name ="ID_AA64PFR1_EL1"  AccessCode = "3, 0,  0, 4, 1" />
+        <register Name ="ID_AA64DFR0_EL1"  AccessCode = "3, 0,  0, 5, 0" />
+        <register Name ="ID_AA64DFR1_EL1"  AccessCode = "3, 0,  0, 5, 1" />
+        <register Name ="ID_AA64AFR0_EL1"  AccessCode = "3, 0,  0, 5, 4" />
+        <register Name ="ID_AA64AFR1_EL1"  AccessCode = "3, 0,  0, 5, 5" />
+        <register Name ="ID_AA64ISAR0_EL1" AccessCode = "3, 0,  0, 6, 0" />
+        <register Name ="ID_AA64ISAR1_EL1" AccessCode = "3, 0,  0, 6, 1" />
+        <register Name ="ID_AA64MMFR0_EL1" AccessCode = "3, 0,  0, 7, 0" />
+        <register Name ="ID_AA64MMFR1_EL1" AccessCode = "3, 0,  0, 7, 1" />
+        <register Name ="ID_AA64MMFR2_EL1" AccessCode = "3, 0,  0, 7, 2" />
+
+
+        <!-- Aarch32 ID and feature registers -->
+        <register Name ="ID_MMFR0"        AccessCode = "3, 0,  0, 1, 4" />
+        <register Name ="ID_MMFR1"        AccessCode = "3, 0,  0, 1, 5" />
+        <register Name ="ID_MMFR2"        AccessCode = "3, 0,  0, 1, 6" />
+        <register Name ="ID_MMFR3"        AccessCode = "3, 0,  0, 1, 7" />
+        <register Name ="ID_MMFR4"        AccessCode = "3, 0,  0, 2, 6" />
+        <register Name ="ID_ISAR0"        AccessCode = "3, 0,  0, 2, 0" />
+        <register Name ="ID_ISAR1"        AccessCode = "3, 0,  0, 2, 1" />
+        <register Name ="ID_ISAR2"        AccessCode = "3, 0,  0, 2, 2" />
+        <register Name ="ID_ISAR3"        AccessCode = "3, 0,  0, 2, 3" />
+        <register Name ="ID_ISAR4"        AccessCode = "3, 0,  0, 2, 4" />
+        <register Name ="ID_ISAR5"        AccessCode = "3, 0,  0, 2, 5" />
+        <register Name ="ID_ISAR6"        AccessCode = "3, 0,  0, 2, 7" />
+        <register Name ="MVFR0_EL1"       AccessCode = "3, 0,  0, 3, 0" />
+        <register Name ="MVFR1_EL1"       AccessCode = "3, 3,  0, 0, 1" />
+        <register Name ="MVFR2_EL1"       AccessCode = "3, 3,  0, 0, 2" />
+        <register Name ="ID_AA64ZFR0_EL1" AccessCode = "3, 0,  0, 4, 4" />
+        <register Name ="DACR32_EL2"      AccessCode = "3, 4,  3, 0, 0" />
+        <register Name ="FPEXC32_EL2"     AccessCode = "3, 4,  5, 3, 0" />
+        <register Name ="DACR32_EL2"      AccessCode = "3, 4,  3, 0, 0" />
+        <register Name ="VMPIDR_EL2"      AccessCode = "3, 4,  0, 0, 5" />
+
+        <!-- System control registers -->
+        <register Name ="SCTLR"          AccessCode = "3, 0,  1, 0, 0" />
+        <register Name ="SCTLR_EL2"      AccessCode = "3, 4,  1, 0, 0" />
+        <register Name ="HCR_EL2"        AccessCode = "3, 4,  1, 1, 0" />
+        <register Name ="HSTR_EL2"       AccessCode = "3, 4,  1, 1, 3" />
+        <register Name ="HACR_EL2"       AccessCode = "3, 4,  1, 1, 7" />
+        <register Name ="ACTLR_EL1"      AccessCode = "3, 0,  1, 0, 1" />
+        <register Name ="ACTLR_EL2"      AccessCode = "3, 4,  1, 0, 1" />
+        <register Name ="CPACR"          AccessCode = "3, 0,  1, 0, 2" />
+        <register Name ="CPTR_EL2"       AccessCode = "3, 4,  1, 1, 2" />
+        <register Name ="CPUECTLR_EL1"   AccessCode = "3, 0, 15, 1, 4" />
+        <register Name ="CNTPS_CTL_EL1"  AccessCode = "3, 7, 14, 2, 1" />
+        <register Name ="CPUMERRSR_EL1"  AccessCode = "3, 1, 15, 2, 2" />
+        <register Name ="CNTPS_CVAL_EL1" AccessCode = "3, 7, 14, 2, 2" />
+        <register Name ="L2MERRSR_EL1"   AccessCode = "3, 1, 15, 2, 3" />
+
+        <!-- Memory protection registers -->
+        <register Name ="TTBR0_EL1" AccessCode = "3, 0,  2, 0, 0" />
+        <register Name ="TTBR0_EL2" AccessCode = "3, 4,  2, 0, 0" />
+        <register Name ="TTBR1_EL1" AccessCode = "3, 0,  2, 0, 1" />
+        <register Name ="VTTBR_EL2" AccessCode = "3, 4,  2, 1, 0" />
+        <register Name ="TCR_EL1"   AccessCode = "3, 0,  2, 0, 2" />
+        <register Name ="TCR_EL2"   AccessCode = "3, 4,  2, 0, 2" />
+        <register Name ="VTCR_EL2"  AccessCode = "3, 4,  2, 1, 2" />
+        <register Name ="ESR_EL1"   AccessCode = "3, 0,  5, 2, 0" />
+        <register Name ="ESR_EL2"   AccessCode = "3, 4,  5, 2, 0" />
+        <register Name ="ESR_EL3"   AccessCode = "3, 6,  5, 2, 0" />
+        <register Name ="FAR_EL1"   AccessCode = "3, 0,  6, 0, 0" />
+        <register Name ="FAR_EL2"   AccessCode = "3, 4,  6, 0, 0" />
+        <register Name ="HPFAR_EL2" AccessCode = "3, 4,  6, 0, 4" />
+        <register Name ="AFSR0_EL1" AccessCode = "3, 0,  5, 1, 0" />
+        <register Name ="AFSR0_EL2" AccessCode = "3, 4,  5, 1, 0" />
+        <register Name ="AFSR1_EL1" AccessCode = "3, 0,  5, 1, 1" />
+        <register Name ="AFSR1_EL2" AccessCode = "3, 4,  5, 1, 1" />
+
+        <!-- Arm cache operation registers -->
+        <register Name ="PAR_EL1"        AccessCode = "3, 0,  7, 4, 0" />
+        <register Name ="CNTFRQ_EL0"     AccessCode = "3, 3, 14, 0, 0" />
+        <register Name ="CNTP_CTL_EL0"   AccessCode = "3, 3, 14, 2, 1" />
+        <register Name ="CNTP_CVAL_EL0"  AccessCode = "3, 3, 14, 2, 2" />
+        <register Name ="CNTV_CTL_EL0"   AccessCode = "3, 3, 14, 3, 1" />
+        <register Name ="CNTV_CVAL_EL0"  AccessCode = "3, 3, 14, 3, 2" />
+        <register Name ="CNTHCTL_EL2"    AccessCode = "3, 4, 14, 1, 0" />
+        <register Name ="CNTHP_CTL_EL2"  AccessCode = "3, 4, 14, 2, 1" />
+        <register Name ="CNTHP_CVAL_EL2" AccessCode = "3, 4, 14, 2, 2" />
+        <register Name ="PMCCFILTR_EL0"  AccessCode = "3, 3, 14,15, 7" />
+        <register Name ="MDCR_EL2"       AccessCode = "3, 4,  1, 1, 1" />
+        <register Name ="PMCR_EL0"       AccessCode = "3, 3,  9,12, 0" />
+        <register Name ="PMCNTENSET_EL0" AccessCode = "3, 3,  9,12, 1" />
+        <register Name ="PMCNTENCLR_EL0" AccessCode = "3, 3,  9,12, 2" />
+        <register Name ="PMOVSSET_EL0"   AccessCode = "3, 3,  9,14, 3" />
+        <register Name ="PMOVSCLR_EL0"   AccessCode = "3, 3,  9,12, 3" />
+        <register Name ="PMSELR_EL0"     AccessCode = "3, 3,  9,12, 5" />
+        <register Name ="PMCEID0_EL0"    AccessCode = "3, 3,  9,12, 6" />
+        <register Name ="PMCEID1_EL0"    AccessCode = "3, 3,  9,12, 7" />
+        <register Name ="PMCCNTR_EL0"    AccessCode = "3, 3,  9,13, 0" />
+        <register Name ="PMUSERENR_EL0"  AccessCode = "3, 3,  9,14, 0" />
+        <register Name ="PMINTENSET_EL1" AccessCode = "3, 0,  9,14, 1" />
+        <register Name ="PMINTENCLR_EL1" AccessCode = "3, 0,  9,14, 2" />
+
+        <!-- Memory remap registers -->
+        <register Name ="MAIR_EL1"   AccessCode = "3, 0, 10, 2, 0" />
+        <register Name ="AMAIR0"     AccessCode = "3, 0, 10, 3, 0" />
+        <register Name ="MAIR_EL2"   AccessCode = "3, 4, 10, 2, 0" />
+        <register Name ="AMAIR_EL2"  AccessCode = "3, 4, 10, 3, 0" />
+        <register Name ="MAIR_EL3"   AccessCode = "3, 6, 10, 2, 0" />
+
+        <!-- Security extensions registers -->
+        <register Name ="VBAR"       AccessCode = "3, 0, 12, 0, 0" />
+        <register Name ="VBAR_EL2"   AccessCode = "3, 4, 12, 0, 0" />
+        <register Name ="RVBAR_EL2"  AccessCode = "3, 4, 12, 0, 1" />
+
+        <!-- Process, context and thread ID registers -->
+        <register Name ="TPIDR_EL0"      AccessCode = "3, 3, 13, 0, 2" />
+        <register Name ="TPIDRRO_EL0"    AccessCode = "3, 3, 13, 0, 3" />        
+        <register Name ="TPIDR_EL1"      AccessCode = "3, 0, 13, 0, 4" />		
+        <register Name ="TPIDR_EL2"      AccessCode = "3, 4, 13, 0, 2" />
+        <register Name ="CONTEXTIDR_EL1" AccessCode = "3, 0, 13, 0, 1" />
+
+        <!-- Cache information registers -->
+        <register Name ="CLIDR"   AccessCode = "3, 1,  0, 0, 1" />
+        <register Name ="AIDR"    AccessCode = "3, 1,  0, 0, 7" />
+        <register Name ="CSSELR"  AccessCode = "3, 2,  0, 0, 0" />
+
+        <!-- Generic Timer registers -->
+        <register Name ="CNTKCTL"     AccessCode = "3, 0, 14, 1, 0" />
+        <register Name ="CNTVOFF_EL2" AccessCode = "3, 4, 14, 0, 3" />
+
+        <!-- CP14 debugging registers -->
+        <register Name ="MDCCSR_EL0" AccessCode = "2, 3,  0, 1, 0" />
+        <register Name ="MDSCR_EL1"  AccessCode = "2, 0,  0, 2, 2" />
+        <register Name ="MDRAR_EL1"  AccessCode = "2, 0,  1, 0, 0" />
+        <register Name ="OSLSR_EL1"  AccessCode = "2, 0,  1, 1, 4" />
+        <register Name ="DBGBVR"     AccessCode = "2, 0,  0, 0, 4" />
+        <register Name ="DBGBVR"     AccessCode = "2, 0,  0, 1, 4" />
+        <register Name ="DBGBVR"     AccessCode = "2, 0,  0, 2, 4" />
+        <register Name ="DBGBVR"     AccessCode = "2, 0,  0, 3, 4" />
+        <register Name ="DBGBVR"     AccessCode = "2, 0,  0, 4, 4" />
+        <register Name ="DBGBVR"     AccessCode = "2, 0,  0, 5, 4" />   
+        <register Name ="DBGBCR"     AccessCode = "2, 0,  0, 0, 5" />
+        <register Name ="DBGBCR"     AccessCode = "2, 0,  0, 1, 5" />
+        <register Name ="DBGBCR"     AccessCode = "2, 0,  0, 2, 5" />
+        <register Name ="DBGBCR"     AccessCode = "2, 0,  0, 3, 5" />
+        <register Name ="DBGBCR"     AccessCode = "2, 0,  0, 4, 5" />
+        <register Name ="DBGBCR"     AccessCode = "2, 0,  0, 5, 5" />
+        <register Name ="DBGWVR"     AccessCode = "2, 0,  0, 0, 6" />
+        <register Name ="DBGWVR"     AccessCode = "2, 0,  0, 1, 6" />
+        <register Name ="DBGWVR"     AccessCode = "2, 0,  0, 2, 6" />
+        <register Name ="DBGWVR"     AccessCode = "2, 0,  0, 3, 6" />
+        <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 0, 7" />
+        <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 1, 7" />
+        <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 2, 7" />
+        <register Name ="DBGWCR"     AccessCode = "2, 0,  0, 3, 7" />
+  </SystemRegisters>
+
+  <!-- x64 System registers mapping -->
+  <SystemRegisters Architecture = "X64" >
+    <!-- system core registers -->
+    <register Name ="efer"   AccessCode = "0xc0000080, 0, 0, 0, 0" />
+  </SystemRegisters>
+
+</SystemRegisterMap>

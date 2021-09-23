@@ -1,0 +1,63 @@
+MSC_WARNING_LEVEL=/W4 /WX
+
+TARGETNAME=ExdiGdbSrv
+TARGETTYPE=DYNLINK
+TARGET_DESTINATION                 =   dbg\exdi
+
+MIDL_FLAGS=$(MIDL_FLAGS) /I ..\..\..\..\external\exdi
+
+_NT_TARGET_VERSION=$(_NT_TARGET_VERSION_WIN7)
+NTDDI_VERSION=$(LATEST_NTDDI_VERSION)
+
+USE_LIBCMT=1
+USE_NATIVE_EH=1
+USE_STL=1
+STL_VER=100
+
+USE_ATL=1
+ATL_VER=70
+
+!if "$(DBGSDK_REF_PATH)" == ""
+DBGSDK_REF_PATH=$(SDKTOOLS_REF_PATH)
+!endif
+
+C_DEFINES = $(C_DEFINES) -DUNICODE -D_UNICODE
+
+SOURCES=\
+    dllmain.cpp \
+	ExdiGdbSrv.idl \
+	ExdiGdbSrv.cpp \
+	$(O)\ExdiGdbSrv_i.c \
+	ExdiGdbSrv.rc \
+	LiveExdiGdbSrvServer.cpp
+	
+INCLUDES = \
+    ..\;\
+    ..\..\..\..\external\exdi;\
+    ..\GdbSrvControllerLib;\
+
+TARGETLIBS=\
+	$(CLIENTCORE_EXTERNAL_SDK_LIB_PATH)\kernel32.lib \
+	$(CLIENTCORE_EXTERNAL_SDK_LIB_PATH)\user32.lib \
+	$(CLIENTCORE_EXTERNAL_SDK_LIB_PATH)\advapi32.lib \
+	$(SDK_LIB_PATH)\ole32.lib \
+	$(ONECORE_EXTERNAL_SDK_LIB_PATH)\oleaut32.lib \
+	$(SDK_LIB_PATH)\uuid.lib \
+    $(ONECORE_EXTERNAL_SDK_LIB_PATH)\ws2_32.lib \
+    $(SDK_LIB_PATH)\Shlwapi.lib \
+    $(ONECORE_EXTERNAL_SDK_LIB_PATH)\xmllite.lib \
+	$(PROJECT_OBJ_ROOT)\debuggers\s\exdi\ExdiGdbSrv\GdbSrvControllerLib\$(O)\GdbSrvControllerLib.lib
+
+PASS0_BINPLACE = \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv *.c \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv *.cpp \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv *.h \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv *.rgs \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv *.txt \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv ExdiGdbSrv.* \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\ExdiGdbSrv sources \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi ..\..\dirs \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv ..\dirs \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv ..\ExdiGdbSrv.sln \
+                 -:DEST $(DBG_PRI_LAYOUT)\sdk\s\exdi\ExdiGdbSrv\doc ..\doc\Readme-EXDIGdbserver.xml \
+

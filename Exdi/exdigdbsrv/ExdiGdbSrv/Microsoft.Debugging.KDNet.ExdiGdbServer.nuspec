@@ -1,0 +1,14 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>Microsoft.Debugging.KDNet.ExdiGdbServer</id>
+        <version>1.0.0</version>
+        <description>This package contains the Exdi GDB server extension module, which gives WinDbg and related debuggers the ability to connect to various GDB servers provided by hardware level debugging tools.</description>
+        <authors>Microsoft</authors>
+    </metadata>
+    <files>
+        <file src="x64\ExdiGdbSrv.dll" target="tools\x64\"/>
+        <file src="x64\exdiConfigData.xml" target="tools\x64\"/>
+        <file src="x64\systemregisters.xml" target="tools\x64\"/>
+    </files>
+</package>
