@@ -1806,13 +1806,13 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
         ULONG totalPackets = 0;
         do
         {
-            StopReplyPacketStruct stopReply;
+            StopReplyPacketStruct stopReply = {0};
             const std::string reply = pController->GetCommandResult();
             bool isParsed = pController->HandleAsynchronousCommandResponse(reply, &stopReply);
             if (isParsed)
             {
                 attempts = 0;
-                //  Is it a OXX console packet?
+                //  Is it a OXX console packet? 
                 if (stopReply.status.isOXXPacket)
                 {
                     //  Try to display the GDB server ouput message if there is an attached text console.
@@ -1861,6 +1861,14 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
                     stopReply.currentAddress = m_lastPcAddress;
                     *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
                     isWaitingOnStopReply = false;
+                } 
+                // Is it an "OK" response w/o any other field (e.g. OpenOCD can send "OK" after 's'/'g')?
+                else if (stopReply.status.isCoreRunning)
+                {
+                    //  Post another receive request on the packet buffer, since there is still no
+                    //  trace of the current thread/address packet.
+                    pController->ContinueWaitingOnStopReplyPacket();
+                    isWaitingOnStopReply = true;                
                 }
 
                 if (!isWaitingOnStopReply)
