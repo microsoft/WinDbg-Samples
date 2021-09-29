@@ -1630,7 +1630,7 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerParameters()
         if (fileNameLength == 0)
         {
             MessageBox(0, _T("Error: the EXDI_GDBSRV_XML_CONFIG_FILE environment variable is not defined.\n")
-                          _T("The Exdi-GdbServer  won't continue at this point.\n")
+                          _T("The Exdi-GdbServer won't continue at this point.\n")
                           _T("Please set the full path to the Exdi xml configuration file."), _T("EXDI-GdbServer"), MB_ICONERROR);
             return E_ABORT;
         }
@@ -1862,14 +1862,6 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
                     *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
                     isWaitingOnStopReply = false;
                 } 
-                // Is it an "OK" response w/o any other field (e.g. OpenOCD can send "OK" after 's'/'g')?
-                else if (stopReply.status.isCoreRunning)
-                {
-                    //  Post another receive request on the packet buffer, since there is still no
-                    //  trace of the current thread/address packet.
-                    pController->ContinueWaitingOnStopReplyPacket();
-                    isWaitingOnStopReply = true;                
-                }
 
                 if (!isWaitingOnStopReply)
                 {

@@ -702,13 +702,6 @@ void AsynchronousGdbSrvController::HandleStopReply(_In_ const std::string reply,
         *pEventNotification = true;
         *pProcessorNumber = GdbSrvController::GetLastKnownActiveCpu();
     }
-    // Is it an "OK" response w/o any other field (e.g. OpenOCD can send this after 's'/'g')?
-    else if (stopReply.status.isCoreRunning)
-    {
-        //  Post another receive request on the packet buffer, since there is still no
-        //  trace of the current thread/address packet.
-        ContinueWaitingOnStopReplyPacket();
-    }
 }
 
 void AsynchronousGdbSrvController::ContinueWaitingOnStopReplyPacket()
