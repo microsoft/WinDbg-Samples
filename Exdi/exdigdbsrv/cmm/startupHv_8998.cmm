@@ -1,6 +1,6 @@
-; This ARM64 trace32 cmm script file is used by the windbg.exe-ExdiGdbSrvSample.dll-T32-GdbServer solution
+; This ARM64 trace32 cmm script file is used by the windbg.exe-ExdiGdbSrv.dll-T32-GdbServer solution
 ; in order to ensure that t32.exe breaks and leaves the target in a Kernel mode context, so
-; ExdiGdbSrvSample (gdb client) does not have to check for the current CPU mode before sending
+; ExdiGdbSrv (gdb client) does not have to check for the current CPU mode before sending
 ; trace32 RSP memory packets when it tries to access NT objects.
 ; This script executes the following actions:
 ; Attach to the target

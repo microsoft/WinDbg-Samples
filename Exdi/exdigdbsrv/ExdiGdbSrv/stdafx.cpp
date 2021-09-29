@@ -1,5 +1,5 @@
 // stdafx.cpp : source file that includes just the standard includes
-// ExdiGdbSrvSample.pch will be the pre-compiled header
+// ExdiGdbSrv.pch will be the pre-compiled header
 // stdafx.obj will contain the pre-compiled type information
 
 #include "stdafx.h"

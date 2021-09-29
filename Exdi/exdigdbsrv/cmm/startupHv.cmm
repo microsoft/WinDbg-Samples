@@ -1,6 +1,6 @@
-; This ARM64 trace32 cmm script file is used by the windbg.exe-ExdiGdbSrvSample.dll-T32-GdbServer solution
+; This ARM64 trace32 cmm script file is used by the windbg.exe-ExdiGdbSrv.dll-T32-GdbServer solution
 ; in order to ensure that t32.exe breaks and leaves the target in the Hypervisor mode context (EL2), so
-; ExdiGdbSrvSample (gdb client) can rely on the current CPU Exception level mode before sending the Special registers
+; ExdiGdbSrv (gdb client) can rely on the current CPU Exception level mode before sending the Special registers
 ; memory packets.
 ; The special registers RSP memory packet retrieve the address of the kernel/hypervisor function
 ; that is used as the starting address for the heuristic method that finds the NT base address.
