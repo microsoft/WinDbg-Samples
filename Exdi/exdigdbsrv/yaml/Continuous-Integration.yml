@@ -10,7 +10,7 @@ pool:
 variables:
   buildConfiguration: 'Release'
   major: 1
-  minor: 0
+  minor: 1
   majorDotMinor: '$(major).$(minor)'
   revision: $[counter(variables['majorDotMinor'], 0)]
 
