@@ -1862,6 +1862,14 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
                     *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
                     isWaitingOnStopReply = false;
                 } 
+                // Is it an "OK" response w/o any other field (e.g. OpenOCD can send "OK" after 's'/'g')?
+                else if (stopReply.status.isCoreRunning)
+                {
+                    //  Post another receive request on the packet buffer, since there is still no
+                    //  trace of the current thread-core/Pc address packet.
+                    pController->ContinueWaitingOnStopReplyPacket();
+                    isWaitingOnStopReply = true;                
+                }
 
                 if (!isWaitingOnStopReply)
                 {
