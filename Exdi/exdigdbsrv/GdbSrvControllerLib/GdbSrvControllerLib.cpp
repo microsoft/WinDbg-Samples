@@ -1978,15 +1978,15 @@ public:
                             {
                                 processorNumber = *it;
                             }
-                            std::vector<std::string> processorIds;
-                            TargetArchitectureHelpers::TokenizeThreadId(processorNumber, ";", &processorIds);
-                            assert(processorIds.size() == 1);
-                            pRspPacket->processorNumber = GetProcessorNumberByThreadId(processorIds[0]);
                         }
-                        else if (sscanf_s(processorNumber.c_str(), "%x", &pRspPacket->processorNumber) != 1)
+                        std::vector<std::string> processorIds;
+                        TargetArchitectureHelpers::TokenizeThreadId(processorNumber, ";", &processorIds);
+                        assert(processorIds.size() == 1);
+                        if (m_targetProcessorIds.empty())
                         {
-                            pRspPacket->processorNumber = static_cast<ULONG>(-1);
+                            m_targetProcessorIds.push_back(processorIds[0]);
                         }
+                        pRspPacket->processorNumber = GetProcessorNumberByThreadId(processorIds[0]);
                     }
                 }
 
