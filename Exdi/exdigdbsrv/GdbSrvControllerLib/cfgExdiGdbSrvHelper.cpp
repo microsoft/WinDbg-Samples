@@ -329,6 +329,11 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         }
     }
 
+    inline bool ConfigExdiGdbServerHelperImpl::GetTreatSwBpAsHwBp() const
+    {
+        return m_ExdiGdbServerData.component.fTreatSwBpAsHwBp;
+    }
+
     private:
     CComPtr<IXmlReader> m_XmlLiteReader;
     CComPtr<IStream> m_IStream;
@@ -850,6 +855,12 @@ void ConfigExdiGdbServerHelper::GetSystemRegistersMapAccessCode(_Out_ unique_ptr
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
     m_pConfigExdiGdbServerHelperImpl->GetSystemRegistersMapAccessCode(spMapSystemRegs);
+}
+
+bool ConfigExdiGdbServerHelper::GetTreatSwBpAsHwBp()
+{
+    assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
+    return m_pConfigExdiGdbServerHelperImpl->GetTreatSwBpAsHwBp();
 }
 
 void ConfigExdiGdbServerHelper::SetTargetArchitecture(_In_ TargetArchitecture targetArch)

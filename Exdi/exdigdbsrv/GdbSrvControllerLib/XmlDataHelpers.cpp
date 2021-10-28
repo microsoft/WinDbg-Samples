@@ -98,6 +98,7 @@ typedef struct
     WCHAR fExceptionThrowEnabled[C_MAX_ATTR_LENGTH];    //  Allow throwing exception by the Exdi COM server.
                                                         //  Used to disallow throwing exceptions when memory failures occur.
     WCHAR qSupportedPacket[C_MAX_ATTR_LENGTH];          //  qSupported packet to send to the dbg server, if empty then just "qSupported"
+    WCHAR fTreatSwBpAsHwBp[C_MAX_ATTR_LENGTH];          //  Treat SW bp as a HW bp.
 } ConfigExdiDataEntry;
 
 typedef struct
@@ -172,6 +173,7 @@ const WCHAR gdbServerConnectionParameters[] = L"GdbServerConnectionParameters";
 const WCHAR gdbServerConnectionValue[] = L"Value";
 const WCHAR gdbServerAgentNamePacket[] = L"agentNamePacket";
 const WCHAR gdbQSupportedPacket[] = L"qSupportedPacket";
+const WCHAR gdbTreatSwBpAsHwBp[] = L"enableTreatingSwBpAsHwBp";
 const WCHAR gdbServerUuid[] = L"uuid";
 const WCHAR displayCommPackets[] = L"displayCommPackets";
 const WCHAR debuggerSessionByCore[] = L"debuggerSessionByCore";
@@ -247,6 +249,7 @@ const XML_ATTRNAME_HANDLER_STRUCT attrExdiServerHandlerMap[] =
     {exdiGdbServerConfigData, debuggerSessionByCore,    XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fDebuggerSessionByCore), C_MAX_ATTR_LENGTH},
     {exdiGdbServerConfigData, enableThrowExceptions,    XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fExceptionThrowEnabled), C_MAX_ATTR_LENGTH},
     {exdiGdbServerConfigData, gdbQSupportedPacket,      XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, qSupportedPacket), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbTreatSwBpAsHwBp,       XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fTreatSwBpAsHwBp), C_MAX_ATTR_LENGTH},
 };
 
 //  Attribute name - handler map for the GdbServer server tag info
@@ -802,6 +805,7 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     pConfigTable->component.fDebuggerSessionByCore = (_wcsicmp(exdiData.fDebuggerSessionByCore, L"yes") == 0) ? true : false;
                     pConfigTable->component.fExceptionThrowEnabled = (_wcsicmp(exdiData.fExceptionThrowEnabled, L"yes") == 0) ? true : false;
                     pConfigTable->component.qSupportedPacket = exdiData.qSupportedPacket;
+                    pConfigTable->component.fTreatSwBpAsHwBp = (_wcsicmp(exdiData.fTreatSwBpAsHwBp, L"yes") == 0) ? true : false;
                     isSet = true;
                 }
             }

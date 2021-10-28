@@ -175,11 +175,13 @@ unsigned AsynchronousGdbSrvController::CreateCodeBreakpoint(_In_ AddressType add
         m_breakpointSlots.push_back(false);
     }
 
-    char breakCmd[128] = {0}; 
+    ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+    PCSTR pBpCommand = (cfgData.GetTreatSwBpAsHwBp()) ? "Z1" : "Z0";
     TargetArchitecture targetArchitecture = GdbSrvController::GetTargetArchitecture();
     PCSTR pFormat = (targetArchitecture == ARM64_ARCH || targetArchitecture == AMD64_ARCH) ?
-                     "Z0,%I64x,%d" : "Z0,%x,%d";
-    sprintf_s(breakCmd, _countof(breakCmd), pFormat, address, GetBreakPointSize());
+                     "%s,%I64x,%d" : "%s,%x,%d";
+    char breakCmd[128] = { 0 };
+    sprintf_s(breakCmd, _countof(breakCmd), pFormat, pBpCommand, address, GetBreakPointSize());
 
     bool isReplyOK = false;
     unsigned totalNumberOfCores = GdbSrvController::GetNumberOfRspConnections();
@@ -239,11 +241,13 @@ void AsynchronousGdbSrvController::DeleteCodeBreakpoint(_In_ unsigned breakpoint
         throw std::exception("Trying to delete nonexisting breakpoint");
     }
 
-    char breakCmd[128] = {0}; 
+    ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+    PCSTR pBpCommand = (cfgData.GetTreatSwBpAsHwBp()) ? "z1" : "z0";
     TargetArchitecture targetArchitecture = GdbSrvController::GetTargetArchitecture();
     PCSTR pFormat = (targetArchitecture == ARM64_ARCH || targetArchitecture == AMD64_ARCH) ?
-                     "z0,%I64x,%d" : "z0,%x,%d";     
-    sprintf_s(breakCmd, _countof(breakCmd), pFormat, address, GetBreakPointSize());
+                     "%s,%I64x,%d" : "%s,%x,%d";
+    char breakCmd[128] = { 0 };
+    sprintf_s(breakCmd, _countof(breakCmd), pFormat, pBpCommand, address, GetBreakPointSize());
 
     bool isReplyOK = false;
     unsigned totalNumberOfCores = GdbSrvController::GetNumberOfRspConnections();
@@ -281,13 +285,13 @@ void AsynchronousGdbSrvController::DeleteCodeBreakpoint(_In_ unsigned breakpoint
 //
 //  Request:
 //  For daWrite breakpoint type:
-//    Z2,address,accessWidth     
+//    Z2,address,accessWidth
 //
 //  For daRead breakpoint type:
-//    Z3,address,accessWidth     
+//    Z3,address,accessWidth
 //
 //  For daBoth breakpoint type:
-//    Z4,address,accessWidth     
+//    Z4,address,accessWidth
 //
 //  Response:
 //  'OK'                    if the command succeeded.

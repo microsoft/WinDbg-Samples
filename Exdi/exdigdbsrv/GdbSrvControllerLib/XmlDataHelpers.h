@@ -55,6 +55,7 @@ namespace GdbSrvControllerLib
         bool fExceptionThrowEnabled;    //  Allow throwing exception by the Exdi COM server.
                                         //  Used to disallow throwing exceptions when memory failures occur.
         std::wstring qSupportedPacket;  //  GDB server supported, if this empty then will send the default "qsupported" packet
+        bool fTreatSwBpAsHwBp;          //  GDB server client will convert SW bp as HW bp.
     } ConfigExdiData;
 
     //  This type indicates the Target data.
