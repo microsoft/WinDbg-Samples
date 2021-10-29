@@ -1572,7 +1572,7 @@ public:
                     //  Yes, return the current stored length
                     //  and let the caller's handles the returned data.
                     fError = true;
-                    // ... unless we didn't read anything, in which case fail
+                    //  unless we didn't read anything, in which case fail
                     if (recvLength == 0 && GetThrowExceptionEnabled())
                     {
                         throw _com_error(E_FAIL);

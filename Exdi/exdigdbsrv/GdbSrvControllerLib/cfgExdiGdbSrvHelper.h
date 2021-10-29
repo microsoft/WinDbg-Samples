@@ -50,6 +50,7 @@ class ConfigExdiGdbServerHelper final
         void GetGdbServerRegisters(_Out_ unique_ptr<vector<RegistersStruct>>* spRegisters);
         void GetGdbServerSystemRegisters(_Out_ unique_ptr<vector<RegistersStruct>>* spSystemRegisters);
         void GetSystemRegistersMapAccessCode(_Out_ unique_ptr<SystemRegistersMapType>* spMapSystemRegs);
+        bool GetTreatSwBpAsHwBp();
         bool IsExceptionThrowEnabled();
         bool IsSupportedSpecialMemoryCommand();
         bool IsSupportedPhysicalMemoryCommand();
