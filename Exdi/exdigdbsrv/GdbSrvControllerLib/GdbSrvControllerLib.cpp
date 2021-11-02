@@ -1594,14 +1594,14 @@ public:
                     result[result.GetLength() - 1] = static_cast<char>(value);
                     recvLength++;
                 }
-                //  Are we done with the requested data?
-                if (recvLength >= size || size == 0 || messageLength == 0)
-                {
-                    break;
-                }
                 //  Update the parameters for the next packet.
                 address += recvLength;
                 size -= recvLength;
+                //  Are we done with the requested data?
+                if (size == 0 || messageLength == 0)
+                {
+                    break;
+                }
             }
             if (fError)
             {
