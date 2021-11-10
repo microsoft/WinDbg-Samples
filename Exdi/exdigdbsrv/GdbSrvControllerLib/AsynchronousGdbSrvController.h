@@ -61,6 +61,8 @@ namespace GdbSrvControllerLib
             _Inout_ AddressType* pPcAddress, _Out_ DWORD* pProcessorNumber, _Out_ bool* pEventNotification);
         ~AsynchronousGdbSrvController();
         void StopTargetAtRun();
+        void SetInterruptEvent();
+        bool IsLastCommandTargetRun();
 
     protected:
         AsynchronousGdbSrvController(_In_ const std::vector<std::wstring> &coreConnectionParameters);

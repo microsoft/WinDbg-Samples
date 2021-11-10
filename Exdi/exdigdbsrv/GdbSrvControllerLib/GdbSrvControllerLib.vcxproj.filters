@@ -54,6 +54,9 @@
     <ClInclude Include="XmlDataHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="TargetGdbServerHelpers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -77,13 +80,5 @@
     <ClCompile Include="XmlDataHelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Xml Include="exdiConfigData.xml">
-      <Filter>Source Files</Filter>
-    </Xml>
-    <Xml Include="systemregisters.xml">
-      <Filter>Source Files</Filter>
-    </Xml>
   </ItemGroup>
 </Project>

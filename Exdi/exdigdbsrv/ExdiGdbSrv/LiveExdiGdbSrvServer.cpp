@@ -219,11 +219,6 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Halt(void)
                 hr = E_NOTIMPL;
             }
         }
-        else
-        {
-            MessageBox(0, _T("Fatal error the Notification listener is not defined."),nullptr, MB_ICONERROR);
-            hr = E_NOTIMPL;
-        }
 
         return hr;
     }
@@ -536,7 +531,6 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadVirtualMemory(
         {
             return E_POINTER;
         }
-
         memoryAccessType memType = {0};
         pController->GetMemoryPacketType(m_lastPSRvalue, &memType);
 
@@ -1038,7 +1032,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         {
             return E_POINTER;
         }
-
+        pController->StopTargetAtRun();
         memset(pContext, 0, sizeof(CONTEXT_ARM4));
 
         std::map<std::string, std::string> registers = pController->QueryAllRegisters(processorNumber);
@@ -1112,6 +1106,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContextEx(_In_ DWORD process
         {
             return E_POINTER;
         }
+        pController->StopTargetAtRun();
         std::map<std::string, ULONGLONG> registers;
         if (pContext->RegGroupSelection.fIntegerRegs)
         {
@@ -1162,7 +1157,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         {
             return E_POINTER;
         }
-
+        pController->StopTargetAtRun();
         memset(pContext, 0, sizeof(CONTEXT_X86_64));
 
         //We do not fetch the actual descriptors, thus we mark them as invalid
@@ -1274,6 +1269,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContextEx(_In_ DWORD process
         {
             return E_POINTER;
         }
+        pController->StopTargetAtRun();
         std::map<std::string, ULONGLONG> registers;
         if (pContext->RegGroupSelection.fIntegerRegs)
         {
@@ -1374,7 +1370,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         {
             return E_POINTER;
         }
-
+        pController->StopTargetAtRun();
         memset(pContext, 0, sizeof(CONTEXT_X86_EX));
 
         pContext->DescriptorCs.Flags = static_cast<DWORD>(X86_DESC_FLAGS);
@@ -1419,7 +1415,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContextEx(_In_ DWORD process
         {
             return E_POINTER;
         }
-
+        pController->StopTargetAtRun();
         SetX86CoreRegisters(processorNumber, pContext, pController);
 
         SetFPCoprocessorRegisters(processorNumber, reinterpret_cast<const VOID *>(pContext), pController);
@@ -2094,7 +2090,7 @@ void CLiveExdiGdbSrvServer::GetNeonRegisters(_In_ AsynchronousGdbSrvController *
 }
 
 void CLiveExdiGdbSrvServer::SetNeonRegisters(_In_ DWORD processorNumber, _In_ const VOID * pContext,
-                                                   _In_ AsynchronousGdbSrvController * const pController)
+                                             _In_ AsynchronousGdbSrvController * const pController)
 {
     assert(pContext != nullptr && pController != nullptr);
 

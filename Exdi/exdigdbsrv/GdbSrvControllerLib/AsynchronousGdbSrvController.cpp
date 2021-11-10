@@ -24,6 +24,13 @@
 
 using namespace GdbSrvControllerLib;
 
+//  GDb protocol asynchronous commands
+LPCSTR const g_GdbStep = "s";
+LPCSTR const g_GdbStepEx = "vCont;s";
+LPCSTR const g_GdbResume = "c";
+LPCSTR const g_GdbResumeEx = "vCont;c";
+
+
 //
 //  GetDataAccessBreakPointCommand  This function returns the data access breakpoint command that
 //                                  will be sent to the GdbServer.
@@ -573,14 +580,14 @@ void AsynchronousGdbSrvController::StartStepCommand(unsigned processorNumber)
     //  Threads that don't match any action remain in their current state.
     //  An action ('s') with no thread - id matches all threads.
     //  Specifying no actions is an error.
-    char stepCommand[256] = "vCont;s:";
-    _snprintf_s(stepCommand, _TRUNCATE, "%s%s", stepCommand, GetTargetThreadId(processorNumber).c_str());
+    char stepCommand[256] = { 0 };
+    _snprintf_s(stepCommand, _TRUNCATE, "%s:%s", g_GdbStepEx, GetTargetThreadId(processorNumber).c_str());
     StartAsynchronousCommand(stepCommand, false, true);
 }
 
 void AsynchronousGdbSrvController::StartRunCommand()
 {
-    StartAsynchronousCommand("vCont;c", false, true);
+    StartAsynchronousCommand(g_GdbResumeEx, false, true);
 }
 
 bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * pPcAddress, _Out_ DWORD * pProcessorNumber,
@@ -737,27 +744,34 @@ void AsynchronousGdbSrvController::ContinueWaitingOnStopReplyPacket()
     AsynchronousCommandThreadBody(reinterpret_cast<PVOID>(&m_AsynchronousCmd));
 }
 
+bool AsynchronousGdbSrvController::IsLastCommandTargetRun()
+{
+    bool isGdbStepTargetCommand = strstr(m_currentAsynchronousCommand.c_str(), g_GdbStepEx) != nullptr ||
+        strstr(m_currentAsynchronousCommand.c_str(), g_GdbStep) != nullptr;
+    bool isGdbResumeTargetCmd = g_GdbResume == m_currentAsynchronousCommand || 
+        g_GdbResumeEx == m_currentAsynchronousCommand;;
+    return isGdbResumeTargetCmd || isGdbStepTargetCommand;
+}
+
 void AsynchronousGdbSrvController::StopTargetAtRun()
 {
-    if (IsAsynchronousCommandInProgress() && 
-        m_currentAsynchronousCommand == "c" &&
+    if (IsAsynchronousCommandInProgress() &&
+        IsLastCommandTargetRun() &&
         m_AsynchronousCmd.isRspNeeded == false)
     {
         //  In case that the target is at run and  the client debugger requested 
         //  a command w/o interruption, then force to interrup the waiting state
-        //  of the GDB client link layer. This situation should not happen, since the debugger engine
-        //  should not post any command unless the target is at break state, but
-        //  there is small chance that this client has not notified the engine about
-        //  the current target state (target is at run/at break).
-        ADDRESS_TYPE currentAddress;
-        DWORD eventProcessor = 0;
-        bool eventNotification = false;
-        //  Set the thread interrupt event
-        HandleInterruptTarget(reinterpret_cast<AddressType*>(&currentAddress),
-            &eventProcessor, &eventNotification);
-        //  Wait for the thread to finish itself once the interrup event is received.
+        //  of the GDB client link layer.
+        //  Set the interrupt event to let the previous resume command to finish.
+        SetInterruptEvent();
+
+        //  Ensure that the waiting thread to finish itself once the interrup event is emitted.
         WaitForSingleObject(m_asynchronousCommandThread, INFINITE);
     }
+}
 
+void AsynchronousGdbSrvController::SetInterruptEvent()
+{
+    GdbSrvController::SetInterruptEvent();
 }
 

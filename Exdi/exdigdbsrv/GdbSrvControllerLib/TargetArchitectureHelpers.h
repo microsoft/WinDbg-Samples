@@ -388,7 +388,6 @@ public:
             MessageBox(0, _T("Target architecture is not supported"), _T("EXDI-GdbServer"), MB_ICONERROR);
         }
     }
-
 };
 
 #pragma endregion
