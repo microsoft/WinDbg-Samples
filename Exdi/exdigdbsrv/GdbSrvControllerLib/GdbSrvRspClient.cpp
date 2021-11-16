@@ -511,26 +511,30 @@ string GdbSrvRspClient<TcpConnectorStream>::CreateSendRspPacketWithRunLengthEnco
 //  readStatus          The status of the last read action.
 //  isRspWaitNeeded     Flag is true when we are inside of the no receive timeout session.
 //  interruptEvent      Handle of the interrupt event
+//  userInterrupt       Flag indicates if the user interrupted.
 //
 //  Return:
 //  true                If we need to interrupt the waiting sequence because the user cancel
 //                      or a link layer error ocurred.
 //  false               Otherwise.
 //
-inline bool IsReceiveInterrupt(_In_ int readStatus, _In_ bool isRspWaitNeeded, _In_ HANDLE interruptEvent)
+inline bool IsReceiveInterrupt(_In_ int readStatus, _In_ bool isRspWaitNeeded, 
+                               _In_ HANDLE interruptEvent, _Out_ bool & userInterrupt)
 {
     bool isInterrupted = false;
-    
+
+    userInterrupt = false;
     if (readStatus == SOCKET_ERROR && isRspWaitNeeded)
     {
         isInterrupted = true;                
     }
     else if(IS_INTERRUPT_EVENT_SET(interruptEvent))
     {
-        isInterrupted = true;                
+        isInterrupted = true;
+        userInterrupt = true;
     }
     return isInterrupted; 
-}                                                               
+}
 
 //
 //  WaitForRspPacketStart   Waits for the start packet character to arrive from the server.
@@ -553,18 +557,22 @@ int GdbSrvRspClient<TcpConnectorStream>::WaitForRspPacketStart(_In_ int maxPacke
     char currentChar;
     int readStatus;
     bool reset = fResetBuffer;
+    bool userInterrupFlag = false;
 
+    ClearInterruptFlag();
     //  Wait for the packet start character to arrive.
     do
     {
         readStatus = ReceiveInternal(maxPacketLength, pStream, reset, &currentChar);
         //  Do we need to exit the receiving sequence?
-        if (IsReceiveInterrupt(readStatus, isRspWaitNeeded, m_interruptEvent.Get()))
+        if (IsReceiveInterrupt(readStatus, isRspWaitNeeded, m_interruptEvent.Get(),
+            userInterrupFlag))
         {
             IsPollingChannelMode = false;
+            SetInterruptFlag(userInterrupFlag);
             break;
         }
-        reset = false;            
+        reset = false;
     }
     while (currentChar != '$' && !IsPollingChannelMode);
 
@@ -1250,8 +1258,6 @@ bool GdbSrvRspClient<TcpConnectorStream>::SendRspInterruptEx(_In_ bool fResetAll
             {
                 //  Set the interrupt event 
                 SetEvent(m_interruptEvent.Get());
-                //  Wait a little bit for the GdbServer to process the break request packet.
-                Sleep(200);
                 isDone = true;
             }
         }
@@ -1388,9 +1394,10 @@ size_t GdbSrvRspClient<TcpConnectorStream>::GetNumberOfStreamConnections()
 
 GdbSrvRspClient<TcpConnectorStream>::GdbSrvRspClient(_In_ const vector<wstring> &coreConnectionParameters) :
                                      m_interruptEvent(CreateEvent(nullptr, FALSE, FALSE, nullptr)),
-                             	     m_pConnector(unique_ptr<TConnectStream>(new (nothrow) TConnectStream(coreConnectionParameters)))
+                                     m_pConnector(unique_ptr<TConnectStream>(new (nothrow) TConnectStream(coreConnectionParameters)))
 {
     InitializeCriticalSection(&m_gdbSrvRspLock);
+     m_fInterruptFlag = false;
 }
 
 GdbSrvRspClient<TcpConnectorStream>::~GdbSrvRspClient()
@@ -1398,4 +1405,10 @@ GdbSrvRspClient<TcpConnectorStream>::~GdbSrvRspClient()
     ShutDownRsp();
     DeleteCriticalSection(&m_gdbSrvRspLock);
     m_interruptEvent.Close();
+}
+
+void GdbSrvRspClient<TcpConnectorStream>::SetInterrupt()
+{
+    //  Set the interrupt event 
+    SetEvent(m_interruptEvent.Get());
 }

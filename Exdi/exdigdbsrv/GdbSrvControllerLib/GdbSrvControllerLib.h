@@ -324,6 +324,9 @@ namespace GdbSrvControllerLib
         //  Set the system register map file path
         void SetSystemRegisterXmlFile(_In_z_ PCWSTR pSystemRegFilePath);
 
+        //  Set event interrupt
+        void SetInterruptEvent();
+
     protected:
         bool IsReplyOK(_In_ const std::string & reply);
 

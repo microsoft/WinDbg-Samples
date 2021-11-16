@@ -20,6 +20,7 @@
 #include <locale>
 #include <codecvt>
 #include "TargetArchitectureHelpers.h"
+#include "TargetGdbServerHelpers.h"
 
 using namespace GdbSrvControllerLib;
 
@@ -789,9 +790,13 @@ public:
             isDone = m_pRspClient->ReceiveRspPacket(result, processor, isRspWaitNeeded);
             if (!isDone)
             {
-                //  A fatal error or a communication error ocurred
-                m_pRspClient->HandleRspErrors(GdbSrvTextType::CommandError);
-                throw _com_error(HRESULT_FROM_WIN32(m_pRspClient->GetRspLastError()));
+                //  Did the user interrupt?
+                if (!m_pRspClient->GetInterruptFlag())
+                {
+                    //  No, then this is a fatal error or a communication error ocurred
+                    m_pRspClient->HandleRspErrors(GdbSrvTextType::CommandError);
+                    throw _com_error(HRESULT_FROM_WIN32(m_pRspClient->GetRspLastError()));
+                }
             }
         }
         else
@@ -2408,6 +2413,12 @@ public:
         wcsncpy_s(m_spSystemRegXmlFile.get(), systemFileLength + 1, pSystemRegFilePath, systemFileLength);
     }
 
+    void GdbSrvControllerImpl::SetInterruptEvent()
+    {
+        assert(m_pRspClient != nullptr);
+        m_pRspClient->SetInterrupt();
+    }
+
     private:
     IGdbSrvTextHandler * m_pTextHandler;
     unsigned m_cachedProcessorCount;
@@ -2772,36 +2783,18 @@ public:
     {
         PCSTR pFormat = nullptr;
 
-        if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isPhysical)
+        bool isT32GdbServer = m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM);
+        if (isT32GdbServer)
         {
-             pFormat = (Is64BitArchitecture()) ? "qtrace32.memory:a,%I64x,%x" : "qtrace32.memory:a,%x,%x";
+            // It's a Trace32 request
+            pFormat = Trace32GdbServerMemoryHelpers::GetGdbSrvReadMemoryCmd(
+                memType, Is64BitArchitecture(), m_targetProcessorArch);
         }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isSupervisor)
+        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER))
         {
-             pFormat = (Is64BitArchitecture()) ? "qtrace32.memory:s,%I64x,%x" : "qtrace32.memory:s,%x,%x";
-        }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isHypervisor)
-        {
-             pFormat = (Is64BitArchitecture()) ? "qtrace32.memory:h,%I64x,%x" : "qtrace32.memory:h,%x,%x";
-        }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isSpecialRegs)
-        {
-            if (m_targetProcessorArch == ARM64_ARCH)
-            {
-                pFormat = "qtrace32.memory:SPR,%x,%x";
-            }
-            else if (m_targetProcessorArch == ARM32_ARCH)
-            {
-                pFormat = "qtrace32.memory:C15,%x,%x";
-            }
-            else
-            {
-                assert(false);
-            }
-        }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs)
-        {
-            pFormat = (Is64BitArchitecture()) ? "aarch64 mrs nsec %d %d %d %d %d" : "amd64 mrs nsec %d %d %d %d %d";
+            // It's an OpenOCD request
+            pFormat = OpenOCDGdbServerMemoryHelpers::GetGdbSrvReadMemoryCmd(
+                memType, Is64BitArchitecture());
         }
         else
         {
@@ -2816,36 +2809,15 @@ public:
         PCSTR pFormat = nullptr;
 
         isQ32GdbServerCmd = m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM);
-        if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isPhysical)
+        if (isQ32GdbServerCmd)
         {
-             pFormat = (Is64BitArchitecture()) ? "Qtrace32.memory:a,%I64x," : "Qtrace32.memory:a,%x,";
+            pFormat = Trace32GdbServerMemoryHelpers::GetGdbSrvWriteMemoryCmd(
+                memType, Is64BitArchitecture(), m_targetProcessorArch);
         }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isSupervisor)
+        else if (m_pRspClient->IsFeatureEnabled(PACKET_WRITE_OPENOCD_SPECIAL_REGISTER))
         {
-             pFormat = (Is64BitArchitecture()) ? "Qtrace32.memory:s,%I64x," : "Qtrace32.memory:s,%x,";
-        }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isHypervisor)
-        {
-             pFormat = (Is64BitArchitecture()) ? "Qtrace32.memory:h,%I64x," : "Qtrace32.memory:h,%x,";
-        }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_TRACE32_SPECIAL_MEM) && memType.isSpecialRegs)
-        {
-            if (m_targetProcessorArch == ARM64_ARCH)
-            {
-                pFormat = "Qtrace32.memory:SPR,%x,";
-            }
-            else if (m_targetProcessorArch == ARM32_ARCH)
-            {
-                pFormat = "Qtrace32.memory:C15,%x,";
-            }
-            else
-            {
-                assert(false);
-            }
-        }
-        else if (m_pRspClient->IsFeatureEnabled(PACKET_WRITE_OPENOCD_SPECIAL_REGISTER) && memType.isSpecialRegs)
-        {
-            pFormat = (Is64BitArchitecture()) ? "aarch64 mrs nsec %d %d %d %d %d %x" : "amd64 mrs nsec %d %d %d %d %d %x";
+            pFormat = OpenOCDGdbServerMemoryHelpers::GetGdbSrvWriteMemoryCmd(
+                memType, Is64BitArchitecture());
         }
         else
         {
@@ -3098,6 +3070,12 @@ bool GdbSrvController::InterruptTarget()
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
     return m_pGdbSrvControllerImpl->InterruptTarget();    
+}
+
+void GdbSrvController::SetInterruptEvent()
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->SetInterruptEvent();    
 }
 
 GdbSrvController::~GdbSrvController()

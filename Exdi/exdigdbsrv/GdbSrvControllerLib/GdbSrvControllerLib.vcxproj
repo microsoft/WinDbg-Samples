@@ -177,6 +177,7 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrv.h" /W1 /I"..\ExdiGdbSrv"  
     <ClInclude Include="HandleHelpers.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="TargetArchitectureHelpers.h" />
+    <ClInclude Include="TargetGdbServerHelpers.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TcpConnectorStream.h" />
     <ClInclude Include="XmlDataHelpers.h" />

@@ -182,7 +182,19 @@ namespace GdbSrvControllerLib
         // Set Feature option enable
         void SetFeatureEnable(_In_ unsigned feature);
 
-	    private:
+        // Set the interrupt event
+        void SetInterrupt();
+
+        // Clear user initiated interrupt event
+        void ClearInterruptFlag() { m_fInterruptFlag = false; }
+
+        // Get status user interrupt flag
+        bool GetInterruptFlag() const { return m_fInterruptFlag; }
+
+        // Set user initiated interrupt flag
+        void SetInterruptFlag(_In_ bool flag) { m_fInterruptFlag = flag; }
+
+        private:
         ValidHandleWrapper m_interruptEvent;
         unique_ptr <TConnectStream> m_pConnector;
         static PacketConfig s_RspProtocolFeatures[MAX_FEATURES];
@@ -195,5 +207,6 @@ namespace GdbSrvControllerLib
         void SetProtocolFeatureFlag(_In_ size_t index, _In_ bool value);
         bool GetNoAckModeRequired(_In_ const string & command);
         bool SendRspInterruptEx(_In_ bool fResetAllCores, _In_ unsigned activeCore);
+        bool m_fInterruptFlag;
     }; 
 }
