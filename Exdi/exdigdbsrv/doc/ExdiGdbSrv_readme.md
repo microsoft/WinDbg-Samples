@@ -47,8 +47,7 @@ Option 1: Installing QEMU on Ubuntu Server
  
 2. Prepare a Windows ARM64/x64 VM image to run on QEMU:
 
-• Download the Windows VHDX file from the build share. It’s required that the build have symbols indexed in the symbol server
-- If it’s a private custom Windows build, then you’ll need the pdb symbol file for NT OS (ntkrnlmp.pdb), or the pre-NT system App that you want to debug.
+• Locate or create a Windows VHDX file. It’s required that the build have symbols indexed on the public symbol server.
 
 •Prepare a script to setup the image for these steps.
 - Get the QEMU para-virtualized drivers added to the image
