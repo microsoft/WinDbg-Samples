@@ -1684,9 +1684,6 @@ DWORD CALLBACK CLiveExdiGdbSrvServer::NotificationThreadBody(LPVOID p)
     assert(SUCCEEDED(result));
     UNREFERENCED_PARAMETER(result);
 
-    ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
-    DWORD waitTimeout = (cfgData.GetMultiCoreGdbServer()) ? INFINITE : 6000;  
-
     for (;;)
     {
         DWORD waitResult = WaitForSingleObject(pServer->m_notificationSemaphore, 100);
@@ -1712,7 +1709,7 @@ DWORD CALLBACK CLiveExdiGdbSrvServer::NotificationThreadBody(LPVOID p)
 
             if (waitResult == WAIT_OBJECT_0)
             {
-                if (pController->GetAsynchronousCommandResult(waitTimeout, nullptr))
+                if (pController->GetAsynchronousCommandResult(INFINITE, nullptr))
                 {
                     pReceiver->OnAsynchronousCommandCompleted();
                 }
