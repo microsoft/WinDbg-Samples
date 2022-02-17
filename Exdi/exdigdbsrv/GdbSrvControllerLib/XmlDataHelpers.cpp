@@ -1252,7 +1252,8 @@ bool XmlDataGdbServerRegisterFile::HandleTargetFileTags(_In_ TAG_ATTR_LIST* cons
             {
                 pConfigTable->file.registerGroupFiles->insert({ RegisterGroupType::SYSTEM_REGS, move(targetFileData.registerFile) });
             }
-            else if (wcsstr(targetFileData.registerFile, L"fpu") != nullptr || wcsstr(targetFileData.registerFile, L"simdfp") != nullptr)
+            else if (wcsstr(targetFileData.registerFile, L"fpu") != nullptr || wcsstr(targetFileData.registerFile, L"simdfp") != nullptr ||
+                wcsstr(targetFileData.registerFile, L"sve") != nullptr)
             {
                 pConfigTable->file.registerGroupFiles->insert({ RegisterGroupType::FPU_REGS, move(targetFileData.registerFile) });
             }
