@@ -16,3 +16,11 @@ steps:
     platform: 'x64'
     solution: 'Exdi/**/*.sln'
     configuration: '${{ parameters.BuildConfiguration }}'
+
+
+- task: VSBuild@1
+  displayName: 'Build ARM64'
+  inputs:
+    platform: 'ARM64'
+    solution: 'Exdi/**/*.sln'
+    configuration: '${{ parameters.BuildConfiguration }}'
