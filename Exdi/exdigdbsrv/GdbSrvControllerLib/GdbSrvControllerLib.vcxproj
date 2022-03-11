@@ -35,39 +35,39 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -137,7 +137,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\ExdiGdbSrvSample\;..\ExdiGdbSrvSample\GeneratedSources</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\ExdiGdbSrv\;..\ExdiGdbSrv\GeneratedSources</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -217,7 +217,7 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrv.h" /W1 /I"..\ExdiGdbSrv"  
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>GeneratedSources;..\ExdiGdbSrvSample\;..\ExdiGdbSrvSample\GeneratedSources;..\ExdiGdbSrvSample\GeneratedSources\x64\Release</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedSources;..\ExdiGdbSrv\;..\ExdiGdbSrv\GeneratedSources;..\ExdiGdbSrv\GeneratedSources\$(Platform)\Release</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <PrecompiledHeaderFile>
@@ -249,7 +249,7 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrv.h" /W1 /I"..\ExdiGdbSrv"  
     </Lib>
     <PreBuildEvent>
       <Command>md GeneratedSources;
-midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrvSample.h" /W1 /I"..\ExdiGdbSrvSample"  /char signed  /tlb "ExdiGdbSrvSample.tlb" /Oicf /target "NT60" /D "_DEBUG" /nologo ..\ExdiGdbSrvSample\ExdiGdbSrvSample.idl</Command>
+midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrv.h" /W1 /I"..\ExdiGdbSrv"  /char signed  /tlb "ExdiGdbSrv.tlb" /Oicf /target "NT60" /D "_DEBUG" /nologo ..\ExdiGdbSrv\ExdiGdbSrv.idl</Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

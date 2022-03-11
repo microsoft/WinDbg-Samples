@@ -29,6 +29,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C36863CC-7DC5-4656-82CF-18EECCC91EA7}</ProjectGuid>
     <Keyword>AtlProj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -58,13 +59,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="Configuration">
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -120,7 +121,9 @@
     <IgnoreImportLibrary>true</IgnoreImportLibrary>
     <LinkIncremental>false</LinkIncremental>
     <CustomBuildBeforeTargets />
-    <OutDir>$(SolutionDir)\$(Configuration)\$(Platform)</OutDir>
+    <OutDir>$(SolutionDir)\$(Configuration)\$(Platform)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+    <TargetName>$(ProjectName)</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -220,7 +223,7 @@
     </Midl>
     <ResourceCompile>
       <Culture>0x0409</Culture>
-      <AdditionalIncludeDirectories>GeneratedSources;$(IntDir);%(AdditionalIncludeDirectories);;GeneratedSources\Debug;GeneratedSources\x64\Release</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedSources;$(IntDir);%(AdditionalIncludeDirectories);;GeneratedSources\Debug;GeneratedSources\ARM64\Release</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
@@ -252,7 +255,7 @@
       <TypeLibraryName>$(IntDir)ExdiGdbSrv.tlb</TypeLibraryName>
       <DllDataFileName />
       <ValidateAllParameters>true</ValidateAllParameters>
-      <AdditionalIncludeDirectories>.\GeneratedSources;.\GeneratedSources\x64\Release;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>.\GeneratedSources;.\GeneratedSources\ARM64\Release;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>GeneratedSources</OutputDirectory>
     </Midl>
     <ResourceCompile>
@@ -341,7 +344,7 @@
       <TypeLibraryName>ExdiGdbSrvSample.tlb</TypeLibraryName>
       <DllDataFileName>
       </DllDataFileName>
-      <AdditionalIncludeDirectories>ExdiGdbSrvSample;.\GeneratedSources;.\GeneratedSources\x64\Release</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>ExdiGdbSrvSample;.\GeneratedSources;.\GeneratedSources\ARM64\Release</AdditionalIncludeDirectories>
       <OutputDirectory>GeneratedSources</OutputDirectory>
     </Midl>
     <ResourceCompile>
@@ -351,10 +354,11 @@
     </ResourceCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <ModuleDefinitionFile>.\ExdiGdbSrvSample.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>.\ExdiGdbSrv.def</ModuleDefinitionFile>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <RegisterOutput>false</RegisterOutput>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <IncrementalLinkDatabaseFile />
     </Link>
     <CustomBuildStep>
       <Command>
