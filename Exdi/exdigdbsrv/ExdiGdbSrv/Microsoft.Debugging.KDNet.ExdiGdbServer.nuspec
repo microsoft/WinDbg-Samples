@@ -11,7 +11,7 @@
         <file src="x64\exdiConfigData.xml" target="tools\x64\"/>
         <file src="x64\systemregisters.xml" target="tools\x64\"/>
 
-        <file src="ARM64\ExdiGdbSrvSample.dll" target="tools\ARM64\"/>
+        <file src="ARM64\ExdiGdbSrv.dll" target="tools\ARM64\"/>
         <file src="ARM64\exdiConfigData.xml" target="tools\ARM64\"/>
         <file src="ARM64\systemregisters.xml" target="tools\ARM64\"/>
     </files>
