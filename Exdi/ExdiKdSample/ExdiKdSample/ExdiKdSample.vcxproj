@@ -98,7 +98,7 @@
       <TargetEnvironment>Win32</TargetEnvironment>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <GenerateStublessProxies>true</GenerateStublessProxies>
-      <TypeLibraryName>ExdiKDSample.tlb</TypeLibraryName>
+      <TypeLibraryName>ExdiKdSample.tlb</TypeLibraryName>
       <DllDataFileName />
       <ValidateAllParameters>true</ValidateAllParameters>
       <OutputDirectory>GeneratedSources</OutputDirectory>
@@ -120,21 +120,23 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>..\KdControllerLib;GeneratedSources</AdditionalIncludeDirectories>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>ExdiKdSample;.\GeneratedSources;.\GeneratedSources\x64\Debug</PreprocessorDefinitions>
       <GenerateStublessProxies>true</GenerateStublessProxies>
       <TypeLibraryName>ExdiKDSample.tlb</TypeLibraryName>
       <DllDataFileName>
       </DllDataFileName>
       <OutputDirectory>GeneratedSources</OutputDirectory>
-      <ProxyFileName>%(Filename)_p_$(PlatformName).c</ProxyFileName>
+      <ProxyFileName>ExdiKdSample_p.c</ProxyFileName>
+      <HeaderFileName>ExdiKdSample.h</HeaderFileName>
     </Midl>
     <ResourceCompile>
       <Culture>0x0409</Culture>
@@ -187,26 +189,30 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
       <PreprocessorDefinitions>WIN32;_WINDOWS;NDEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>..\KdControllerLib;GeneratedSources</AdditionalIncludeDirectories>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>
+      </PreprocessorDefinitions>
       <GenerateStublessProxies>true</GenerateStublessProxies>
-      <TypeLibraryName>ExdiKDSample.tlb</TypeLibraryName>
+      <TypeLibraryName>ExdiKdSample.tlb</TypeLibraryName>
       <DllDataFileName>
       </DllDataFileName>
       <OutputDirectory>GeneratedSources</OutputDirectory>
-      <GenerateTypeLibrary>false</GenerateTypeLibrary>
-      <ProxyFileName>%(Filename)_p_$(PlatformName).c</ProxyFileName>
+      <GenerateTypeLibrary>true</GenerateTypeLibrary>
+      <ProxyFileName>ExdiKdSample_p.c</ProxyFileName>
+      <HeaderFileName>ExdiKdSample.h</HeaderFileName>
+      <AdditionalIncludeDirectories>ExdiKdSample;.\GeneratedSources;.\GeneratedSources\x64\Release</AdditionalIncludeDirectories>
     </Midl>
     <ResourceCompile>
       <Culture>0x0409</Culture>
-      <AdditionalIncludeDirectories>$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>GeneratedSources;$(IntDir);%(AdditionalIncludeDirectories);GeneratedSources\Debug</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <Link>
