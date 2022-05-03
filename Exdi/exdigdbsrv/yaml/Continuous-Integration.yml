@@ -34,7 +34,7 @@ steps:
   inputs:
     SymbolsFolder: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\**\*.pdb'
     SearchPattern: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\$(buildConfiguration)\**\*.pdb'
-    SymbolServerType: 'TeamServices'
+    SymbolServerType: TeamServices
 
 - task: ms-vscs-artifact.build-tasks.artifactSymbolTask-1.artifactSymbolTask@0
   displayName: 'Publish to Symbols to Artifact Services'
