@@ -41,5 +41,5 @@ steps:
   inputs:
     symbolServiceURI: 'https://microsoft.artifacts.visualstudio.com/DefaultCollection'
     requestName: 'DebuggingExperiences/$(Build.BuildNumber)/$(Build.BuildId)'
-    sourcePath: '$(Build.SourcesDirectory)'
+    sourcePath: '$(buildConfiguration)'
     expirationInDays: '365'
