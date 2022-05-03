@@ -27,7 +27,13 @@ steps:
 - task: PublishSymbols@1
   displayName: 'Source index symbols'
   inputs:
-    SearchPattern: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\**\*.pdb'
+    SearchPattern: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\$(buildConfiguration)\**\*.pdb'
+
+- task: PublishSymbols@2
+  displayName: 'Source index symbols 2'
+  inputs:
+    SymbolsFolder: '$(Build.SourcesDirectory)\\Exdi\exdigdbsrv\**\*.pdb'
+    SearchPattern: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\$(buildConfiguration)\*.pdb'
 
 - task: ms-vscs-artifact.build-tasks.artifactSymbolTask-1.artifactSymbolTask@0
   displayName: 'Publish to Symbols to Artifact Services'
