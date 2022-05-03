@@ -23,3 +23,17 @@ steps:
   displayName: 'Publish Artifact: bin'
   inputs:
     PathtoPublish: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\$(buildConfiguration)'
+
+- task: PublishSymbols@2
+  displayName: 'Source index symbols 2'
+  inputs:
+    SearchPattern: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\$(buildConfiguration)\**\*.pdb'
+    SymbolServerType: 'TeamServices'
+
+- task: ms-vscs-artifact.build-tasks.artifactSymbolTask-1.artifactSymbolTask@0
+  displayName: 'Publish to Symbols to Artifact Services'
+  inputs:
+    symbolServiceURI: 'https://microsoft.artifacts.visualstudio.com/DefaultCollection'
+    requestName: 'DebuggingExperiences/$(Build.BuildNumber)/$(Build.BuildId)'
+    sourcePath: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv'
+    expirationInDays: '365'
