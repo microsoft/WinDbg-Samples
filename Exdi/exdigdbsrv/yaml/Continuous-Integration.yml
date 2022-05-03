@@ -27,7 +27,7 @@ steps:
 - task: PublishSymbols@1
   displayName: 'Source index symbols'
   inputs:
-    SearchPattern: '$(buildConfiguration)\**\*.pdb'
+    SearchPattern: '$(buildConfiguration)\**\**\**\*.pdb'
 
 - task: ms-vscs-artifact.build-tasks.artifactSymbolTask-1.artifactSymbolTask@0
   displayName: 'Publish to Symbols to Artifact Services'
