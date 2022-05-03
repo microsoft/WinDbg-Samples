@@ -32,7 +32,6 @@ steps:
 - task: PublishSymbols@2
   displayName: 'Source index symbols 2'
   inputs:
-    SymbolsFolder: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\**\*.pdb'
     SearchPattern: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv\$(buildConfiguration)\**\*.pdb'
     SymbolServerType: 'TeamServices'
 
@@ -41,5 +40,5 @@ steps:
   inputs:
     symbolServiceURI: 'https://microsoft.artifacts.visualstudio.com/DefaultCollection'
     requestName: 'DebuggingExperiences/$(Build.BuildNumber)/$(Build.BuildId)'
-    sourcePath: '$(buildConfiguration)'
+    sourcePath: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv'
     expirationInDays: '365'
