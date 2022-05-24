@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ExtensionPackages Version="1.0.0.0" Compression="none">
+  <ExtensionPackage>
+    <Name>TextDumpCompositionPackage</Name>
+    <Version>1.0.0.0</Version>
+    <MinDebuggerSupported>10.0.17074.1002</MinDebuggerSupported>
+    <Components>
+        <BinaryComponent Name="TextDumpComposition" Type="Engine">
+            <LoadTriggers>
+                <TriggerSet>
+                    <IdentifyTargetTrigger FileExtension="txt" />
+                </TriggerSet>
+            </LoadTriggers>
+            <Files>
+                <File Architecture="amd64" Module="amd64\TextDumpComposition.dll" FilePathKind="RepositoryRelative"/>
+            </Files>
+        </BinaryComponent>
+    </Components>
+  </ExtensionPackage>
+</ExtensionPackages>
