@@ -6,6 +6,11 @@ using Nito.AsyncEx;
 using System.CommandLine;
 using System.Xml.Linq;
 
+/// <summary>
+/// This sample program shows how to open a dump file and run a data model query. The data model queries that can be run are very similar to what can be queried
+/// via the "dx" command in the debugger console. The result comes back as XML that represents the structure of the data, much like what would be displayed
+/// in the watch window of WinDbg.
+/// </summary>
 public class Program
 {
     static void Main(string[] args)
