@@ -67,8 +67,16 @@ steps:
       echo Copy files ...
 
       copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\x64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
+      
+      copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\GdbSrvControllerLib\systemregisters.xml $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
+
+      copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\GdbSrvControllerLib\exdiConfigData.xml $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
 
       copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\ARM64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
+
+      copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\GdbSrvControllerLib\systemregisters.xml $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
+
+      copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\GdbSrvControllerLib\exdiConfigData.xml $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
 
 - task: PkgESVPack@12
   displayName: 'Create ExdiGdbSrv VPack '
