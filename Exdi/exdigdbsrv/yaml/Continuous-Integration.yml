@@ -46,15 +46,15 @@ steps:
     script: >
       echo dir Build.SourcesDirectory...
 
-      dir /s/b $(Build.SourcesDirectory)
+      dir /s/b $(Build.SourcesDirectory)\Exdi\exdigdbsrv
 
-      echo dir Release\x64...
+      echo dir Exdi\exdigdbsrv\Release\x64...
 
-      dir $(Build.SourcesDirectory)\Release\x64
+      dir $(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\x64
 
-      echo dir Release\ARM64...
+      echo dir Exdi\exdigdbsrv\Release\ARM64...
 
-      dir $(Build.SourcesDirectory)\Release\ARM64
+      dir $(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\ARM64
 
       md $(Agent.TempDirectory)
 
@@ -66,9 +66,9 @@ steps:
 
       echo Copy files ...
 
-      copy $(Build.SourcesDirectory)\Release\x64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
+      copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\x64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
 
-      copy $(Build.SourcesDirectory)\Release\ARM64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
+      copy $(Build.SourcesDirectory)\Exdi\exdigdbsrv\Release\ARM64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
 
 - task: PkgESVPack@12
   displayName: 'Create ExdiGdbSrv VPack '
