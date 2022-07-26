@@ -37,3 +37,42 @@ steps:
     requestName: 'DebuggingExperiences/$(Build.BuildNumber)/$(Build.BuildId)'
     sourcePath: '$(Build.SourcesDirectory)\Exdi\exdigdbsrv'
     expirationInDays: '365'
+
+#Add the ExdiGdbSrv vpack steps.
+
+- task: CmdLine@2
+  displayName: dir files for debugging
+  inputs:
+    script: >
+      echo dir Build.SourcesDirectory...
+
+      dir /s/b $(Build.SourcesDirectory)
+
+      echo dir Release\x64...
+
+      dir $(Build.SourcesDirectory)\Release\x64
+
+      echo dir Release\ARM64...
+
+      dir $(Build.SourcesDirectory)\Release\ARM64
+
+      md $(Agent.TempDirectory)
+
+      md $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp
+
+      md $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
+
+      md $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
+
+      echo Copy files ...
+
+      copy $(Build.SourcesDirectory)\Release\x64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\x64
+
+      copy $(Build.SourcesDirectory)\Release\ARM64\ExdiGdbSrv.dll $(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp\ARM64
+
+- task: PkgESVPack@12
+  displayName: 'Create ExdiGdbSrv VPack '
+  inputs:
+    sourceDirectory: '$(Agent.TempDirectory)\ExdiGdbSrv.vpack.temp'
+    description: 'ExdiGdbSrv binary'
+    pushPkgName: ExdiGdbSrv.vpack.binary
