@@ -1,0 +1,58 @@
+//**************************************************************************
+//
+// HelpStrings.rc
+//
+// Resource file for help strings.
+//
+//**************************************************************************
+//
+// Copyright (c) Microsoft Corporation.  All rights reserved.
+//
+//**************************************************************************
+
+#include "HelpStrings.h"
+
+STRINGTABLE
+BEGIN
+    SYMBOLBUILDER_IDS_MODULE_SYMBOLBUILDERSYMBOLS   "The symbol builder symbols for the module"
+    SYMBOLBUILDER_IDS_CREATESYMBOLS                 "CreateSymbols(module) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object"
+    SYMBOLBUILDER_IDS_SYMBOLSET_TYPES               "The list of available types"
+    SYMBOLBUILDER_IDS_SYMBOLSET_DATA                "The list of available global data"
+    SYMBOLBUILDER_IDS_TYPES_ADDBASICCTYPES          "AddBasicCTypes() - For symbol builder symbols created without default C types, this adds the default C types to the type system"
+    SYMBOLBUILDER_IDS_TYPES_CREATE                  "Create(typeName, [qualifiedTypeName]) - Creates a new user defined type.  An explicit 'qualifiedTypeName' may be optionally provided if different than the base name"
+    SYMBOLBUILDER_IDS_TYPES_CREATEARRAY             "CreateArray(baseType, arraySize) - Creates a new array type.  'baseType' may either be a type object or a type name.  'arraySize' is the size of the array"
+    SYMBOLBUILDER_IDS_TYPES_CREATEENUM              "CreateEnum(typeName, [basicType], [qualifiedTypeName]) - Creates a new enum type.  'basicType' is the type of the enum; if unspecified, the default is 'int'.  An explicit 'qualifiedTypeName' may optionally be provided if different than the base name"
+    SYMBOLBUILDER_IDS_TYPES_CREATEPOINTER           "CreatePointer(baseType) - Creates a new pointer to the given type"
+    SYMBOLBUILDER_IDS_TYPES_CREATETYPEDEF           "CreateTypedef(typeName, baseType, [qualifiedTypeName]) - Creates a new typedef to 'baseType'.  An explicit 'qualifiedTypeName' may optionally be provided if different than the base name"
+    SYMBOLBUILDER_IDS_SYMBOL_NAME                   "The name of the symbol"
+    SYMBOLBUILDER_IDS_SYMBOL_QUALIFIEDNAME          "The qualified name of the symbol"
+    SYMBOLBUILDER_IDS_SYMBOL_PARENT                 "The parent of the symbol"
+    SYMBOLBUILDER_IDS_TYPE_SIZE                     "The size of the type as if sizeof(t) had been applied"
+    SYMBOLBUILDER_IDS_TYPE_ALIGNMENT                "The alignment of the type as if __alignof(t) had been applied"
+    SYMBOLBUILDER_IDS_TYPE_DELETE                   "Delete() - Deletes the type from the symbol builder symbols.  Any live objects of the given type are orphaned"
+    SYMBOLBUILDER_IDS_UDTTYPE_BASECLASSES           "The list of base classes of the type"
+    SYMBOLBUILDER_IDS_UDTTYPE_FIELDS                "The list of fields of the type"
+    SYMBOLBUILDER_IDS_POINTERTYPE_BASETYPE          "The type which the pointer points to"
+    SYMBOLBUILDER_IDS_ARRAYTYPE_ARRAYSIZE           "The size of the array"
+    SYMBOLBUILDER_IDS_ARRAYTYPE_BASETYPE            "The type which the array is an array of"
+    SYMBOLBUILDER_IDS_TYPEDEFTYPE_BASETYPE          "The type which this typedef refers to"
+    SYMBOLBUILDER_IDS_ENUMTYPE_BASETYPE             "The basic underlying type of the enum"
+    SYMBOLBUILDER_IDS_ENUMTYPE_ENUMERANTS           "The list of enumerants of the enum"
+    SYMBOLBUILDER_IDS_FIELDS_ADD                    "Add(name, type, [offset]) - Adds a new field of the given name and type.  'type' may be a type name or type object.  If 'offset' is supplied, the field will be placed at the given offset; otherwise, it will be placed automatically as if defined in a C structure"
+    SYMBOLBUILDER_IDS_ENUMERANTS_ADD                "Add(name, [value]) - Adds a new enumerant of the given name and value.  If 'value' is supplied, the enumerant has an explicitly assigned value; otherwise, it will be assigned automatically as if defined in a C enum"
+    SYMBOLBUILDER_IDS_FIELD_ISAUTOMATICLAYOUT       "Whether or not the field or enumerant has automatically assigned offsets and/or values"
+    SYMBOLBUILDER_IDS_FIELD_TYPE                    "The type of the field"
+    SYMBOLBUILDER_IDS_FIELD_OFFSET                  "The offset of the field"
+    SYMBOLBUILDER_IDS_FIELD_DELETE                  "Delete() - Deletes the field or enumerant from its parent type/enum"
+    SYMBOLBUILDER_IDS_FIELD_MOVEBEFORE              "MoveBefore(pos) - Moves this field/enumerant to a location in its parent type before the given field/enumerant.  Note that 'pos' may either be a field/enumerant object or it may be a zero based ordinal indicating its position within the list of fields/enumerants"
+    SYMBOLBUILDER_IDS_BASECLASSES_ADD               "Add(baseClassType, [offset]) - Adds a new base class of the given type.  If 'offset' is supplied, the base class will be placed at the given offset; otherwise, it will be placed automatically as if defined in a C++ struct/class"
+    SYMBOLBUILDER_IDS_BASECLASS_ISAUTOMATICLAYOUT   "Indicates whether the base class has an automatically assigned offset within its parent type"
+    SYMBOLBUILDER_IDS_BASECLASS_TYPE                "The type of the base class"
+    SYMBOLBUILDER_IDS_BASECLASS_OFFSET              "The offset of the base class within its parent type"
+    SYMBOLBUILDER_IDS_BASECLASS_DELETE              "Delete() - Deletes the base class from its parent type"
+    SYMBOLBUILDER_IDS_BASECLASS_MOVEBEFORE          "MoveBefore(pos) - Moves this base class to a location in its parent type before the given base class.  Note that 'pos' may either be a base class object or it may be a zero based ordinal indicating its position within the list of base classes"
+    SYMBOLBUILDER_IDS_DATA_CREATEGLOBAL             "CreateGlobal(name, type, offset, [qualifiedName]) - Adds new global data of a specified 'type' at 'offset' bytes into the module.  An explicit 'qualifiedName' may optionally be provided if different than the base name"
+    SYMBOLBUILDER_IDS_GLOBALDATA_TYPE               "The type of the global data"
+    SYMBOLBUILDER_IDS_GLOBALDATA_OFFSET             "The offset of the global data within its loaded module"
+    SYMBOLBUILDER_IDS_GLOBALDATA_DELETE             "Delete() - Deletes the global data"
+END
