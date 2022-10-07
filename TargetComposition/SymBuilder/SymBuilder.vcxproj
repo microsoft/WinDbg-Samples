@@ -218,15 +218,15 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets" Condition="Exists('packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" />
-    <Import Project="packages\Microsoft.Debugging.DataModel.CppLib.1.0.1\build\native\Microsoft.Debugging.DataModel.CppLib.targets" Condition="Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.1\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" />
     <Import Project="packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets" Condition="Exists('packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" />
+    <Import Project="packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets" Condition="Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
     <Error Condition="!Exists('packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets'))" />
-    <Error Condition="!Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.1\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.DataModel.CppLib.1.0.1\build\native\Microsoft.Debugging.DataModel.CppLib.targets'))" />
     <Error Condition="!Exists('packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets'))" />
   </Target>
 </Project>
