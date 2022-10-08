@@ -25,6 +25,8 @@ namespace Services
 namespace SymbolBuilder
 {
 
+class SymbolBuilderManager;
+
 //*************************************************
 // Overall Symbol Set:
 //
@@ -108,10 +110,17 @@ class SymbolSet :
         Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
         ISvcSymbolSet,
         ISvcSymbolSetSimpleNameResolution,
+        ISvcSymbolSetScopeResolution,
         ISvcDescription
         >
 {
 public:
+
+    //
+    // ScopeBoundIdFlag: Indicates that the ID is a scope binding and not an index
+    //                   into our master list of symbols.
+    //
+    static constexpr ULONG64 ScopeBoundIdFlag = (1ull << 63);
 
     SymbolSet() :
         m_nextId(0),
@@ -130,18 +139,7 @@ public:
     // Returns the symbol for a given symbol ID (returned by ISvcSymbol::GetId)
     //
     IFACEMETHOD(GetSymbolById)(_In_ ULONG64 symbolId,
-                               _COM_Outptr_ ISvcSymbol **ppSymbol)
-    {
-        *ppSymbol = nullptr;
-        if (symbolId >= m_symbols.size())
-        {
-            return E_INVALIDARG;
-        }
-
-        Microsoft::WRL::ComPtr<ISvcSymbol> spSymbol = m_symbols[static_cast<size_t>(symbolId)];
-        *ppSymbol = spSymbol.Detach();
-        return S_OK;
-    }
+                               _COM_Outptr_ ISvcSymbol **ppSymbol);
 	
     //
     // EnumerateAllSymbols():
@@ -175,6 +173,34 @@ public:
                                     _In_ bool exactMatchOnly,
                                     _COM_Outptr_ ISvcSymbol **ppSymbol,
                                     _Out_ ULONG64 *pSymbolOffset);
+
+    //*************************************************
+    // ISvcSymbolSetScopeResolution:
+    //
+
+    // GetGlobalScope():
+    //
+    // Returns a scope representing the global scope of the module the symbol set represents.  This 
+    // may be an aggregation of other symbols one could discover through fully enumerating the symbol
+    // set.
+    //
+    IFACEMETHOD(GetGlobalScope)(_COM_Outptr_ ISvcSymbolSetScope **ppScope);
+
+    // FindScopeByOffset():
+    //
+    // Finds a scope by an offset within the image (which is assumed to be an offset within
+    // a function or other code area)
+    //
+    IFACEMETHOD(FindScopeByOffset)(_In_ ULONG64 moduleOffset,
+                                   _COM_Outptr_ ISvcSymbolSetScope **ppScope);
+
+    // FindScopeFrame():
+    //
+    // Finds a scope by the unwound context record for a stack frame.
+    //
+    IFACEMETHOD(FindScopeFrame)(_In_ ISvcProcess *pProcess,
+                                _In_ ISvcRegisterContext *pRegisterContext,
+                                _COM_Outptr_ ISvcSymbolSetScopeFrame **ppScopeFrame);
 
     //*************************************************
     // ISvcDescription:
@@ -257,6 +283,23 @@ public:
                            _COM_Outptr_opt_ BaseTypeSymbol **ppTypeSymbol,
                            _In_ bool allowAutoCreations = true);
 
+    // GetScopeBindingId():
+    //
+    // Gets a new ID for a scope binding.
+    //
+    HRESULT GetScopeBindingId(_In_ ULONG64 variableId,
+                              _In_ ULONG64 moduleOffset,
+                              _Out_ ULONG64 *pId)
+    {
+        auto fn = [&]()
+        {
+            m_scopeBindings.push_back( std::pair<ULONG64, ULONG64> { variableId, moduleOffset } );
+            *pId = ScopeBoundIdFlag | (m_scopeBindings.size() - 1);
+            return S_OK;
+        };
+        return ConvertException(fn);
+    }
+
     //*************************************************
     // Internal Accessors:
     //
@@ -313,6 +356,7 @@ public:
     std::vector<ULONG64> const& InternalGetGlobalSymbols() const { return m_globalSymbols; }
     IDebugServiceManager* GetServiceManager() const;
     ISvcMachineArchitecture* GetArchInfo() const;
+    SymbolBuilderManager* GetSymbolBuilderManager() const;
 
 private:
 
@@ -329,6 +373,9 @@ private:
 
     // The master index of "global" symbols
     std::vector<ULONG64> m_globalSymbols;
+
+    // Scope bindings: pair< variable id, moduleOffset > 
+    std::vector<std::pair<ULONG64, ULONG64>> m_scopeBindings;
 
     // The master index of names -> global symbol IDs
     std::unordered_map<std::wstring, ULONG64> m_symbolNameMap;
@@ -348,12 +395,12 @@ private:
     
 };
 
-// GlobalSymbolEnumerator:
+// BaseSymbolEnumerator:
 //
-// An enumerator which enumerates all of the global symbols within a symbol set.
+// A base class for symbol enumeration which provides certain helpers.
 //
-class GlobalEnumerator :
-    public Microsoft::WRL::RuntimeClass<
+class BaseSymbolEnumerator :
+    public Microsoft::WRL::Implements<
         Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
         ISvcSymbolSetEnumerator
         >
@@ -381,6 +428,135 @@ public:
     IFACEMETHOD(GetNext)(_COM_Outptr_ ISvcSymbol **ppSymbol)
     {
         *ppSymbol = nullptr;
+        return E_BOUNDS;
+    }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    SymbolSet *InternalGetSymbolSet() const { return m_spSymbolSet.Get(); }
+
+protected:
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT BaseInitialize(_In_ SymbolSet *pSymbolSet)
+    {
+        m_spSymbolSet = pSymbolSet;
+        m_searchKind = SvcSymbol;
+        m_pSearchInfo = nullptr;
+        return Reset();
+    }
+
+    HRESULT BaseInitialize(_In_ SymbolSet *pSymbolSet,
+                           _In_ SvcSymbolKind symKind,
+                           _In_opt_ PCWSTR pwszName,
+                           _In_opt_ SvcSymbolSearchInfo *pSearchInfo)
+    {
+        auto fn = [&]()
+        {
+            m_spSymbolSet = pSymbolSet;
+            m_searchKind = symKind;
+            m_pSearchInfo = nullptr;
+            if (pwszName != nullptr)
+            {
+                m_searchName = pwszName;
+            }
+            if (pSearchInfo != nullptr)
+            {
+                size_t dataSize = pSearchInfo->HeaderSize + pSearchInfo->InfoSize;
+                m_searchData.reset(new(std::nothrow) unsigned char[dataSize]);
+                if (m_searchData.get() == nullptr)
+                {
+                    return E_OUTOFMEMORY;
+                }
+                m_pSearchInfo = reinterpret_cast<SvcSymbolSearchInfo *>(m_searchData.get());
+                memcpy(m_pSearchInfo, pSearchInfo, dataSize);
+            }
+            return Reset();
+        };
+        return ConvertException(fn);
+    }
+
+    // SymbolMatchesSearchCriteria():
+    //
+    // Checks whether a given symbol from the scope matches other search criteria (name, kind,
+    // type kind, etc...)
+    //
+    bool SymbolMatchesSearchCriteria(_In_ BaseSymbol *pSymbol) const
+    {
+        if (m_searchKind != SvcSymbol && pSymbol->InternalGetKind() != m_searchKind)
+        {
+            return false;
+        }
+
+        if (!m_searchName.empty())
+        {
+            wchar_t const *pMatchName = 
+                (m_pSearchInfo != nullptr && (m_pSearchInfo->SearchOptions & 
+                                              SvcSymbolSearchQualifiedName) != 0) ?
+                    pSymbol->InternalGetQualifiedName().c_str() :
+                    pSymbol->InternalGetName().c_str();
+
+            if (!pMatchName || wcscmp(pMatchName, m_searchName.c_str()) != 0)
+            {
+                return false;
+            }
+        }
+
+        if (m_searchKind == SvcSymbolType && m_pSearchInfo != nullptr &&
+            m_pSearchInfo->InfoSize >= FIELD_OFFSET(SvcTypeSearchInfo, SearchType) + 
+                                       sizeof (SvcSymbolTypeKind))
+        {
+            SvcTypeSearchInfo *pTypeSearchInfo = reinterpret_cast<SvcTypeSearchInfo *>(
+                reinterpret_cast<char *>(m_pSearchInfo) + m_pSearchInfo->HeaderSize
+                );
+
+            BaseTypeSymbol *pTypeSymbol = static_cast<BaseTypeSymbol *>(pSymbol);
+            if (pTypeSymbol->InternalGetTypeKind() != pTypeSearchInfo->SearchType)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    size_t m_pos;
+    Microsoft::WRL::ComPtr<SymbolSet> m_spSymbolSet;
+
+    SvcSymbolKind m_searchKind;
+    std::wstring m_searchName;
+    SvcSymbolSearchInfo *m_pSearchInfo;
+    std::unique_ptr<unsigned char[]> m_searchData;
+};
+
+// GlobalSymbolEnumerator:
+//
+// An enumerator which enumerates all of the global symbols within a symbol set.
+//
+class GlobalEnumerator :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseSymbolEnumerator
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbolSetEnumerator:
+    //
+
+    // GetNext():
+    //
+    // Gets the next symbol from the enumerator.
+    //
+    IFACEMETHOD(GetNext)(_COM_Outptr_ ISvcSymbol **ppSymbol)
+    {
+        *ppSymbol = nullptr;
 
         //
         // NOTE: There may be gaps in our id <-> symbol mapping because of deleted symbols or other
@@ -391,12 +567,17 @@ public:
 
         while (m_pos < symbols.size())
         {
-            Microsoft::WRL::ComPtr<ISvcSymbol> spSymbol = symbols[m_pos];
+            ISvcSymbol *pSymbol = symbols[m_pos].Get();
             ++m_pos;
-            if (spSymbol.Get() != nullptr)
+            if (pSymbol != nullptr)
             {
-                *ppSymbol = spSymbol.Detach();
-                return S_OK;
+                BaseSymbol *pBaseSymbol = static_cast<BaseSymbol *>(pSymbol);
+                if (SymbolMatchesSearchCriteria(pBaseSymbol))
+                {
+                    Microsoft::WRL::ComPtr<ISvcSymbol> spSymbol = pSymbol;
+                    *ppSymbol = spSymbol.Detach();
+                    return S_OK;
+                }
             }
         }
 
@@ -409,14 +590,323 @@ public:
 
     HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet)
     {
+        return BaseInitialize(pSymbolSet);
+    }
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                   _In_ SvcSymbolKind symKind,
+                                   _In_opt_ PCWSTR pwszName,
+                                   _In_opt_ SvcSymbolSearchInfo *pSearchInfo)
+    {
+        return BaseInitialize(pSymbolSet, symKind, pwszName, pSearchInfo);
+    }
+};
+
+// GlobalScope:
+//
+// A representation of the global scope.
+//
+class GlobalScope :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        ISvcSymbolSetScope,
+        ISvcSymbolChildren
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbolSetScope:
+
+    // EnumerateArguments():
+    //
+    // If the scope is a function scope (or is a lexical sub-scope of a function), this enumerates
+    // the arguments of the function.  
+    //
+    // This will fail for a scope for which arguments are inappropriate.
+    //
+    IFACEMETHOD(EnumerateArguments)(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum)
+    {
+        //
+        // There are no "arguments" in the global scope.
+        //
+        *ppEnum = nullptr;
+        return E_FAIL;
+    }
+
+    // EnumerateLocals():
+    //
+    // Enumerates the locals within the scope.  
+    //
+    IFACEMETHOD(EnumerateLocals)(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum)
+    {
+        //
+        // There are no "local variables" in the global scope.
+        //
+        *ppEnum = nullptr;
+        return E_FAIL;
+    }
+
+    //*************************************************
+    // ISvcSymbolSetChildren:
+    //
+
+    // EnumerateChildren():
+    //
+    // Enumerates all children of the given symbol.
+    //
+    IFACEMETHOD(EnumerateChildren)(_In_ SvcSymbolKind kind,
+                                   _In_opt_z_ PCWSTR pwszName,
+                                   _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
+                                   _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum)
+    {
+        HRESULT hr = S_OK;
+        *ppChildEnum = nullptr;
+
+        Microsoft::WRL::ComPtr<GlobalEnumerator> spEnum;
+        IfFailedReturn(Microsoft::WRL::MakeAndInitialize<GlobalEnumerator>(&spEnum,
+                                                                           m_spSymbolSet.Get(),
+                                                                           kind,
+                                                                           pwszName,
+                                                                           pSearchInfo));
+
+        *ppChildEnum = spEnum.Detach();
+        return hr;
+    }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet)
+    {
         m_spSymbolSet = pSymbolSet;
-        return Reset();
+        return S_OK;
     }
 
 private:
 
-    size_t m_pos;
     Microsoft::WRL::ComPtr<SymbolSet> m_spSymbolSet;
+
+};
+
+// BaseScope:
+//
+// The base of a scope or a scope frame for a function.  Note that we only support function scopes.
+// It is entirely possible to have a scope which represents a deeply nested lexical scope, etc...
+// This base class implements all necessary scope functionality outside of that required 
+// specifically for a scope frame.  It also provides some helpers for a scope frame.
+//
+class BaseScope :
+    public Microsoft::WRL::Implements<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        ISvcSymbolSetScope,
+        ISvcSymbolChildren
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbolSetScope:
+
+    // EnumerateArguments():
+    //
+    // If the scope is a function scope (or is a lexical sub-scope of a function), this enumerates
+    // the arguments of the function.  
+    //
+    // This will fail for a scope for which arguments are inappropriate.
+    //
+    IFACEMETHOD(EnumerateArguments)(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum);
+
+    // EnumerateLocals():
+    //
+    // Enumerates the locals within the scope.  
+    //
+    IFACEMETHOD(EnumerateLocals)(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum);
+
+    //*************************************************
+    // ISvcSymbolSetChildren:
+    //
+
+    // EnumerateChildren():
+    //
+    // Enumerates all children of the given symbol.
+    //
+    IFACEMETHOD(EnumerateChildren)(_In_ SvcSymbolKind kind,
+                                   _In_opt_z_ PCWSTR pwszName,
+                                   _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
+                                   _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum);
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    SymbolSet *InternalGetSymbolSet() const { return m_spSymbolSet.Get(); }
+    FunctionSymbol *InternalGetFunction() const { return m_spFunction.Get(); }
+    ULONG64 InternalGetFunctionOffset() const { return m_srelOffset; }
+    ISvcProcess *InternalGetScopeFrameProcess() const { return m_spFrameProcess.Get(); }
+    ISvcRegisterContext *InternalGetScopeFrameContext() const { return m_spFrameContext.Get(); }
+
+protected:
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT BaseInitialize(_In_ SymbolSet *pSymbolSet,
+                           _In_ FunctionSymbol *pFunction,
+                           _In_ ULONG64 srelOffset,
+                           _In_opt_ ISvcProcess *pFrameProcess = nullptr,
+                           _In_opt_ ISvcRegisterContext *pFrameContext = nullptr)
+    {
+        HRESULT hr = S_OK;
+
+        m_spSymbolSet = pSymbolSet;
+        m_spFunction = pFunction;
+        m_srelOffset = srelOffset;
+        m_spFrameProcess = pFrameProcess;
+
+        if (pFrameContext != nullptr)
+        {
+            IfFailedReturn(pFrameContext->Duplicate(&m_spFrameContext));
+        }
+
+        return hr;
+    }
+
+    // Our owning symbol set
+    Microsoft::WRL::ComPtr<SymbolSet> m_spSymbolSet;
+
+    // The function for which we are a scope.
+    Microsoft::WRL::ComPtr<FunctionSymbol> m_spFunction;
+
+    // The offset relative to the base of m_spFunction for the @pc of this scope
+    ULONG64 m_srelOffset;
+
+    // Information for a scope frame.
+    Microsoft::WRL::ComPtr<ISvcProcess> m_spFrameProcess;
+    Microsoft::WRL::ComPtr<ISvcRegisterContext> m_spFrameContext;
+
+};
+
+// Scope:
+//
+// Represents a scope (detached from a particular register context)
+//
+class Scope :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseScope
+        >
+{
+public:
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                   _In_ FunctionSymbol *pFunction,
+                                   _In_ ULONG64 srelOffset)
+    {
+        return BaseInitialize(pSymbolSet, pFunction, srelOffset);
+    }
+};
+
+// ScopeFrame:
+//
+// Represents a scope (attached to a particular register context; e.g.: from a stack frame)
+//
+class ScopeFrame :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseScope,
+        ISvcSymbolSetScopeFrame
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbolSetScopeFrame:
+    //
+
+    // GetContext():
+    //
+    // Gets the context for the scope frame.
+    //
+    IFACEMETHOD(GetContext)(_In_ SvcContextFlags /*contextFlags*/,
+                            _COM_Outptr_ ISvcRegisterContext **ppRegisterContext)
+    {
+        *ppRegisterContext = nullptr;
+
+        if (InternalGetScopeFrameContext() == nullptr)
+        {
+            return E_FAIL;
+        }
+
+        Microsoft::WRL::ComPtr<ISvcRegisterContext> spRegisterContext = InternalGetScopeFrameContext();
+        *ppRegisterContext = spRegisterContext.Detach();
+        return S_OK;
+    }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                   _In_ FunctionSymbol *pFunction,
+                                   _In_ ULONG64 srelOffset,
+                                   _In_opt_ ISvcProcess *pFrameProcess,
+                                   _In_ ISvcRegisterContext *pFrameContext)
+    {
+        return BaseInitialize(pSymbolSet, pFunction, srelOffset, pFrameProcess, pFrameContext);
+    }
+};
+
+// ScopeEnumerator:
+//
+// A symbol enumerator for a scope.
+//
+class ScopeEnumerator :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseSymbolEnumerator
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbolSetEnumerator:
+    //
+
+    // GetNext():
+    //
+    // Gets the next symbol from the enumerator.
+    //
+    IFACEMETHOD(GetNext)(_COM_Outptr_ ISvcSymbol **ppSymbol);
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ BaseScope *pScope)
+    {
+        m_spScope = pScope;
+        return BaseInitialize(pScope->InternalGetSymbolSet());
+    }
+
+    HRESULT RuntimeClassInitialize(_In_ BaseScope *pScope,
+                                   _In_ SvcSymbolKind symKind,
+                                   _In_opt_ PCWSTR pwszName,
+                                   _In_opt_ SvcSymbolSearchInfo *pSearchInfo)
+    {
+        m_spScope = pScope;
+        return BaseInitialize(pScope->InternalGetSymbolSet(), symKind, pwszName, pSearchInfo);
+    }
+
+private:
+
+    Microsoft::WRL::ComPtr<ISvcSymbolSetScope> m_spScope;
 
 };
 

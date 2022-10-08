@@ -32,11 +32,13 @@ namespace SymbolBuilder
 
 HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
                                        _In_ SvcSymbolKind symKind,
-                                       _In_ ULONG64 owningTypeId,
+                                       _In_ ULONG64 owningSymbolId,
                                        _In_ ULONG64 symOffset,
                                        _In_ ULONG64 symTypeId,
                                        _In_opt_ PCWSTR pwszName,
-                                       _In_opt_ PCWSTR pwszQualifiedName)
+                                       _In_opt_ PCWSTR pwszQualifiedName,
+                                       _In_ bool newSymbol,
+                                       _In_ ULONG64 id)
 {
     HRESULT hr = S_OK;
 
@@ -51,11 +53,13 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     //
     // Global data does not need an owning type.
     //
-    BaseSymbol *pOwningType = nullptr;
+    BaseSymbol *pOwningSymbol = nullptr;
     if (symKind != SvcSymbolData)
     {
-        pOwningType = pSymbolSet->InternalGetSymbol(owningTypeId);
-        if (pOwningType == nullptr || pOwningType->InternalGetKind() != SvcSymbolType)
+        pOwningSymbol = pSymbolSet->InternalGetSymbol(owningSymbolId);
+        if (pOwningSymbol == nullptr || 
+            (pOwningSymbol->InternalGetKind() != SvcSymbolType && symKind != SvcSymbolDataParameter &&
+             symKind != SvcSymbolDataLocal))
         {
             return E_INVALIDARG;
         }
@@ -70,58 +74,70 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     m_rangeCacheOffset = Uninitialized;
     m_rangeCacheSize = Uninitialized;
 
-    IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, symKind, owningTypeId, pwszName, pwszQualifiedName));
+    IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, symKind, owningSymbolId, pwszName, pwszQualifiedName, newSymbol, id));
 
     m_symTypeId = symTypeId;
     m_symOffset = symOffset;
 
-    if (pOwningType != nullptr)
+    if (pOwningSymbol != nullptr && newSymbol)
     {
-        IfFailedReturn(pOwningType->AddChild(InternalGetId()));
+        IfFailedReturn(pOwningSymbol->AddChild(InternalGetId()));
     }
 
-    //
-    // Keep track of the type's size and offset so we can recache information about the placement of the data upon
-    // any change in the type.
-    //
-    BaseTypeSymbol *pType = static_cast<BaseTypeSymbol *>(pSymbolType);
-
-    //
-    // Let the symbol set know about the mapping of this symbol <-> address range if it has such.
-    //
-    if (symKind == SvcSymbolData && !InternalIsConstantValue())
+    if (symKind != SvcSymbolDataParameter && symKind != SvcSymbolDataLocal)
     {
-        ULONG64 start = InternalGetActualSymbolOffset();
-        ULONG64 end = start + pType->InternalGetTypeSize();
-        IfFailedReturn(pSymbolSet->InternalAddSymbolRange(start, end, InternalGetId()));
-        m_rangeCacheOffset = start;
-        m_rangeCacheSize = end - start;
+        //
+        // Keep track of the type's size and offset so we can recache information about the placement of the data upon
+        // any change in the type.
+        //
+        BaseTypeSymbol *pType = static_cast<BaseTypeSymbol *>(pSymbolType);
+
+        //
+        // Let the symbol set know about the mapping of this symbol <-> address range if it has such.
+        //
+        if (symKind == SvcSymbolData && !InternalIsConstantValue())
+        {
+            ULONG64 start = InternalGetActualSymbolOffset();
+            ULONG64 end = start + pType->InternalGetTypeSize();
+            IfFailedReturn(pSymbolSet->InternalAddSymbolRange(start, end, InternalGetId()));
+            m_rangeCacheOffset = start;
+            m_rangeCacheSize = end - start;
+        }
+	
+        //
+        // Setup a chain of dependency:
+        //
+        //     - From the type of this field/base to the field itself
+        //     - From the field/base to the owning type
+        //
+        // This way, changes will cause a recomputation of the layout of the owning type when:
+        //
+        //     - Something about the type of this field/base changes
+        //     - Something about the field/base itself changes (e.g.: a manual change of type / offset / etc...)
+        //
+        if (newSymbol)
+        {
+            IfFailedReturn(pSymbolType->AddDependentNotify(InternalGetId()));
+        }
     }
 
-    //
-    // Setup a chain of dependency:
-    //
-    //     - From the type of this field/base to the field itself
-    //     - From the field/base to the owning type
-    //
-    // This way, changes will cause a recomputation of the layout of the owning type when:
-    //
-    //     - Something about the type of this field/base changes
-    //     - Something about the field/base itself changes (e.g.: a manual change of type / offset / etc...)
-    //
-    IfFailedReturn(pSymbolType->AddDependentNotify(InternalGetId()));
-    IfFailedReturn(AddDependentNotify(owningTypeId));
+    if (newSymbol)
+    {
+        IfFailedReturn(AddDependentNotify(owningSymbolId));
+    }
 
     return hr;
 }
 
 HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
                                        _In_ SvcSymbolKind symKind,
-                                       _In_ ULONG64 owningTypeId,
+                                       _In_ ULONG64 owningSymbolId,
                                        _In_ VARIANT *pValue,
                                        _In_ ULONG64 symTypeId,
                                        _In_ PCWSTR pwszName,
-                                       _In_opt_ PCWSTR pwszQualifiedName)
+                                       _In_opt_ PCWSTR pwszQualifiedName,
+                                       _In_ bool newSymbol,
+                                       _In_ ULONG64 id)
 
 {
     HRESULT hr = S_OK;
@@ -170,11 +186,13 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     // 
     // Global data does not need to belong to some type.
     //
-    BaseSymbol *pOwningType = nullptr;
+    BaseSymbol *pOwningSymbol = nullptr;
     if (symKind != SvcSymbolData)
     {
-        pOwningType = pSymbolSet->InternalGetSymbol(owningTypeId);
-        if (pOwningType == nullptr || pOwningType->InternalGetKind() != SvcSymbolType)
+        pOwningSymbol = pSymbolSet->InternalGetSymbol(owningSymbolId);
+        if (pOwningSymbol == nullptr || 
+            (pOwningSymbol->InternalGetKind() != SvcSymbolType && symKind != SvcSymbolDataParameter &&
+             symKind != SvcSymbolDataLocal))
         {
             return E_INVALIDARG;
         }
@@ -187,7 +205,7 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
         // Only enumerants are allowed to not have a specified type.  Such type will automatically inherit
         // from the parent enum type.  We must make sure in this case that the parent symbol really is an enum type!
         //
-        BaseSymbol *pParentSymbol = pSymbolSet->InternalGetSymbol(owningTypeId);
+        BaseSymbol *pParentSymbol = pSymbolSet->InternalGetSymbol(owningSymbolId);
         if (pParentSymbol == nullptr || pParentSymbol->InternalGetKind() != SvcSymbolType)
         {
             return E_INVALIDARG;
@@ -208,7 +226,7 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
         }
     }
 
-    IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, symKind, owningTypeId, pwszName, pwszQualifiedName));
+    IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, symKind, owningSymbolId, pwszName, pwszQualifiedName, newSymbol, id));
 
     m_symTypeId = symTypeId;
     m_symOffset = (pValue->vt == VT_EMPTY ? UdtPositionalSymbol::AutomaticIncreaseConstantValue 
@@ -222,27 +240,34 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     //
     m_symValue = *pValue;
 
-    if (pOwningType != nullptr)
+    if (newSymbol)
     {
-        IfFailedReturn(pOwningType->AddChild(InternalGetId()));
-    }
+        if (pOwningSymbol != nullptr)
+        {
+            IfFailedReturn(pOwningSymbol->AddChild(InternalGetId()));
+        }
 
-    //
-    // Setup a chain of dependency:
-    //
-    //     - From the type of this field/base to the field itself
-    //     - From the field/base to the owning type
-    //
-    // This way, changes will cause a recomputation of the layout of the owning type when:
-    //
-    //     - Something about the type of this field/base changes
-    //     - Something about the field/base itself changes (e.g.: a manual change of type / offset / etc...)
-    //
-    if (pSymbolType != nullptr)
-    {
-        IfFailedReturn(pSymbolType->AddDependentNotify(InternalGetId()));
+        //
+        // Setup a chain of dependency:
+        //
+        //     - From the type of this field/base to the field itself
+        //     - From the field/base to the owning type
+        //
+        // This way, changes will cause a recomputation of the layout of the owning type when:
+        //
+        //     - Something about the type of this field/base changes
+        //     - Something about the field/base itself changes (e.g.: a manual change of type / offset / etc...)
+        //
+        if (symKind != SvcSymbolDataParameter && symKind != SvcSymbolDataLocal)
+        {
+            if (pSymbolType != nullptr)
+            {
+                IfFailedReturn(pSymbolType->AddDependentNotify(InternalGetId()));
+            }
+        }
+
+        IfFailedReturn(AddDependentNotify(owningSymbolId));
     }
-    IfFailedReturn(AddDependentNotify(owningTypeId));
 
     return hr;
 }
@@ -399,6 +424,391 @@ HRESULT GlobalDataSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
 {
     return BaseInitialize(pSymbolSet, SvcSymbolData, parentId, dataOffset, dataTypeId, pwszName, pwszQualifiedName);
 }
+
+//*************************************************
+// Parameters and Locals:
+//
+
+BaseScope *VariableSymbol::GetBoundScope() const 
+{ 
+    return static_cast<BaseScope *>(m_spBoundScope.Get());
+}
+
+HRESULT VariableSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                               _In_ SvcSymbolKind symKind,
+                                               _In_ ULONG64 parentId,
+                                               _In_ ULONG64 parameterTypeId,
+                                               _In_ PCWSTR pwszName)
+{
+    if (symKind != SvcSymbolDataParameter && symKind != SvcSymbolDataLocal)
+    {
+        return E_UNEXPECTED;
+    }
+
+    m_curId = 0;
+    return BaseInitialize(pSymbolSet, symKind, parentId, 0ull, parameterTypeId, pwszName, nullptr, true);
+}
+
+HRESULT VariableSymbol::RuntimeClassInitialize(_In_ VariableSymbol *pSourceSymbol,
+                                               _In_ BaseScope *pScope)
+{
+    auto fn = [&]()
+    {
+        HRESULT hr = S_OK;
+
+        m_curId = 0;
+        m_spBoundScope = pScope;
+
+        IfFailedReturn(BaseInitialize(pSourceSymbol->InternalGetSymbolSet(),
+                                      pSourceSymbol->InternalGetKind(),
+                                      pSourceSymbol->InternalGetParentId(), 
+                                      0ull,
+                                      pSourceSymbol->InternalGetSymbolTypeId(),
+                                      pSourceSymbol->InternalGetName().c_str(),
+                                      nullptr,
+                                      false,
+                                      pSourceSymbol->InternalGetId()));
+
+        //
+        // These must be copied over such that the ordering is preserved in m_liveRangeList!
+        // Normally, live range data would come from some other source that the variable symbol
+        // would point at (e.g.: a DWARF DIE or some record in the PDB).  As we are synthetic,
+        // the unbound VariableSymbol is the source of truth and not some external record.
+        //
+        auto&& liveRanges = pSourceSymbol->InternalGetLiveRanges();
+        for(LiveRange const *pLiveRange : liveRanges)
+        {
+            auto insResult = m_liveRanges.insert( { pLiveRange->UniqueId, *pLiveRange } );
+            m_liveRangeList.push_back(&insResult.first->second);
+        }
+
+        return hr;
+    };
+    return ConvertException(fn);
+}
+
+bool VariableSymbol::ValidateLiveRange(_In_ ULONG64 rangeOffset,
+                                       _In_ ULONG64 rangeSize,
+                                       _In_ ULONG64 ignoreRange)
+{
+    ULONG64 functionId = InternalGetParentId();
+    BaseSymbol *pParentSymbol = InternalGetSymbolSet()->InternalGetSymbol(functionId);
+    if (pParentSymbol == nullptr || pParentSymbol->InternalGetKind() != SvcSymbolFunction)
+    {
+        return false;
+    }
+
+    FunctionSymbol *pParentFunction = static_cast<FunctionSymbol *>(pParentSymbol);
+    auto&& addressRanges = pParentFunction->InternalGetAddressRanges();
+
+    //
+    // Ensure that there are no areas of the "live range" which are *OUTSIDE* the bounds
+    // of the function!
+    //
+    if (addressRanges.size() == 0)
+    {
+        return false;
+    }
+
+    ULONG64 functionBase = addressRanges[0].first;
+
+    //
+    // Verify that the live range is within the bounds of the function.  The range must
+    // be within a single "address range" of any disjoint function because contiguous
+    // ranges are reported as a single area so anything spilling outside a single range 
+    // would be invalid.
+    //
+    ULONG64 rangeStart = functionBase + rangeOffset;
+    ULONG64 rangeEnd = rangeStart + rangeSize;
+
+    bool outsideFunction = false;
+    bool found = false;
+
+    for(auto&& functionRange : addressRanges)
+    {
+        ULONG64 functionStart = functionRange.first;
+        ULONG64 functionEnd = functionStart + functionRange.second;
+
+        if ((rangeStart >= functionStart && rangeStart < functionEnd) ||
+            (rangeEnd >= functionStart && rangeEnd < functionEnd))
+        {
+            found = true;
+
+            if (rangeStart < functionStart || rangeEnd > functionEnd)
+            {
+                outsideFunction = true;
+            }
+        }
+    }
+
+    if (outsideFunction || !found)
+    {
+        return false;
+    }
+
+    //
+    // Ensure that this new live range does *NOT* overlap with any existing live range.
+    // That would also be a failure (at least for *US* -- real symbols might have cases where
+    // things might be available in one of two registers in a given basic block, etc...)
+    //
+    for(LiveRange const* pLiveRange : m_liveRangeList)
+    {
+        if (pLiveRange->UniqueId == ignoreRange)
+        {
+            continue;
+        }
+
+        ULONG64 travRangeStart = functionBase + pLiveRange->Offset;
+        ULONG64 travRangeEnd = travRangeStart + pLiveRange->Size;
+
+        if ((rangeStart >= travRangeStart && rangeStart < travRangeEnd) ||
+            (rangeEnd >= travRangeStart && rangeEnd < travRangeEnd))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+HRESULT VariableSymbol::AddLiveRange(_In_ ULONG64 rangeOffset,
+                                     _In_ ULONG64 rangeSize,
+                                     _In_ SvcSymbolLocation const& varLocation,
+                                     _Out_ ULONG64 *pUniqueId)
+{
+    auto fn = [&]()
+    {
+        if (!ValidateLiveRange(rangeOffset, rangeSize))
+        {
+            return E_INVALIDARG;
+        }
+
+        //
+        // Get a unique ID (a handle) for this particular live range.
+        //
+        ULONG64 id = ++m_curId;
+
+        auto insResult = m_liveRanges.insert( { id, { id, rangeOffset, rangeSize, varLocation } } );
+        *pUniqueId = id;
+
+        LiveRange * pRange = &(insResult.first->second);
+        m_liveRangeList.push_back(pRange);
+
+        // 
+        // Send an advisory notification upwards that everyone should flush caches.  Do not consider
+        // this a failure to set the offset if something goes wrong.  At worst, an explicit 
+        // .reload will be required in the debugger.
+        //
+        (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+
+        return S_OK;
+    };
+    return ConvertException(fn);
+}
+
+HRESULT VariableSymbol::GetOffset(_Out_ ULONG64 * /*pSymbolOffset*/)
+{
+    //
+    // We do not have any simple offset.
+    //
+    return E_FAIL;
+}
+
+HRESULT VariableSymbol::GetLocation(_Out_ SvcSymbolLocation *pLocation)
+{
+    //
+    // If this isn't bound to a scope, the only time we can return a location is if there is
+    // a single live range that covers the entire function.
+    //
+    if (!IsBoundToScope())
+    {
+        if (m_liveRangeList.size() != 1)
+        {
+            return E_FAIL;
+        }
+
+        LiveRange const *pLiveRange = m_liveRangeList[0];
+        if (pLiveRange->Offset != 0)
+        {
+            return E_FAIL;
+        }
+
+        BaseSymbol *pParent = InternalGetSymbolSet()->InternalGetSymbol(InternalGetParentId());
+        if (pParent == nullptr || pParent->InternalGetKind() != SvcSymbolFunction)
+        {
+            return E_FAIL;
+        }
+
+        FunctionSymbol *pFunction = static_cast<FunctionSymbol *>(pParent);
+        auto&& addressRanges = pFunction->InternalGetAddressRanges();
+
+        //
+        // If the function is disjoint, a single live range cannot cover it.
+        //
+        if (addressRanges.size() != 1)
+        {
+            return E_FAIL;
+        }
+
+        std::pair<ULONG64, ULONG64> addressRange = addressRanges[0];
+
+        if (pLiveRange->Size != addressRange.second)
+        {
+            return E_FAIL;
+        }
+
+        //
+        // At this point, we have a guaranteed match between the live range and the entire
+        // code of the function itself.  This location is *ALWAYS* valid.  It doesn't matter if 
+        // we know the scope or not.
+        //
+        *pLocation = pLiveRange->VariableLocation;
+        return S_OK;
+    }
+    else
+    {
+        ULONG64 srelOffset = GetBoundScope()->InternalGetFunctionOffset();
+        FunctionSymbol *pFunction = GetBoundScope()->InternalGetFunction();
+
+        //
+        // Sanity check that the scope we are bound to is within our parent function!
+        //
+        if (pFunction->InternalGetId() != InternalGetParentId())
+        {
+            return E_UNEXPECTED;
+        }
+
+        LiveRange const* pLiveRange = GetLiveRangeByOffset(srelOffset);
+        if (pLiveRange == nullptr)
+        {
+            //
+            // It is not alive at this particular location.
+            //
+            pLocation->Kind = SvcSymbolLocationNone;
+            return S_OK;
+        }
+
+        *pLocation = pLiveRange->VariableLocation;
+        return S_OK;
+    }
+}
+
+bool VariableSymbol::InternalSetLiveRangeOffset(_In_ ULONG64 id, _In_ ULONG64 offset)
+{
+    LiveRange *pLiveRange = GetLiveRange(id);
+    if (pLiveRange == nullptr ||
+        !ValidateLiveRange(offset, pLiveRange->Size, id))
+    {
+        return false;
+    }
+
+    pLiveRange->Offset = offset;
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to set the offset if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+    return true;
+}
+
+bool VariableSymbol::InternalSetLiveRangeSize(_In_ ULONG64 id, _In_ ULONG64 size)
+{
+    LiveRange *pLiveRange = GetLiveRange(id);
+    if (pLiveRange == nullptr ||
+        !ValidateLiveRange(pLiveRange->Offset, size, id))
+    {
+        return false;
+    }
+
+    pLiveRange->Size = size;
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to set the offset if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+    return true;
+}
+
+bool VariableSymbol::InternalSetLiveRangeLocation(_In_ ULONG64 id, _In_ SvcSymbolLocation const& location)
+{
+    LiveRange *pLiveRange = GetLiveRange(id);
+    if (pLiveRange == nullptr)
+    {
+        return false;
+    }
+
+    pLiveRange->VariableLocation = location;
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to set the offset if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+    return true;
+}
+
+bool VariableSymbol::InternalDeleteLiveRange(_In_ ULONG64 id)
+{
+    auto fn = [&]()
+    {
+        bool found = false;
+
+        auto it = m_liveRanges.find(id);
+
+        for (size_t i = 0; i < m_liveRangeList.size(); ++i)
+        {
+            if (m_liveRangeList[i]->UniqueId == id)
+            {
+                found = true;
+                m_liveRangeList.erase(m_liveRangeList.begin() + i);
+                break;
+            }
+        }
+
+        if (it == m_liveRanges.end() || !found)
+        {
+            return E_FAIL;
+        }
+
+        m_liveRanges.erase(it);
+        return S_OK;
+    };
+    if (FAILED(ConvertException(fn)))
+    {
+        return false;
+    }
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to set the offset if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+
+    return true;
+}
+
+HRESULT VariableSymbol::MoveToBefore(_In_ ULONG64 position)
+{
+    if (InternalGetKind() != SvcSymbolDataParameter)
+    {
+        return E_UNEXPECTED;
+    }
+
+    BaseSymbol *pParentSymbol = InternalGetSymbolSet()->InternalGetSymbol(m_parentId);
+    if (pParentSymbol == nullptr)
+    {
+        return E_UNEXPECTED;
+    }
+
+    return pParentSymbol->MoveChildBefore(InternalGetId(), position, InternalGetKind());
+}
+
 
 } // SymbolBuilder
 } // Services

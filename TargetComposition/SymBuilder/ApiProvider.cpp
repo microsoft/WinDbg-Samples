@@ -248,6 +248,7 @@ ApiProvider::ApiProvider()
     m_spSymbolSetFactory = std::make_unique<SymbolSetObject>();
     m_spTypesFactory = std::make_unique<TypesObject>();
     m_spDataFactory = std::make_unique<DataObject>();
+    m_spFunctionsFactory = std::make_unique<FunctionsObject>();
 
     //
     // Types:
@@ -267,6 +268,12 @@ ApiProvider::ApiProvider()
     m_spGlobalDataFactory = std::make_unique<GlobalDataObject>();
 
     //
+    // Functions:
+    //
+
+    m_spFunctionFactory = std::make_unique<FunctionObject>();
+
+    //
     // Other Symbols:
     //
 
@@ -275,6 +282,12 @@ ApiProvider::ApiProvider()
     m_spBaseClassesFactory = std::make_unique<BaseClassesObject>();
     m_spBaseClassFactory = std::make_unique<BaseClassObject>();
     m_spEnumerantsFactory = std::make_unique<EnumerantsObject>();
+    m_spParametersFactory = std::make_unique<ParametersObject>();
+    m_spParameterFactory = std::make_unique<ParameterObject>();
+    m_spLocalVariablesFactory = std::make_unique<LocalVariablesObject>();
+    m_spLocalVariableFactory = std::make_unique<LocalVariableObject>();
+    m_spLiveRangesFactory = std::make_unique<LiveRangesObject>();
+    m_spLiveRangeFactory = std::make_unique<LiveRangeObject>();
 }
 
 ApiProvider::~ApiProvider()
@@ -416,6 +429,13 @@ Object SymbolSetObject::GetData(_In_ const Object& /*symbolSetObject*/,
 {
     DataObject& dataFactory = ApiProvider::Get().GetDataFactory();
     return dataFactory.CreateInstance(spSymbolSet);
+}
+
+Object SymbolSetObject::GetFunctions(_In_ const Object& /*symbolSetObject*/, 
+                                     _In_ ComPtr<SymbolSet>& spSymbolSet)
+{
+    FunctionsObject& functionsFactory = ApiProvider::Get().GetFunctionsFactory();
+    return functionsFactory.CreateInstance(spSymbolSet);
 }
 
 //*************************************************
@@ -576,6 +596,15 @@ Object SymbolObjectHelpers::BoxSymbol(_In_ BaseSymbol *pSymbol)
             ComPtr<BaseClassSymbol> spBaseClassSymbol = pBaseClassSymbol;
             BaseClassObject& baseClassFactory = ApiProvider::Get().GetBaseClassFactory();
             symbolObject = baseClassFactory.CreateInstance(spBaseClassSymbol);
+            break;
+        }
+
+        case SvcSymbolFunction:
+        {
+            FunctionSymbol *pFunctionSymbol = static_cast<FunctionSymbol *>(pSymbol);
+            ComPtr<FunctionSymbol> spFunctionSymbol = pFunctionSymbol;
+            FunctionObject& functionFactory = ApiProvider::Get().GetFunctionFactory();
+            symbolObject = functionFactory.CreateInstance(spFunctionSymbol); 
             break;
         }
 
@@ -1562,6 +1591,588 @@ void GlobalDataObject::Delete(_In_ const Object& /*globalDataObject*/,
 }
 
 //*************************************************
+// Function APIs
+// 
+
+Object FunctionsObject::Create(_In_ const Object& /*functionsObject*/, 
+                               _In_ ComPtr<SymbolSet>& spSymbolSet,
+                               _In_ std::wstring functionName,
+                               _In_ Object returnType,
+                               _In_ ULONG64 codeOffset,
+                               _In_ ULONG64 codeSize,
+                               _In_ size_t argCount,
+                               _In_reads_(argCount) Object *pArgs)
+{
+    //
+    // The signature here allows for a bit of overloading.  The first argument in pArgs can either
+    // be a qualified name (string) or a parameter (object).  We need to do our own resolution.
+    //
+    std::wstring qualifiedName;
+    PCWSTR pwszQualifiedName = nullptr;
+
+    size_t paramStart = 0;
+    if (argCount > 0)
+    {
+        if (pArgs[0].GetKind() == ObjectIntrinsic)
+        {
+            qualifiedName = (std::wstring)(pArgs[0]);
+            pwszQualifiedName = qualifiedName.c_str();
+            paramStart++;
+        }
+    }
+
+    SymbolSet *pSymbolSet = spSymbolSet.Get();
+
+    BaseTypeSymbol *pReturnType = UnboxType(pSymbolSet, returnType);
+
+    PCWSTR pwszFunctionName = functionName.c_str();
+
+    ComPtr<FunctionSymbol> spFunction;
+    CheckHr(MakeAndInitialize<FunctionSymbol>(&spFunction,
+                                              pSymbolSet,
+                                              0,
+                                              pReturnType->InternalGetId(),
+                                              codeOffset,
+                                              codeSize,
+                                              pwszFunctionName,
+                                              pwszQualifiedName));
+
+    //
+    // If there are optional parameters in the pArgs... list, apply them one by one.  The method
+    // will currently expect objects that look like:
+    //
+    // { Name: <name>, Type: <type> }
+    //
+    for (size_t i = paramStart; i < argCount; ++i)
+    {
+        Object paramInfo = pArgs[i];
+        std::wstring paramName = (std::wstring)paramInfo.KeyValue(L"Name");
+        Object paramType = paramInfo.KeyValue(L"Type");
+
+        BaseTypeSymbol *pParamType = UnboxType(pSymbolSet, paramType);
+
+        ComPtr<VariableSymbol> spParameter;
+        CheckHr(MakeAndInitialize<VariableSymbol>(&spParameter, 
+                                                  pSymbolSet,
+                                                  SvcSymbolDataParameter,
+                                                  spFunction->InternalGetId(),
+                                                  pParamType->InternalGetId(),
+                                                  paramName.c_str()));
+    }
+
+    FunctionObject& functionFactory = ApiProvider::Get().GetFunctionFactory();
+    return functionFactory.CreateInstance(spFunction);
+}
+
+std::experimental::generator<Object> FunctionsObject::GetIterator(_In_ const Object& /*functionsObject*/,
+                                                                  _In_ ComPtr<SymbolSet>& spSymbolSet)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& globalSymbols = spSymbolSet->InternalGetGlobalSymbols();
+        if (cur >= globalSymbols.size())
+        {
+            break;
+        }
+
+        ULONG64 nextGlobal = globalSymbols[cur];
+        ++cur;
+
+        BaseSymbol *pNextSymbol = spSymbolSet->InternalGetSymbol(nextGlobal);
+        if (pNextSymbol->InternalGetKind() != SvcSymbolFunction)
+        {
+            continue;
+        }
+
+        FunctionSymbol *pNextFunction = static_cast<FunctionSymbol *>(pNextSymbol);
+        Object functionObject = BoxSymbol(pNextFunction);
+        co_yield functionObject;
+    }
+}
+
+//*************************************************
+// Function APIs:
+//
+
+std::wstring FunctionObject::ToString(_In_ const Object& /*functionObject*/,
+                                      _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                                      _In_ const Metadata& /*metadata*/)
+{
+    wchar_t buf[512];
+
+    std::wstring const& functionName = spFunctionSymbol->InternalGetQualifiedName();
+
+    swprintf_s(buf, ARRAYSIZE(buf), L"Function: %s",
+               functionName.empty() ? L"<Unknown>" : functionName.c_str());
+
+    return (std::wstring)buf;
+}
+
+Object FunctionObject::GetLocalVariables(_In_ const Object& /*functionObject*/,
+                                         _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    LocalVariablesObject& localVariablesFactory = ApiProvider::Get().GetLocalVariablesFactory();
+    return localVariablesFactory.CreateInstance(spFunctionSymbol);
+}
+
+Object FunctionObject::GetParameters(_In_ const Object& /*functionObject*/,
+                                     _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    ParametersObject& parametersFactory = ApiProvider::Get().GetParametersFactory();
+    return parametersFactory.CreateInstance(spFunctionSymbol);
+}
+
+Object FunctionObject::GetReturnType(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    return BoxRelatedType(spFunctionSymbol.Get(), spFunctionSymbol->InternalGetReturnTypeId());
+}
+
+void FunctionObject::SetReturnType(_In_ const Object& /*functionObject*/, 
+                                   _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                                   _In_ Object returnType)
+{
+    BaseTypeSymbol *pNewReturnType = UnboxType(spFunctionSymbol->InternalGetSymbolSet(),
+                                               returnType);
+
+    CheckHr(spFunctionSymbol->InternalSetReturnTypeId(pNewReturnType->InternalGetId()));
+}
+
+Object ParametersObject::Add(_In_ const Object& /*parametersObject*/,
+                             _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                             _In_ std::wstring parameterName,
+                             _In_ Object parameterType)
+{
+    SymbolSet *pSymbolSet = spFunctionSymbol->InternalGetSymbolSet();
+
+    BaseTypeSymbol *pParameterType = UnboxType(pSymbolSet, parameterType);
+
+    ComPtr<VariableSymbol> spParameter;
+    CheckHr(MakeAndInitialize<VariableSymbol>(&spParameter, 
+                                              pSymbolSet,
+                                              SvcSymbolDataParameter,
+                                              spFunctionSymbol->InternalGetId(),
+                                              pParameterType->InternalGetId(),
+                                              parameterName.c_str()));
+
+    ParameterObject& parameterFactory = ApiProvider::Get().GetParameterFactory();
+    return parameterFactory.CreateInstance(spParameter);
+}
+
+std::experimental::generator<Object> ParametersObject::GetIterator(_In_ const Object& /*parametersObject*/,
+                                                               _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& children = spFunctionSymbol->InternalGetChildren();
+        if (cur >= children.size())
+        {
+            break;
+        }
+
+        ULONG64 nextChild = children[cur];
+        ++cur;
+
+        BaseSymbol *pNextSymbol = spFunctionSymbol->InternalGetSymbolSet()->InternalGetSymbol(nextChild);
+        if (pNextSymbol->InternalGetKind() != SvcSymbolDataParameter)
+        {
+            continue;
+        }
+
+        VariableSymbol *pNextParameter = static_cast<VariableSymbol *>(pNextSymbol);
+        ComPtr<VariableSymbol> spNextParameter = pNextParameter;
+        ParameterObject& parameterFactory = ApiProvider::Get().GetParameterFactory();
+        Object parameterObj = parameterFactory.CreateInstance(spNextParameter);
+        co_yield parameterObj;
+    }
+}
+
+std::wstring ParametersObject::ToString(_In_ const Object& /*parametersObject*/,
+                                        _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                                        _In_ const Metadata& /*metadata*/)
+{
+    auto pSymbolSet = spFunctionSymbol->InternalGetSymbolSet();
+
+    bool first = true;
+    std::wstring str = L"(";
+
+    auto&& children = spFunctionSymbol->InternalGetChildren();
+    for(size_t i = 0; i < children.size(); ++i)
+    {
+        BaseSymbol *pChild = pSymbolSet->InternalGetSymbol(children[i]);
+        if (pChild == nullptr || pChild->InternalGetKind() != SvcSymbolDataParameter)
+        {
+            continue;
+        }
+
+        VariableSymbol *pParam = static_cast<VariableSymbol *>(pChild);
+        BaseSymbol *pType = pSymbolSet->InternalGetSymbol(pParam->InternalGetSymbolTypeId());
+        if (pType == nullptr)
+        {
+            continue;
+        }
+
+        if (!first)
+        {
+            str += L", ";
+        }
+
+        str += pType->InternalGetQualifiedName();
+        str += L" ";
+        str += pParam->InternalGetName();
+
+        first = false;
+    }
+
+
+    str += L")";
+
+    return str;
+}
+
+Object LocalVariablesObject::Add(_In_ const Object& /*localVariablesObject*/,
+                                 _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                                 _In_ std::wstring localVariableName,
+                                 _In_ Object localVariableType)
+{
+    SymbolSet *pSymbolSet = spFunctionSymbol->InternalGetSymbolSet();
+
+    BaseTypeSymbol *pLocalVariableType = UnboxType(pSymbolSet, localVariableType);
+
+    ComPtr<VariableSymbol> spLocalVariable;
+    CheckHr(MakeAndInitialize<VariableSymbol>(&spLocalVariable, 
+                                              pSymbolSet,
+                                              SvcSymbolDataLocal,
+                                              spFunctionSymbol->InternalGetId(),
+                                              pLocalVariableType->InternalGetId(),
+                                              localVariableName.c_str()));
+
+    LocalVariableObject& localVariableFactory = ApiProvider::Get().GetLocalVariableFactory();
+    return localVariableFactory.CreateInstance(spLocalVariable);
+}
+
+std::experimental::generator<Object> LocalVariablesObject::GetIterator(_In_ const Object& /*localVariablesObject*/,
+                                                                       _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& children = spFunctionSymbol->InternalGetChildren();
+        if (cur >= children.size())
+        {
+            break;
+        }
+
+        ULONG64 nextChild = children[cur];
+        ++cur;
+
+        BaseSymbol *pNextSymbol = spFunctionSymbol->InternalGetSymbolSet()->InternalGetSymbol(nextChild);
+        if (pNextSymbol->InternalGetKind() != SvcSymbolDataLocal)
+        {
+            continue;
+        }
+
+        VariableSymbol *pNextLocalVariable = static_cast<VariableSymbol *>(pNextSymbol);
+        ComPtr<VariableSymbol> spNextLocalVariable = pNextLocalVariable;
+        LocalVariableObject& localVariableFactory = ApiProvider::Get().GetLocalVariableFactory();
+        Object localVariableObj = localVariableFactory.CreateInstance(spNextLocalVariable);
+        co_yield localVariableObj;
+    }
+}
+
+Object BaseVariableObject::GetName(_In_ const Object& /*variableObject*/,
+                                   _In_ ComPtr<VariableSymbol>& spVariableSymbol)
+{
+    if (spVariableSymbol->InternalGetName().empty())
+    {
+        return Object::CreateNoValue();
+    }
+
+    return spVariableSymbol->InternalGetName();
+}
+
+void BaseVariableObject::SetName(_In_ const Object& /*variableObject*/, 
+                                 _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                                 _In_ std::wstring variableName)
+{
+    if (!spVariableSymbol->InternalSetName(variableName.c_str()))
+    {
+        throw std::runtime_error("Failure to set parameter name");
+    }
+}
+
+Object BaseVariableObject::GetType(_In_ const Object& /*variableObject*/,
+                                   _In_ ComPtr<VariableSymbol>& spVariableSymbol)
+{
+    return BoxRelatedType(spVariableSymbol.Get(), spVariableSymbol->InternalGetSymbolTypeId());
+}
+
+void BaseVariableObject::SetType(_In_ const Object& /*variableObject*/, 
+                                 _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                                 _In_ Object variableType)
+{
+    BaseTypeSymbol *pNewVariableType = UnboxType(spVariableSymbol->InternalGetSymbolSet(),
+                                                 variableType);
+
+    CheckHr(spVariableSymbol->InternalSetSymbolTypeId(pNewVariableType->InternalGetId()));
+}
+
+Object BaseVariableObject::GetLiveRanges(_In_ const Object& /*variableObject*/,
+                                         _In_ ComPtr<VariableSymbol>& spVariableSymbol)
+{
+    LiveRangesObject& liveRangesFactory = ApiProvider::Get().GetLiveRangesFactory();
+    return liveRangesFactory.CreateInstance(spVariableSymbol);
+}
+
+std::wstring BaseVariableObject::ToString(_In_ const Object& /*variableObject*/,
+                                          _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                                          _In_ const Metadata& /*metadata*/)
+{
+    std::wstring str;
+
+    auto pSymbolSet = spVariableSymbol->InternalGetSymbolSet();
+    BaseSymbol *pVarType = pSymbolSet->InternalGetSymbol(spVariableSymbol->InternalGetSymbolTypeId());
+
+    if (pVarType == nullptr)
+    {
+        throw std::runtime_error("Type not found");
+    }
+
+    str = pVarType->InternalGetQualifiedName();
+    str += L" ";
+    str += spVariableSymbol->InternalGetName();
+
+    return str;
+}
+
+void BaseVariableObject::Delete(_In_ const Object& /*variableObject*/, 
+                                _In_ ComPtr<VariableSymbol>& spVariableSymbol)
+{
+    CheckHr(spVariableSymbol->Delete());
+}
+
+
+void ParameterObject::MoveBefore(_In_ const Object& /*parameterObject*/, 
+                                 _In_ ComPtr<VariableSymbol>& spParameterSymbol,
+                                 _In_ Object beforeObj)
+{
+    ULONG64 pos = 0;
+
+    //
+    // The 'beforeObj' may be legitimately another parameter *OR* it may be a positional index 
+    // of the parameter within the list of children.  Handle both.
+    //
+    ParameterObject& parameterFactory = ApiProvider::Get().GetParameterFactory();
+    if (parameterFactory.IsObjectInstance(beforeObj))
+    {
+        ComPtr<VariableSymbol> spParameterSymbol = parameterFactory.GetStoredInstance(beforeObj);
+
+        SymbolSet *pSymbolSet = spParameterSymbol->InternalGetSymbolSet();
+        BaseSymbol *pParentSymbol = pSymbolSet->InternalGetSymbol(spParameterSymbol->InternalGetParentId());
+        if (pParentSymbol == nullptr)
+        {
+            throw std::runtime_error("cannot rearrange an orphan parameter");
+        }
+
+        CheckHr(pParentSymbol->GetChildPosition(spParameterSymbol->InternalGetId(), &pos));
+    }
+    else
+    {
+        pos = (ULONG64)beforeObj;
+    }
+
+    CheckHr(spParameterSymbol->MoveToBefore(pos));
+}
+
+Object LiveRangesObject::Add(_In_ const Object& /*liveRangesObject*/,
+                             _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                             _In_ ULONG64 rangeOffset,
+                             _In_ ULONG64 rangeSize,
+                             _In_ std::wstring locDesc)
+{
+    auto pManager = spVariableSymbol->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+    SvcSymbolLocation loc;
+    if (FAILED(pManager->ParseLocation(locDesc.c_str(), &loc)))
+    {
+        throw std::invalid_argument("Unable to parse location description");
+    }
+
+    ULONG64 uniqueId;
+    CheckHr(spVariableSymbol->AddLiveRange(rangeOffset, rangeSize, loc, &uniqueId));
+
+    LiveRangeObject& liveRangeFactory = ApiProvider::Get().GetLiveRangeFactory();
+    return liveRangeFactory.CreateInstance( { spVariableSymbol, uniqueId } );
+}
+
+std::experimental::generator<Object> LiveRangesObject::GetIterator(_In_ const Object& liveRangesObject,
+                                                                   _In_ ComPtr<VariableSymbol>& spVariableSymbol)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& liveRanges = spVariableSymbol->InternalGetLiveRanges();
+        if (cur >= liveRanges.size())
+        {
+            break;
+        }
+
+        VariableSymbol::LiveRange *pLiveRange = liveRanges[cur];
+        ++cur;
+
+        LiveRangeObject& liveRangeFactory = ApiProvider::Get().GetLiveRangeFactory();
+        Object liveRangeObj = liveRangeFactory.CreateInstance( { spVariableSymbol, pLiveRange->UniqueId } );
+        co_yield liveRangeObj;
+    }
+}
+
+std::wstring LiveRangeObject::ToString(_In_ const Object& /*liveRangeObject*/,
+                                       _In_ LiveRangeInformation const& liveRangeInfo,
+                                       _In_ const Metadata& /*metadata*/)
+{
+    auto pManager = liveRangeInfo.Variable->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+    VariableSymbol::LiveRange const *pLiveRange = liveRangeInfo.Variable->GetLiveRange(liveRangeInfo.LiveRangeIdentity);
+    if (pLiveRange == nullptr)
+    {
+        return L"";
+    }
+
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L"[%I64x, %I64x): ", 
+               pLiveRange->Offset,
+               pLiveRange->Offset + pLiveRange->Size);
+
+    std::wstring str = buf;
+    str += liveRangeInfo.Variable->InternalGetName();
+    str += L" = ";
+
+    std::wstring liveRangeDesc;
+    CheckHr(pManager->LocationToString(&pLiveRange->VariableLocation, &liveRangeDesc));
+
+    str += liveRangeDesc;
+    return str;
+}
+
+ULONG64 LiveRangeObject::GetOffset(_In_ const Object& /*liveRangeObject*/, 
+                                   _In_ LiveRangeInformation const& liveRangeInfo)
+{
+    VariableSymbol::LiveRange const *pLiveRange = 
+        liveRangeInfo.Variable->GetLiveRange(liveRangeInfo.LiveRangeIdentity);
+
+    if (pLiveRange == nullptr)
+    {
+        throw std::runtime_error("unrecognized live range");
+    }
+
+    return pLiveRange->Offset;
+}
+
+void LiveRangeObject::SetOffset(_In_ const Object& /*liveRangeObject*/, 
+                                _In_ LiveRangeInformation const& liveRangeInfo,
+                                _In_ ULONG64 offset)
+{
+    if (!liveRangeInfo.Variable->InternalSetLiveRangeOffset(liveRangeInfo.LiveRangeIdentity, 
+                                                            offset))
+    {
+        throw std::invalid_argument("unable to set specified live range offset");
+    }
+}
+
+ULONG64 LiveRangeObject::GetSize(_In_ const Object& /*liveRangeObject*/,
+                                 _In_ LiveRangeInformation const& liveRangeInfo)
+{
+    VariableSymbol::LiveRange const *pLiveRange = 
+        liveRangeInfo.Variable->GetLiveRange(liveRangeInfo.LiveRangeIdentity);
+
+    if (pLiveRange == nullptr)
+    {
+        throw std::runtime_error("unrecognized live range");
+    }
+
+    return pLiveRange->Size;
+}
+
+void LiveRangeObject::SetSize(_In_ const Object& /*liveRangeObject*/,
+                              _In_ LiveRangeInformation const& liveRangeInfo,
+                              _In_ ULONG64 size)
+{
+    if (!liveRangeInfo.Variable->InternalSetLiveRangeSize(liveRangeInfo.LiveRangeIdentity, 
+                                                          size))
+    {
+        throw std::invalid_argument("unable to set specified live range size");
+    }
+}
+
+std::wstring LiveRangeObject::GetLocation(_In_ const Object& /*liveRangeObject*/,
+                                          _In_ LiveRangeInformation const& liveRangeInfo)
+{
+    auto pManager = liveRangeInfo.Variable->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+    VariableSymbol::LiveRange const *pLiveRange = 
+        liveRangeInfo.Variable->GetLiveRange(liveRangeInfo.LiveRangeIdentity);
+
+    if (pLiveRange == nullptr)
+    {
+        throw std::runtime_error("unrecognized live range");
+    }
+
+    std::wstring locDesc;
+    if (FAILED(pManager->LocationToString(&pLiveRange->VariableLocation, &locDesc)))
+    {
+        throw std::runtime_error("unable to get location description for live range");
+    }
+
+    return locDesc;
+}
+
+void LiveRangeObject::SetLocation(_In_ const Object& /*liveRangeObject*/,
+                                  _In_ LiveRangeInformation const& liveRangeInfo,
+                                  _In_ std::wstring location)
+{
+    auto pManager = liveRangeInfo.Variable->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+    SvcSymbolLocation loc;
+    if (FAILED(pManager->ParseLocation(location.c_str(), &loc)))
+    {
+        throw std::invalid_argument("Unable to parse location description");
+    }
+
+    if (!liveRangeInfo.Variable->InternalSetLiveRangeLocation(liveRangeInfo.LiveRangeIdentity, 
+                                                              loc))
+    {
+        throw std::invalid_argument("unable to set specified live range location");
+    }
+}
+
+void LiveRangeObject::Delete(_In_ const Object& /*liveRangeObject*/, 
+                             _In_ LiveRangeInformation const& liveRangeInfo)
+{
+    liveRangeInfo.Variable->InternalDeleteLiveRange(liveRangeInfo.LiveRangeIdentity);
+}
+
+//*************************************************
 // Data Model Bindings:
 //
 // The constructors for our extension points & typed model / factory objects set up all of the available properties,
@@ -1586,6 +2197,9 @@ SymbolSetObject::SymbolSetObject() :
 {
     AddReadOnlyProperty(L"Data", this, &SymbolSetObject::GetData,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_DATA }));
+
+    AddReadOnlyProperty(L"Functions", this, &SymbolSetObject::GetFunctions,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_FUNCTIONS }));
 
     AddReadOnlyProperty(L"Types", this, &SymbolSetObject::GetTypes,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_TYPES }));
@@ -1791,6 +2405,110 @@ GlobalDataObject::GlobalDataObject()
 
     AddMethod(L"Delete", this, &GlobalDataObject::Delete,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_GLOBALDATA_DELETE }));
+}
+
+FunctionsObject::FunctionsObject() :
+    TypedInstanceModel()
+{
+    AddMethod(L"Create", this, &FunctionsObject::Create,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTIONS_CREATE },
+                       L"PreferShow", true));
+
+    AddGeneratorFunction(this, &FunctionsObject::GetIterator);
+}
+
+FunctionObject::FunctionObject()
+{
+    AddStringDisplayableFunction(this, &FunctionObject::ToString);
+
+    AddReadOnlyProperty(L"LocalVariables", this, &FunctionObject::GetLocalVariables,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_LOCALVARIABLES }));
+
+    AddReadOnlyProperty(L"Parameters", this, &FunctionObject::GetParameters,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_PARAMETERS }));
+
+    AddProperty(L"ReturnType", this, &FunctionObject::GetReturnType, &FunctionObject::SetReturnType,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_RETURNTYPE }));
+}
+
+ParametersObject::ParametersObject() :
+    TypedInstanceModel()
+{
+    AddMethod(L"Add", this, &ParametersObject::Add,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PARAMETERS_ADD },
+                       L"PreferShow", true));
+
+    AddGeneratorFunction(this, &ParametersObject::GetIterator);
+
+    AddStringDisplayableFunction(this, &ParametersObject::ToString);
+}
+
+LocalVariablesObject::LocalVariablesObject() :
+    TypedInstanceModel()
+{
+    AddMethod(L"Add", this, &LocalVariablesObject::Add,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LOCALVARIABLES_ADD },
+                       L"PreferShow", true));
+
+    AddGeneratorFunction(this, &LocalVariablesObject::GetIterator);
+}
+
+BaseVariableObject::BaseVariableObject()
+{
+    AddProperty(L"Name", this, &BaseVariableObject::GetName, &BaseVariableObject::SetName,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_VARIABLE_NAME }));
+
+    AddProperty(L"Type", this, &BaseVariableObject::GetType, &BaseVariableObject::SetType,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_VARIABLE_TYPE }));
+
+    AddReadOnlyProperty(L"LiveRanges", this, &BaseVariableObject::GetLiveRanges,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_VARIABLE_LIVERANGES }));
+
+    AddStringDisplayableFunction(this, &BaseVariableObject::ToString);
+
+    AddMethod(L"Delete", this, &BaseVariableObject::Delete,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_VARIABLE_DELETE },
+                       L"PreferShow", true));
+}
+
+ParameterObject::ParameterObject() :
+    BaseVariableObject()
+{
+    AddMethod(L"MoveBefore", this, &ParameterObject::MoveBefore,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PARAMETER_MOVEBEFORE }));
+}
+
+LocalVariableObject::LocalVariableObject() :
+    BaseVariableObject()
+{
+}
+
+LiveRangesObject::LiveRangesObject() :
+    TypedInstanceModel()
+{
+    AddMethod(L"Add", this, &LiveRangesObject::Add,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LIVERANGES_ADD },
+                       L"PreferShow", true));
+
+    AddGeneratorFunction(this, &LiveRangesObject::GetIterator);
+}
+
+LiveRangeObject::LiveRangeObject() :
+    TypedInstanceModel()
+{
+    AddProperty(L"Offset", this, &LiveRangeObject::GetOffset, &LiveRangeObject::SetOffset,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LIVERANGE_OFFSET }));
+
+    AddProperty(L"Size", this, &LiveRangeObject::GetSize, &LiveRangeObject::SetSize,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LIVERANGE_SIZE }));
+
+    AddProperty(L"Location", this, &LiveRangeObject::GetLocation, &LiveRangeObject::SetLocation,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LIVERANGE_LOCATION }));
+
+    AddMethod(L"Delete", this, &LiveRangeObject::Delete,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LIVERANGE_DELETE }));
+
+    AddStringDisplayableFunction(this, &LiveRangeObject::ToString);
 }
 
 SymbolBuilderNamespace::SymbolBuilderNamespace() :

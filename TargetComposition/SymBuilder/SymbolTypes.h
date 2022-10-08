@@ -276,14 +276,8 @@ public:
     IFACEMETHOD(GetIntrinsicType)(_Out_opt_ SvcSymbolIntrinsicKind *pKind,
                                   _Out_opt_ ULONG *pPackingSize)
     {
-        if (pKind != nullptr)
-        {
-            *pKind = m_intrinsicKind;
-        }
-        if (pPackingSize != nullptr)
-        {
-            *pPackingSize = static_cast<ULONG>(m_typeSize);
-        }
+        *pKind = m_intrinsicKind;
+        *pPackingSize = static_cast<ULONG>(m_typeSize);
         return S_OK;
     }
 
@@ -924,6 +918,73 @@ public:
                                                    symTypeId,
                                                    nullptr);
     }
+};
+
+// FunctionTypeSymbol:
+//
+// A symbol representing a function type.
+//
+class FunctionTypeSymbol :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseTypeSymbol
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbolType:
+    //
+
+    // GetTypeKind():
+    //
+    // Gets the kind of type symbol that this is (e.g.: base type, struct, array, etc...)
+    //
+    IFACEMETHOD(GetTypeKind)(_Out_ SvcSymbolTypeKind *pTypeKind)
+    {
+        *pTypeKind = SvcSymbolTypeFunction;
+        return S_OK;
+    }
+
+    // GetFunctionReturnType():
+    //
+    // Returns the return type of a function.  Even non-value returning functions (e.g.: void) should return
+    // a type representing this.
+    //
+    IFACEMETHOD(GetFunctionReturnType)(_COM_Outptr_ ISvcSymbol **ppReturnType);
+
+    // GetFunctionParameterTypeCount():
+    //
+    // Returns the number of parameters that the function takes.
+    //
+    IFACEMETHOD(GetFunctionParameterTypeCount)(_Out_ ULONG64 *pCount)
+    {
+        *pCount = m_paramTypes.size();
+        return S_OK;
+    }
+
+    // GetFunctionParameterTypeAt():
+    //
+    // Returns the type of the "i"-th argument to the function as a new ISvcSymbol
+    //
+    IFACEMETHOD(GetFunctionParameterTypeAt)(_In_ ULONG64 i,
+                                            _COM_Outptr_ ISvcSymbol **ppParameterType);
+
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                   _In_ ULONG64 returnTypeId,
+                                   _In_ ULONG64 paramCount,
+                                   _In_reads_(paramCount) ULONG64 *pParamTypes);
+
+private:
+
+    ULONG64 m_returnType;
+    std::vector<ULONG64> m_paramTypes;
+
 };
 
 } // SymbolBuilder
