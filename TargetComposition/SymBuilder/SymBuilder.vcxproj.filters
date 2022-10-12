@@ -51,9 +51,12 @@
     <ClCompile Include="SymManager.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ImportSymbols.cpp">
+    <ClCompile Include="SymbolFunction.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ImportSymbols.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>    
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ApiProvider.h">
@@ -89,7 +92,6 @@
     <ClInclude Include="SymManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ImportSymbols.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

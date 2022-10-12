@@ -47,21 +47,15 @@ public:
     bool TryGetSymbolsForModule(_In_ ULONG64 moduleKey,
                                 _COM_Outptr_ SymbolSet **ppSymbols)
     {
-        if (ppSymbols != nullptr)
-        {
-            *ppSymbols = nullptr;
-        }
+        *ppSymbols = nullptr;
         auto it = m_symbols.find(moduleKey);
         if (it == m_symbols.end())
         {
             return false;
         }
 
-        if (ppSymbols != nullptr)
-        {
-            Microsoft::WRL::ComPtr<SymbolSet> spSymbols = it->second;
-            *ppSymbols = spSymbols.Detach();
-        }
+        Microsoft::WRL::ComPtr<SymbolSet> spSymbols = it->second;
+        *ppSymbols = spSymbols.Detach();
         return true;
     }
 
@@ -137,6 +131,17 @@ private:
 
 struct DECLSPEC_UUID("AF4E77D9-1100-4c40-BAB0-67450027FCA5") ISvcSymbolBuilderManager;
 
+// RegisterInformation:
+//
+// Information about a register for the machine architecture in use.
+//
+struct RegisterInformation
+{
+    std::wstring Name;
+    ULONG Id;
+    ULONG Size;
+};
+
 // ISvcSymbolBuilderManager:
 //
 // This is an **INTERNAL ONLY** interface that we place on our management service.  When a request comes
@@ -194,6 +199,33 @@ DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
     STDMETHOD(TrackProcess)(_In_ ISvcProcess *pProcess,
                             _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
+    // FindInformationForRegisterByName():
+    //
+    // Find information for a given register by its name.
+    //
+    STDMETHOD(FindInformationForRegister)(_In_ PCWSTR pwszRegisterName,
+                                          _Out_ RegisterInformation **ppRegisterInfo) PURE;
+
+    // FindInformationForRegisterById():
+    //
+    // Find information for a given register by its canonical id.
+    //
+    STDMETHOD(FindInformationForRegisterById)(_In_ ULONG id,
+                                              _Out_ RegisterInformation **ppRegisterInfo) PURE;
+
+    // ParseLocation():
+    //
+    // Parses a location string to get a SvcSymbolLocation.
+    //
+    STDMETHOD(ParseLocation)(_In_ PCWSTR pwszLocation,
+                             _Out_ SvcSymbolLocation *pLocation) PURE;
+
+    // LocationToString():
+    //
+    // Converts a location to a displayable string for the associated architecture.
+    //
+    STDMETHOD(LocationToString)(_In_ SvcSymbolLocation const *pLocation,
+                                _Out_ std::wstring *pString) PURE;
 };
 
 // SymbolBuilderManager:
@@ -317,6 +349,11 @@ public:
         //
         IfFailedReturn(pServiceManager->RegisterEventNotification(DEBUG_SVCEVENT_MODULEDISAPPEARANCE, this));
 
+        if (m_spArchInfo != nullptr)
+        {
+            IfFailedReturn(InitArchBased());
+        }
+
         return hr;
     }
 
@@ -375,6 +412,7 @@ public:
                 // *EVERY* arch info service is *REQUIRED* to support ISvcMachineArchitecture
                 //
                 IfFailedReturn(pNewService->QueryInterface(IID_PPV_ARGS(&m_spArchInfo)));
+                IfFailedReturn(InitArchBased());
             }
         }
         else if (serviceGuid == DEBUG_SERVICE_VIRTUAL_MEMORY)
@@ -465,6 +503,34 @@ public:
     IFACEMETHOD(TrackProcess)(_In_ ISvcProcess *pProcess,
                               _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
+    // FindInformationForRegisterByName():
+    //
+    // Find information for a given register by its name.
+    //
+    IFACEMETHOD(FindInformationForRegister)(_In_ PCWSTR pwszRegisterName,
+                                            _Out_ RegisterInformation **ppRegisterInfo);
+
+    // FindInformationForRegisterById():
+    //
+    // Find information for a given register by its canonical id.
+    //
+    IFACEMETHOD(FindInformationForRegisterById)(_In_ ULONG id,
+                                                _Out_ RegisterInformation **ppRegisterInfo);
+
+    // ParseLocation():
+    //
+    // Parses a location string to get a SvcSymbolLocation.
+    //
+    IFACEMETHOD(ParseLocation)(_In_ PCWSTR pwszLocation,
+                               _Out_ SvcSymbolLocation *pLocation);
+
+    // LocationToString():
+    //
+    // Converts a location to a displayable string for the associated architecture.
+    //
+    IFACEMETHOD(LocationToString)(_In_ SvcSymbolLocation const *pLocation,
+                                  _Out_ std::wstring *pString);
+
     // GetServiceManager():
     //
     // Gets the service manager that this process was created from.
@@ -494,8 +560,25 @@ public:
 
 private:
 
+    // InitArchBased():
+    //
+    // Initializes architecture based information.
+    //
+    HRESULT InitArchBased();
+
+    // Parse*():
+    //
+    // Helpers for ParseLocation which parses individual elements out of the location string.
+    //
+    bool ParseHex(_In_ wchar_t const *pc, _Out_ wchar_t const **ppn, _Out_ ULONG64 *pValue);
+    bool ParseReg(_In_ wchar_t const *pc, _Out_ wchar_t const **ppn, _Out_ RegisterInformation **ppReg);
+
     // A listing of our tracked processes.
     std::unordered_map<ULONG64, Microsoft::WRL::ComPtr<SymbolBuilderProcess>> m_trackedProcesses;
+
+    // Information about registers so that we can manage live range information for variables.
+    std::unordered_map<ULONG, RegisterInformation> m_regInfosById;
+    std::unordered_map<std::wstring, ULONG> m_regIds;
 
     // Our container's process enumeration service.
     Microsoft::WRL::ComPtr<ISvcProcessEnumeration> m_spProcEnum;
