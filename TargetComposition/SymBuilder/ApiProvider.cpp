@@ -287,10 +287,12 @@ ApiProvider::~ApiProvider()
 //
 
 Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*/,
-                                             _In_ Object moduleArg)
+                                             _In_ Object moduleArg,
+                                             _In_ std::optional<Object> options)
 {
     ModelObjectKind moduleArgKind = moduleArg.GetKind();
 
+    bool autoImportSymbols = false;
     ULONG64 moduleBase = 0;
     Object moduleObject;
     switch(moduleArgKind)
@@ -333,6 +335,16 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
         moduleContext = HostContext::Current();
     }
 
+    if (options.has_value())
+    {
+        Object optionsObj = options.value();
+        std::optional<Object> autoImportSymbolsKey = optionsObj.TryGetKeyValue(L"AutoImportSymbols");
+        if (autoImportSymbolsKey.has_value())
+        {
+            autoImportSymbols = (bool)autoImportSymbolsKey.value();
+        }
+    }
+
     ComPtr<ISvcSymbolBuilderManager> spSymbolManager;
     ComPtr<ISvcProcess> spProcess;
     GetSymbolBuilderManager(moduleContext, &spSymbolManager, &spProcess);
@@ -357,6 +369,28 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
     }
 
     CheckHr(spSymbolProcess->CreateSymbolsForModule(spModule.Get(), moduleKey, &spSymbolSet));
+
+    //
+    // If we have been asked to automatically import symbols, set up an appropriate "on demand" importer.
+    // It is *NOT* a failure to create the symbol builder set if we cannot set up the importer!
+    //
+    std::unique_ptr<SymbolImporter> spImporter;
+    if (autoImportSymbols)
+    {
+        //
+        // Go ask the debugger through the data model for its symbol path.
+        //
+        std::wstring symPath = (std::wstring)Object::RootNamespace().KeyValue(L"Debugger")
+                                                                    .KeyValue(L"Settings")
+                                                                    .KeyValue(L"Symbols")
+                                                                    .KeyValue(L"Sympath");
+
+        spImporter.reset(new SymbolImporter_DbgHelp(spSymbolSet.Get(), symPath.c_str()));
+        if (SUCCEEDED(spImporter->ConnectToSource()))
+        {
+            spSymbolSet->SetImporter(std::move(spImporter));
+        }
+    }
 
     SymbolSetObject& symbolSetFactory = ApiProvider::Get().GetSymbolSetFactory();
     return symbolSetFactory.CreateInstance(spSymbolSet);

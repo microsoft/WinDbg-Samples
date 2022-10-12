@@ -743,11 +743,13 @@ private:
     //
     // Creates a new symbol builder set for a given module.  We support several forms of CreateSymbols():
     //
-    //     CreateSymbols(moduleObject)     // moduleObject is @$curprocess.Modules[N]
-    //     CreateSymbols(moduleBase)       // moduleBase is the base address of a module in the current process context
-    //     CreateSymbols(moduleName)       // moduleName is the name of a module in the current process context
+    //     CreateSymbols(moduleObject, [options])     // moduleObject is @$curprocess.Modules[N]
+    //     CreateSymbols(moduleBase, [options])       // moduleBase is the base address of a module in the current process context
+    //     CreateSymbols(moduleName, [options])       // moduleName is the name of a module in the current process context
     //
-    Object CreateSymbols(_In_ const Object& contextObject, _In_ Object moduleArg);
+    Object CreateSymbols(_In_ const Object& contextObject, 
+                         _In_ Object moduleArg,
+                         _In_ std::optional<Object> options);
 
 };
 

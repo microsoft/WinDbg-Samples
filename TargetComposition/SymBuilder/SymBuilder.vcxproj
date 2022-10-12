@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="ApiProvider.cpp" />
     <ClCompile Include="Extension.cpp" />
+    <ClCompile Include="ImportSymbols.cpp" />
     <ClCompile Include="SymbolBase.cpp" />
     <ClCompile Include="SymbolData.cpp" />
     <ClCompile Include="SymbolServices.cpp" />
@@ -31,6 +32,7 @@
   <ItemGroup>
     <ClInclude Include="ApiProvider.h" />
     <ClInclude Include="HelpStrings.h" />
+    <ClInclude Include="ImportSymbols.h" />
     <ClInclude Include="InternalGuids.h" />
     <ClInclude Include="ObjectModel.h" />
     <ClInclude Include="SymbolBase.h" />
@@ -146,7 +148,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>dbgeng.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dbgeng.lib;dbghelp.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>SymbolBuilderComposition.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
@@ -169,7 +171,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>dbgeng.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dbgeng.lib;dbghelp.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>SymbolBuilderComposition.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
@@ -188,7 +190,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>dbgeng.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dbgeng.lib;dbghelp.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>SymbolBuilderComposition.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
@@ -211,7 +213,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>dbgeng.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>dbgeng.lib;dbghelp.lib;runtimeobject.lib;DbgTargetCompositionGuids.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ModuleDefinitionFile>SymbolBuilderComposition.def</ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>

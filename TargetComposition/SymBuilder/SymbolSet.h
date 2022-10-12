@@ -257,6 +257,15 @@ public:
                            _COM_Outptr_opt_ BaseTypeSymbol **ppTypeSymbol,
                            _In_ bool allowAutoCreations = true);
 
+    // SetImporter():
+    //
+    // Sets an "on demand" importer to use for this symbol set.
+    //
+    void SetImporter(_In_ std::unique_ptr<SymbolImporter>&& importer)
+    {
+        m_spImporter = std::move(importer);
+    }
+
     //*************************************************
     // Internal Accessors:
     //
@@ -313,6 +322,8 @@ public:
     std::vector<ULONG64> const& InternalGetGlobalSymbols() const { return m_globalSymbols; }
     IDebugServiceManager* GetServiceManager() const;
     ISvcMachineArchitecture* GetArchInfo() const;
+    ISvcModule* GetModule() const;
+    SymbolBuilderProcess* GetOwningProcess() const { return m_pOwningProcess; }
 
 private:
 
@@ -320,6 +331,12 @@ private:
     {
         return ++m_nextId;
     }
+
+    // HasImporter():
+    //
+    // Indicates whether or not we have an underlying symbol importer.
+    //
+    bool HasImporter() const { return m_spImporter.get() != nullptr; }
 
     // The next "unique id" that we will hand out when a new symbol is constructed
     ULONG64 m_nextId;
@@ -341,6 +358,10 @@ private:
 
     // Tracks the address ranges associated with global symbols.
     SymbolRangeList m_symbolRanges;
+
+    // If we have an importer that will automatically pull in underlying symbols, this points
+    // to it. 
+    std::unique_ptr<SymbolImporter> m_spImporter;
 
     // Configuration options:
     bool m_demandCreatePointerTypes;

@@ -308,6 +308,11 @@ ISvcMachineArchitecture* SymbolSet::GetArchInfo() const
     return m_pOwningProcess->GetArchInfo();
 }
 
+ISvcModule* SymbolSet::GetModule() const
+{
+    return m_spModule.Get();
+}
+
 HRESULT SymbolSet::AddBasicCTypes()
 {
     HRESULT hr = S_OK;
@@ -672,6 +677,19 @@ HRESULT SymbolSet::FindSymbolByOffset(_In_ ULONG64 moduleOffset,
 {
     HRESULT hr = S_OK;
     *ppSymbol = nullptr;
+
+    //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the address in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (HasImporter())
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spImporter->ImportForOffsetQuery(SvcSymbol, moduleOffset);
+    }
 
     SymbolRangeList::SymbolList const* pSymbols;
     if (!m_symbolRanges.FindSymbols(moduleOffset, &pSymbols) || pSymbols->size() == 0)

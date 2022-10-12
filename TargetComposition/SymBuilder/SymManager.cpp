@@ -34,6 +34,11 @@ ISvcMachineArchitecture *SymbolBuilderProcess::GetArchInfo() const
     return m_pOwningManager->GetArchInfo();
 }
 
+ISvcMemoryAccess *SymbolBuilderProcess::GetVirtualMemory() const
+{
+    return m_pOwningManager->GetVirtualMemory();
+}
+
 HRESULT SymbolBuilderProcess::CreateSymbolsForModule(_In_ ISvcModule *pModule,
                                                      _In_ ULONG64 moduleKey,
                                                      _COM_Outptr_ SymbolSet **ppSymbols)
@@ -130,6 +135,20 @@ HRESULT SymbolBuilderManager::TrackProcess(_In_ ISvcProcess *pProcess,
 
     *ppProcess = spProcess.Detach();
     return hr;
+}
+
+HRESULT SymbolBuilderManager::ProcessKeyToProcess(_In_ ULONG64 processKey,
+                                                  _COM_Outptr_ ISvcProcess **ppProcess)
+{
+    HRESULT hr = S_OK;
+    *ppProcess = nullptr;
+
+    if (m_spProcEnum == nullptr)
+    {
+        return E_FAIL;
+    }
+
+    return m_spProcEnum->FindProcess(processKey, ppProcess);
 }
 
 HRESULT SymbolBuilderManager::PidToProcess(_In_ ULONG64 pid,
