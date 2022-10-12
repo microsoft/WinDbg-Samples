@@ -369,18 +369,19 @@ public:
     ISvcModule* GetModule() const;
     SymbolBuilderProcess* GetOwningProcess() const { return m_pOwningProcess; }
 
+    // HasImporter/GetImporter():
+    //
+    // Indicates whether or not we have an underlying symbol importer / gets it.
+    //
+    bool HasImporter() const { return m_spImporter.get() != nullptr; }
+    SymbolImporter *GetImporter() const { return m_spImporter.get(); }
+
 private:
 
     ULONG64 GetUniqueId() 
     {
         return ++m_nextId;
     }
-
-    // HasImporter():
-    //
-    // Indicates whether or not we have an underlying symbol importer.
-    //
-    bool HasImporter() const { return m_spImporter.get() != nullptr; }
 
     // The next "unique id" that we will hand out when a new symbol is constructed
     ULONG64 m_nextId;
@@ -679,21 +680,7 @@ public:
     IFACEMETHOD(EnumerateChildren)(_In_ SvcSymbolKind kind,
                                    _In_opt_z_ PCWSTR pwszName,
                                    _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
-                                   _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum)
-    {
-        HRESULT hr = S_OK;
-        *ppChildEnum = nullptr;
-
-        Microsoft::WRL::ComPtr<GlobalEnumerator> spEnum;
-        IfFailedReturn(Microsoft::WRL::MakeAndInitialize<GlobalEnumerator>(&spEnum,
-                                                                           m_spSymbolSet.Get(),
-                                                                           kind,
-                                                                           pwszName,
-                                                                           pSearchInfo));
-
-        *ppChildEnum = spEnum.Detach();
-        return hr;
-    }
+                                   _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum);
 
     //*************************************************
     // Internal APIs:

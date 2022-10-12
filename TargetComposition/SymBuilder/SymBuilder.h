@@ -41,7 +41,51 @@
 #include <DbgServices.h>
 #include <DbgServicesBridgeClient.h>
 
+//
+// NOTE: A number of things in Sym* rely on constants that are in cvconst.h.  Unfortunately, that is NOT
+//       in the same SDKs as DbgHelp.  *SOME* of these are defined in the DbgHelp.h header with _NO_CVCONST_H
+//       defined and others are not.  We manually copy a few definitions here.
+//
+#define _NO_CVCONST_H
 #include <DbgHelp.h>
+
+enum BasicType
+{
+    btNoType = 0,
+    btVoid = 1,
+    btChar = 2,
+    btWChar = 3,
+    btInt = 6,
+    btUInt = 7,
+    btFloat = 8,
+    btBCD = 9,
+    btBool = 10,
+    btLong = 13,
+    btULong = 14,
+    btCurrency = 25,
+    btDate = 26,
+    btVariant = 27,
+    btComplex = 28,
+    btBit = 29,
+    btBSTR = 30,
+    btHresult = 31,
+    btChar16 = 32,  // char16_t
+    btChar32 = 33,  // char32_t
+};
+
+enum DataKind
+{
+    DataIsUnknown,
+    DataIsLocal,
+    DataIsStaticLocal,
+    DataIsParam,
+    DataIsObjectPtr,
+    DataIsFileStatic,
+    DataIsGlobal,
+    DataIsMember,
+    DataIsStaticMember,
+    DataIsConstant
+};
 
 template<typename FN>
 HRESULT ConvertException(const FN& fn)
@@ -72,6 +116,16 @@ struct BSTRDeleter
 };
 
 typedef std::unique_ptr<wchar_t, BSTRDeleter> bstr_ptr;
+
+struct LocalStringDeleter
+{
+    void operator()(_In_ WCHAR *pwsz)
+    {
+        LocalFree(pwsz);
+    }
+};
+
+typedef std::unique_ptr<WCHAR, LocalStringDeleter> localstr_ptr;
 
 namespace Debugger
 {

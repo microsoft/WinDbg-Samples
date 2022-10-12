@@ -706,6 +706,19 @@ HRESULT SymbolSet::FindSymbolByName(_In_ PCWSTR symbolName, _COM_Outptr_ ISvcSym
     *ppSymbol = nullptr;
 
     //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the name in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (HasImporter())
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spImporter->ImportForNameQuery(SvcSymbol, symbolName);
+    }
+
+    //
     // We cannot let a C++ exception escape.
     //
     auto fn = [&]()
@@ -935,6 +948,37 @@ HRESULT ScopeEnumerator::GetNext(_COM_Outptr_ ISvcSymbol **ppSymbol)
 // Scopes:
 //
 
+HRESULT GlobalScope::EnumerateChildren(_In_ SvcSymbolKind kind,
+                                       _In_opt_z_ PCWSTR pwszName,
+                                       _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
+                                       _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum)
+{
+    HRESULT hr = S_OK;
+    *ppChildEnum = nullptr;
+
+    //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the name in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (m_spSymbolSet->HasImporter())
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spSymbolSet->GetImporter()->ImportForNameQuery(kind, pwszName);
+    }
+
+    Microsoft::WRL::ComPtr<GlobalEnumerator> spEnum;
+    IfFailedReturn(Microsoft::WRL::MakeAndInitialize<GlobalEnumerator>(&spEnum,
+                                                                       m_spSymbolSet.Get(),
+                                                                       kind,
+                                                                       pwszName,
+                                                                       pSearchInfo));
+
+    *ppChildEnum = spEnum.Detach();
+    return hr;
+}
 
 HRESULT BaseScope::EnumerateArguments(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum)
 {

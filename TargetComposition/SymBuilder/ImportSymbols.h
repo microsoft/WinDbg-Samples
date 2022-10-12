@@ -282,6 +282,69 @@ private:
     //
     HRESULT InternalConnectToSource();
 
+    // ImportArray():
+    //
+    // Imports the given array into the symbol builder.
+    //
+    HRESULT ImportArray(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportPointer():
+    //
+    // Imports the given pointer into the symbol builder.
+    //
+    HRESULT ImportPointer(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportTypedef():
+    //
+    // Imports the given typedef into the symbol builder.
+    //
+    HRESULT ImportTypedef(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportFunction():
+    //
+    // Imports the given function into the symbol builder.
+    //
+    HRESULT ImportFunction(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportUDT():
+    //
+    // Imports the given UDT into the symbol builder.
+    //
+    HRESULT ImportUDT(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportBaseType():
+    //
+    // Imports the given base type into the symbol builder.
+    //
+    HRESULT ImportBaseType(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportTypeSymbol():
+    //
+    // Imports the given type symbol into the symbol builder.
+    //
+    HRESULT ImportTypeSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    // ImportSymbol():
+    //
+    // Import the given symbol into the symbol builder.
+    //
+    HRESULT ImportSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+
+    HRESULT ImportSymbol(_In_ PSYMBOL_INFOW pSymInfo, _Out_ ULONG64 *pBuilderId)
+    {
+        return ImportSymbol(pSymInfo->Index, pBuilderId);
+    }
+
+    // TagMatchesSearchCriteria():
+    //
+    // Check whether a symbol tag returned from DbgHelp matches the kind of symbol(s) we are looking for.
+    //
+    static bool TagMatchesSearchCriteria(_In_ ULONG tag, _In_ SvcSymbolKind searchKind);
+
+    //*************************************************
+    // DbgHelp Callback Handlers:
+    //
+
     // LegacySymbolCallback():
     //
     // DbgHelp callbacks.
@@ -383,7 +446,7 @@ private:
     bool m_fullGlobalImport;
     std::unordered_set<std::wstring> m_nameQueries;
     std::unordered_set<ULONG64> m_addressQueries;
-    std::unordered_set<ULONG> m_importedIndicies;
+    std::unordered_map<ULONG, ULONG64> m_importedIndexMap;
 
 };
 

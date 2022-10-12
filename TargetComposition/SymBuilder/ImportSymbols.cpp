@@ -214,6 +214,611 @@ void SymbolImporter_DbgHelp::DisconnectFromSource()
     }
 }
 
+bool SymbolImporter_DbgHelp::TagMatchesSearchCriteria(_In_ ULONG tag, _In_ SvcSymbolKind searchKind)
+{
+    switch(tag)
+    {
+        //
+        // We do not care about any of these:
+        //
+        default:
+        case SymTagExe:
+        case SymTagCompiland:
+        case SymTagCompilandDetails:
+        case SymTagCompilandEnv:
+        case SymTagBlock:
+        case SymTagAnnotation:
+        case SymTagLabel:
+        case SymTagFriend:
+        case SymTagFuncDebugStart:
+        case SymTagFuncDebugEnd:
+        case SymTagUsingNamespace:
+        case SymTagVTable:
+        case SymTagCustom:
+        case SymTagThunk:
+        case SymTagCustomType:
+        case SymTagManagedType:
+        case SymTagDimension:
+            return false;
+
+        //
+        // Function related:
+        //
+        case SymTagFunction:
+            return (searchKind == SvcSymbol || searchKind == SvcSymbolFunction);
+
+        case SymTagFunctionArgType:
+            return false;
+
+        //
+        // Data related:
+        //
+        case SymTagData:
+            return (searchKind == SvcSymbol || searchKind == SvcSymbolData || searchKind == SvcSymbolDataParameter
+                                            || searchKind == SvcSymbolDataLocal);
+
+        case SymTagPublicSymbol:
+            return (searchKind == SvcSymbol || searchKind == SvcSymbolPublic);
+        
+        //
+        // Type related:
+        //
+        case SymTagUDT:
+        case SymTagFunctionType:
+        case SymTagPointerType:
+        case SymTagArrayType:
+        case SymTagBaseType:
+        case SymTagTypedef:
+        case SymTagBaseClass:
+            return (searchKind == SvcSymbol || searchKind == SvcSymbolType);
+
+    }
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportBaseType(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    HRESULT hr = S_OK;
+
+    ULONG64 size;
+    ULONG baseType;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_BASETYPE, &baseType) ||
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_LENGTH, &size))
+    {
+        return E_FAIL;
+    }
+
+    wchar_t const *pDefaultName = nullptr;
+    SvcSymbolIntrinsicKind ik;
+
+    switch(baseType)
+    {
+        case btVoid:
+            pDefaultName = L"void";
+            ik = SvcSymbolIntrinsicVoid;
+            break;
+
+        case btInt:
+        {
+            ik = SvcSymbolIntrinsicInt;
+            switch(size)
+            {
+                case 1:
+                    pDefaultName = L"char";
+                    break;
+                case 2:
+                    pDefaultName = L"short";
+                    break;
+                case 4:
+                    pDefaultName = L"int";
+                    break;
+                case 8:
+                    pDefaultName = L"__int64";
+                    break;
+            }
+            break;
+        }
+        case btUInt:
+        {
+            ik = SvcSymbolIntrinsicUInt;
+            switch(size)
+            {
+                case 1:
+                    pDefaultName = L"unsigned char";
+                    break;
+                case 2:
+                    pDefaultName = L"unsigned short";
+                    break;
+                case 4:
+                    pDefaultName = L"unsigned int";
+                    break;
+                case 8:
+                    pDefaultName = L"unsigned __int64";
+                    break;
+            }
+            break;
+        }
+
+        case btFloat:
+        {
+            ik = SvcSymbolIntrinsicFloat;
+            switch(size)
+            {
+                case 4:
+                    pDefaultName = L"float";
+                    break;
+                case 8:
+                    pDefaultName = L"double";
+                    break;
+            }
+            break;
+        }
+
+        case btBool:
+        {
+            ik = SvcSymbolIntrinsicBool;
+            switch(size)
+            {
+                case 1:
+                    pDefaultName = L"bool";
+                    break;
+            }
+            break;
+        }
+
+        case btLong:
+        {
+            ik = SvcSymbolIntrinsicLong;
+            switch(size)
+            {
+                case 4:
+                    pDefaultName = L"long";
+                    break;
+                case 8:
+                    pDefaultName = L"long long";
+                    break;
+            }
+            break;
+        }
+
+        case btULong:
+        {
+            ik = SvcSymbolIntrinsicULong;
+            switch(size)
+            {
+                case 4:
+                    pDefaultName = L"unsigned long";
+                    break;
+                case 8:
+                    pDefaultName = L"unsigned long long";
+                    break;
+            }
+            break;
+        }
+
+        case btChar:
+        {
+            ik = SvcSymbolIntrinsicChar;
+            switch(size)
+            {
+                case 1:
+                    pDefaultName = L"char";
+                    break;
+            }
+            break;
+        }
+
+        case btWChar:
+        {
+            ik = SvcSymbolIntrinsicWChar;
+            switch(size)
+            {
+                case 2:
+                    pDefaultName = L"wchar_t";
+                    break;
+            }
+            break;
+        }
+
+        case btChar16:
+        {
+            ik = SvcSymbolIntrinsicChar16;
+            switch(size)
+            {
+                case 2:
+                    pDefaultName = L"char16_t";
+                    break;
+            }
+        }
+        
+        case btChar32:
+        {
+            ik = SvcSymbolIntrinsicChar32;
+            switch(size)
+            {
+                case 4:
+                    pDefaultName = L"char32_t";
+                    break;
+            }
+        }
+
+        default:
+            break;
+    }
+
+    //
+    // We cannot create one of our synthetic symbols without a name.  If this is a basic type
+    // that we do not recognize, we are sunk.
+    //
+    if (pDefaultName == nullptr)
+    {
+        return E_FAIL;
+    }
+
+    //
+    // If we already know this basic type, just return it.
+    //
+    ULONG64 builderId;
+    HRESULT hrFind = m_pOwningSet->FindTypeByName(pDefaultName, &builderId, nullptr, false);
+    if (SUCCEEDED(hrFind))
+    {
+        *pBuilderId = builderId;
+        return S_FALSE;
+    }
+
+    ComPtr<BasicTypeSymbol> spBasicTypeSymbol;
+    IfFailedReturn(MakeAndInitialize<BasicTypeSymbol>(&spBasicTypeSymbol, 
+                                                      m_pOwningSet, 
+                                                      ik,  
+                                                      static_cast<ULONG>(size), 
+                                                      pDefaultName));
+
+    *pBuilderId = spBasicTypeSymbol->InternalGetId();
+    return S_OK;
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportUDT(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    HRESULT hr = S_OK;
+
+    WCHAR *pSymName;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMNAME, &pSymName))
+    {
+        return E_FAIL;
+    }
+    localstr_ptr spSymName(pSymName);
+
+    ULONG64 udtSize;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_LENGTH, &udtSize))
+    {
+        return E_FAIL;
+    }
+
+    ULONG childCount;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_CHILDRENCOUNT, &childCount))
+    {
+        return E_FAIL;
+    }
+
+    //
+    // Now that we have some basic information about the UDT, go and create the shell of it in the symbol
+    // builder and then copy over base classes, fields, and any other data we wish to import one by one.
+    //
+    ComPtr<UdtTypeSymbol> spUdt;
+    IfFailedReturn(MakeAndInitialize<UdtTypeSymbol>(&spUdt,
+                                                    m_pOwningSet,
+                                                    0,
+                                                    pSymName,
+                                                    nullptr));
+
+    std::unique_ptr<char []> spBuf(new char[sizeof(TI_FINDCHILDREN_PARAMS) + sizeof(ULONG) * childCount]);
+    TI_FINDCHILDREN_PARAMS *pChildQuery = reinterpret_cast<TI_FINDCHILDREN_PARAMS *>(spBuf.get());
+
+    pChildQuery->Count = childCount;
+    pChildQuery->Start = 0;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_FINDCHILDREN, pChildQuery))
+    {
+        return E_FAIL;
+    }
+
+    enum SymTagEnum passTags[] = { SymTagBaseClass, SymTagData };
+    for (size_t pass = 0; pass < ARRAYSIZE(passTags); ++pass)
+    {
+        for (ULONG i = 0; i < childCount; ++i)
+        {
+            ULONG childTag;
+            if (!SymGetTypeInfo(m_symHandle, m_moduleBase, pChildQuery->ChildId[i], TI_GET_SYMTAG, &childTag))
+            {
+                return E_FAIL;
+            }
+
+            if (childTag != static_cast<ULONG>(passTags[pass]))
+            {
+                continue;
+            }
+
+            switch(passTags[pass])
+            {
+                case SymTagBaseClass:
+                {
+                    // @TODO:
+                    break;
+                }
+
+                case SymTagData:
+                {
+                    //
+                    // If we have a data, go ask what kind of data it is.
+                    //
+                    enum DataKind dk;
+                    ULONG childTI;
+                    WCHAR *pDataName;
+
+                    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, pChildQuery->ChildId[i], TI_GET_DATAKIND, &dk) ||
+                        !SymGetTypeInfo(m_symHandle, m_moduleBase, pChildQuery->ChildId[i], TI_GET_TYPEID, &childTI) ||
+                        !SymGetTypeInfo(m_symHandle, m_moduleBase, pChildQuery->ChildId[i], TI_GET_SYMNAME, &pDataName))
+                    {
+                        return E_FAIL;
+                    }
+
+                    localstr_ptr spDataName(pDataName);
+
+                    switch(dk)
+                    {
+                        //
+                        // If it's a field of a UDT, we need to import the type.
+                        //
+                        case DataIsMember:
+                        {
+                            ULONG64 memberBuilderType;
+                            IfFailedReturn(ImportSymbol(childTI, &memberBuilderType));
+
+                            ULONG offset;
+                            if (!SymGetTypeInfo(m_symHandle, m_moduleBase, pChildQuery->ChildId[i], TI_GET_OFFSET, &offset))
+                            {
+                                return E_FAIL;
+                            }
+
+                            ComPtr<FieldSymbol> spField;
+                            IfFailedReturn(MakeAndInitialize<FieldSymbol>(&spField,
+                                                                          m_pOwningSet,
+                                                                          spUdt->InternalGetId(),
+                                                                          offset,
+                                                                          memberBuilderType,
+                                                                          pDataName));
+
+                            break;
+                        }
+
+                        default:
+                            //
+                            // We don't import this part of the type.
+                            //
+                            break;
+                    }
+
+                    break;
+                }
+
+                default:
+                    return E_UNEXPECTED;
+            }
+        }
+    }
+
+    *pBuilderId = spUdt->InternalGetId();
+    return S_OK;
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportFunction(_In_ ULONG /*symIndex*/, _Out_ ULONG64 * /*pBuilderId*/)
+{
+    return E_NOTIMPL;
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportPointer(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // NOTE: Unfortunately, the DBGHelp APIs cannot differentiate a standard reference from an rvalue
+    //       one despite DIA (and ISvcSymbolSet) being able to do that.  We are stuck with * or & on
+    //       an import.
+    //
+    ULONG pointerToId;
+    ULONG isReference;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_TYPEID, &pointerToId) ||
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_IS_REFERENCE, &isReference))
+    {
+        return E_FAIL;
+    }
+
+    ULONG64 pointerToBuilderId;
+    IfFailedReturn(ImportTypeSymbol(pointerToId, &pointerToBuilderId));
+
+    ComPtr<PointerTypeSymbol> spPointer;
+    IfFailedReturn(MakeAndInitialize<PointerTypeSymbol>(&spPointer,
+                                                        m_pOwningSet,
+                                                        pointerToBuilderId,
+                                                        isReference == 0 ? SvcSymbolPointerStandard
+                                                                         : SvcSymbolPointerReference));
+
+    *pBuilderId = spPointer->InternalGetId();
+    return S_OK;
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportArray(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    HRESULT hr = S_OK;
+
+    ULONG arrayOfId;
+    ULONG64 arraySize;
+    ULONG64 baseSize;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_TYPEID, &arrayOfId) ||
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_LENGTH, &arraySize) ||
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, arrayOfId, TI_GET_LENGTH, &baseSize))
+    {
+        return E_FAIL;
+    }
+
+    ULONG64 arrayOfBuilderId;
+    IfFailedReturn(ImportTypeSymbol(arrayOfId, &arrayOfBuilderId));
+
+    //
+    // NOTE: If the base type of the array was already defined (in symbol builder symbols) and we resolve to
+    //       that, the size of the array may be off what we indicate here.  This is the size of the array
+    //       in the PDB (or whatever symbols DbgHelp is proxying).
+    //      
+
+
+    ComPtr<ArrayTypeSymbol> spArray;
+    IfFailedReturn(MakeAndInitialize<ArrayTypeSymbol>(&spArray,
+                                                      m_pOwningSet,
+                                                      arrayOfBuilderId,
+                                                      arraySize / baseSize));
+
+    *pBuilderId = spArray->InternalGetId();
+    return S_OK;
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportTypedef(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    HRESULT hr = S_OK;
+
+    WCHAR *pSymName;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMNAME, &pSymName))
+    {
+        return E_FAIL;
+    }
+    localstr_ptr spSymName(pSymName);
+
+    ULONG typedefTypeId;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_TYPEID, &typedefTypeId))
+    {
+        return E_FAIL;
+    }
+
+    ULONG64 typedefBuilderId;
+    IfFailedReturn(ImportTypeSymbol(typedefTypeId, &typedefBuilderId));
+
+    ComPtr<TypedefTypeSymbol> spTypedef;
+    IfFailedReturn(MakeAndInitialize<TypedefTypeSymbol>(&spTypedef,
+                                                        m_pOwningSet,
+                                                        typedefBuilderId,
+                                                        0,
+                                                        pSymName,
+                                                        nullptr));
+
+    *pBuilderId = spTypedef->InternalGetId();
+    return S_OK;
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportTypeSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    ULONG tag;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMTAG, &tag))
+    {
+        return E_FAIL;
+    }
+
+    bool isNamed = (tag == SymTagUDT || tag == SymTagTypedef);
+    if (isNamed)
+    {
+        WCHAR *pSymName;
+        if (SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMNAME, &pSymName))
+        {
+            localstr_ptr spSymName(pSymName);
+
+            //
+            // Make sure there is *NOT* a naming conflict on this particular type.  Maybe someone already created
+            // this type explicitly before we tried to import anything...
+            //
+            ULONG64 builderId;
+            HRESULT hrFind = m_pOwningSet->FindTypeByName(pSymName, &builderId, nullptr, false);
+            if (SUCCEEDED(hrFind))
+            {
+                //
+                // At this point, we have a naming conflict.  We can either fail to import this or just point to the
+                // existing type.  Here, we choose the latter.
+                //
+                *pBuilderId = builderId;
+                return S_FALSE;
+            }
+        }
+    }
+
+    switch(tag)
+    {
+        case SymTagUDT:
+            return ImportUDT(symIndex, pBuilderId);
+
+        case SymTagBaseType:
+            return ImportBaseType(symIndex, pBuilderId);
+
+        case SymTagTypedef:
+            return ImportTypedef(symIndex, pBuilderId);
+
+        case SymTagPointerType:
+            return ImportPointer(symIndex, pBuilderId);
+
+        case SymTagArrayType:
+            return ImportArray(symIndex, pBuilderId);
+
+        case SymTagFunctionType:
+            return E_NOTIMPL;
+
+        default:
+            return E_NOTIMPL;
+    }
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // If we have already imported this particular symbol, just return the ID within the symbol builder
+    // of the import and be done.  S_FALSE indicates this situation.  It's a "successful import" but we didn't
+    // actually do anything.
+    //
+    // This might, for instance, be because some other import referenced it (e.g.: a field of a UDT being imported
+    // refers to a type that's already been imported).
+    //
+    auto it = m_importedIndexMap.find(symIndex);
+    if (it != m_importedIndexMap.end())
+    {
+        *pBuilderId = it->second;
+        return S_FALSE;
+    }
+
+    ULONG tag;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMTAG, &tag))
+    {
+        return E_FAIL;
+    }
+
+    switch(tag)
+    {
+        case SymTagFunction:
+            return ImportFunction(symIndex, pBuilderId);
+
+        case SymTagData:
+            return E_NOTIMPL; // return ImportGlobalData(symIndex, pBuilderId);
+
+        case SymTagUDT:
+        case SymTagBaseType:
+        case SymTagTypedef:
+        case SymTagFunctionType:
+        case SymTagPointerType:
+        case SymTagArrayType:
+            return ImportTypeSymbol(symIndex, pBuilderId);
+
+        case SymTagBaseClass:
+            return E_NOTIMPL;
+
+        default:
+            return E_NOTIMPL;
+    }
+}
+
 bool SymbolImporter_DbgHelp::LegacyReadMemory(_Inout_ IMAGEHLP_CBA_READ_MEMORY *pReadMemory)
 {
     auto pOwningProcess = m_pOwningSet->GetOwningProcess();
@@ -250,11 +855,22 @@ bool SymbolImporter_DbgHelp::LegacySymbolEnumerate(_In_ SymbolQueryInformation *
 {
     auto fn = [&]()
     {
-        auto it = m_importedIndicies.find(pSymInfo->Index);
-        if (it != m_importedIndicies.end())
+        auto it = m_importedIndexMap.find(pSymInfo->Index);
+        if (it != m_importedIndexMap.end())
         {
             return S_OK;
         }
+
+        //
+        // If we do not care about this symbol, skip it.
+        //
+        if (!TagMatchesSearchCriteria(pSymInfo->Tag, pQueryInfo->SearchKind))
+        {
+            return S_OK;
+        }
+
+        ULONG64 importedId;
+        (void)ImportSymbol(pSymInfo, &importedId);
 
         return S_OK;
     };
@@ -308,6 +924,18 @@ HRESULT SymbolImporter_DbgHelp::ImportForOffsetQuery(_In_ SvcSymbolKind searchKi
 HRESULT SymbolImporter_DbgHelp::ImportForNameQuery(_In_ SvcSymbolKind searchKind,
                                                    _In_opt_ PCWSTR pwszName)
 {
+    //
+    // **FOR NOW**: Do not allow a full import by name.  If there's a search for everything,
+    //              we are *NOT* going to pull the entire contents across into the symbol builder.
+    //              Yes...  that means you can do a query by name and see things that won't appear with
+    //              a global query.  It prevents a number of huge performance pains around checking
+    //              nested types or our lack of RegEx support.
+    //
+    if (pwszName == nullptr)
+    {
+        return E_NOTIMPL;
+    }
+
     auto fn = [&]()
     {
         //
@@ -339,14 +967,38 @@ HRESULT SymbolImporter_DbgHelp::ImportForNameQuery(_In_ SvcSymbolKind searchKind
         info.Query.QueryOffset = 0;
         info.Importer = this;
 
-        if (!SymEnumSymbolsExW(m_symHandle,
-                               m_moduleBase,
-                               pwszName,
-                               &SymbolImporter_DbgHelp::LegacySymbolEnumerateBridge,
-                               reinterpret_cast<void *>(&info),
-                               SYMENUM_OPTIONS_DEFAULT))
+        if (searchKind != SvcSymbolType)
         {
-            return S_FALSE;
+            if (!SymEnumSymbolsExW(m_symHandle,
+                                   m_moduleBase,
+                                   pwszName,
+                                   &SymbolImporter_DbgHelp::LegacySymbolEnumerateBridge,
+                                   reinterpret_cast<void *>(&info),
+                                   SYMENUM_OPTIONS_DEFAULT))
+            {
+                return S_FALSE;
+            }
+        }
+
+        if (searchKind == SvcSymbolType || searchKind == SvcSymbol)
+        {
+            if (!SymEnumTypesByNameW(m_symHandle,
+                                     m_moduleBase,
+                                     pwszName,
+                                     &SymbolImporter_DbgHelp::LegacySymbolEnumerateBridge,
+                                     reinterpret_cast<void *>(&info)))
+            {
+                return S_FALSE;
+            }
+        }
+
+        if (pwszName != nullptr)
+        {
+            m_nameQueries.insert(searchName);
+        }
+        else
+        {
+            m_fullGlobalImport = true;
         }
 
         return S_OK;
