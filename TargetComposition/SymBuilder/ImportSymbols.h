@@ -169,6 +169,13 @@ public:
     virtual HRESULT ImportForRegExQuery(_In_ SvcSymbolKind searchKind,
                                         _In_opt_ PCWSTR pwszRegEx) =0;
 
+    // ImportFailure():
+    //
+    // Any failure from the import process as a result of import error (and not something like out
+    // of memory) should call return ImportFailure(hr) rather than just return hr *AT THE POINT* where the import
+    // failure originates.
+    //
+    virtual HRESULT ImportFailure(_In_ HRESULT hr, _In_opt_ PCWSTR pwszImportMsg = nullptr);
 
 protected:
 
@@ -282,58 +289,111 @@ private:
     //
     HRESULT InternalConnectToSource();
 
-    // ImportArray():
+    //********************
+    // General Symbol Import:
     //
-    // Imports the given array into the symbol builder.
-    //
-    HRESULT ImportArray(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
-
-    // ImportPointer():
-    //
-    // Imports the given pointer into the symbol builder.
-    //
-    HRESULT ImportPointer(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
-
-    // ImportTypedef():
-    //
-    // Imports the given typedef into the symbol builder.
-    //
-    HRESULT ImportTypedef(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
 
     // ImportFunction():
     //
     // Imports the given function into the symbol builder.
     //
-    HRESULT ImportFunction(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+    HRESULT ImportFunction(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
+    // ImportSymbol():
+    //
+    // Import the given symbol into the symbol builder.  This is the *ONLY* method that should be called
+    // recursively as it adds symbols to the appropriate lookup tables as part of the import process.
+    //
+    HRESULT ImportSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
+    HRESULT ImportSymbol(_In_ PSYMBOL_INFOW pSymInfo, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0)
+    {
+        return ImportSymbol(pSymInfo->Index, pBuilderId);
+    }
+
+    //********************
+    // Type Symbol Import:
+    //
+
+    // ImportArray():
+    //
+    // Imports the given array into the symbol builder.
+    //
+    HRESULT ImportArray(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
+    // ImportPointer():
+    //
+    // Imports the given pointer into the symbol builder.
+    //
+    HRESULT ImportPointer(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
+    // ImportTypedef():
+    //
+    // Imports the given typedef into the symbol builder.
+    //
+    HRESULT ImportTypedef(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
+    // ImportFunctionType():
+    //
+    // Imports the given function type into the symbol builder.
+    //
+    HRESULT ImportFunctionType(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
 
     // ImportUDT():
     //
     // Imports the given UDT into the symbol builder.
     //
-    HRESULT ImportUDT(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+    HRESULT ImportUDT(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
+    // ImportEnum():
+    //
+    // Imports the given enum into the symbol builder.
+    //
+    HRESULT ImportEnum(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
 
     // ImportBaseType():
     //
     // Imports the given base type into the symbol builder.
     //
-    HRESULT ImportBaseType(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+    HRESULT ImportBaseType(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
 
     // ImportTypeSymbol():
     //
     // Imports the given type symbol into the symbol builder.
     //
-    HRESULT ImportTypeSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+    HRESULT ImportTypeSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
 
-    // ImportSymbol():
+    // ImportBaseClass():
     //
-    // Import the given symbol into the symbol builder.
+    // Imports the given base class symbol into the symbol builder.
     //
-    HRESULT ImportSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId);
+    HRESULT ImportBaseClass(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId);
 
-    HRESULT ImportSymbol(_In_ PSYMBOL_INFOW pSymInfo, _Out_ ULONG64 *pBuilderId)
-    {
-        return ImportSymbol(pSymInfo->Index, pBuilderId);
-    }
+    //********************
+    // Data Symbol Import:
+    //
+
+    // ImportMemberData():
+    //
+    // Imports a data member (field) into the symbol builder.
+    //
+    HRESULT ImportMemberData(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId);
+
+    // ImportConstantData():
+    //
+    // Imports constant data into the symbol builder.
+    //
+    HRESULT ImportConstantData(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId);
+
+    // ImportDataSymbol():
+    //
+    // Imports the given data symbol into the symbol builder.
+    //
+    HRESULT ImportDataSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId);
+
+    //********************
+    // Other Related:
+    //
 
     // TagMatchesSearchCriteria():
     //

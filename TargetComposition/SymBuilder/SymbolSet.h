@@ -125,7 +125,8 @@ public:
     SymbolSet() :
         m_nextId(0),
         m_demandCreatePointerTypes(true),
-        m_demandCreateArrayTypes(true)
+        m_demandCreateArrayTypes(true),
+        m_cacheInvalidationDisabled(false)
     {
     }
 
@@ -256,7 +257,7 @@ public:
     //
     // Called to add a new symbol to our management lists and assign it a unique id.
     //
-    HRESULT AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId);
+    HRESULT AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId, _In_ ULONG64 reservedId = 0);
 
     // DeleteExistingSymbol():
     //
@@ -308,6 +309,15 @@ public:
     {
         m_spImporter = std::move(importer);
     }	
+
+    // SetCacheInvalidationDisable():
+    //
+    // Turns on / off the ability to send cache invalidation notifications.
+    //
+    void SetCacheInvalidationDisable(_In_ bool disable)
+    {
+        m_cacheInvalidationDisabled = disable;
+    }
 
     //*************************************************
     // Internal Accessors:
@@ -375,6 +385,7 @@ public:
     //
     bool HasImporter() const { return m_spImporter.get() != nullptr; }
     SymbolImporter *GetImporter() const { return m_spImporter.get(); }
+    ULONG64 ReserveUniqueId() { return GetUniqueId(); }
 
 private:
 
@@ -410,6 +421,9 @@ private:
     // If we have an importer that will automatically pull in underlying symbols, this points
     // to it. 
     std::unique_ptr<SymbolImporter> m_spImporter;
+
+    // An indication of whether cache invalidation is disabled or not.
+    bool m_cacheInvalidationDisabled;
 
     // Configuration options:
     bool m_demandCreatePointerTypes;

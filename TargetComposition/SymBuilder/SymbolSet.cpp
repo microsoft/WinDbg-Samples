@@ -342,14 +342,14 @@ HRESULT SymbolSet::AddBasicCTypes()
     return hr;
 }
 
-HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId)
+HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId, _In_ ULONG64 reservedId)
 {
     //
     // We cannot let a C++ exception escape.
     //
     auto fn = [&]()
     {
-        ULONG64 uniqueId = GetUniqueId();
+        ULONG64 uniqueId = (reservedId == 0 ? GetUniqueId() : reservedId);
         if (uniqueId > std::numeric_limits<size_t>::max())
         {
             return E_FAIL;
@@ -358,6 +358,11 @@ HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUn
         if (m_symbols.size() <= uniqueId + 1)
         {
             m_symbols.resize(static_cast<size_t>(uniqueId + 1));
+        }
+
+        if (m_symbols[static_cast<size_t>(uniqueId)] != nullptr)
+        {
+            return E_UNEXPECTED;
         }
 
         m_symbols[static_cast<size_t>(uniqueId)] = pBaseSymbol;
@@ -506,17 +511,24 @@ HRESULT SymbolSet::InvalidateExternalCaches()
 {
     HRESULT hr = S_OK;
 
-    IDebugServiceManager *pServiceManager = GetServiceManager();
-    if (pServiceManager == nullptr)
+    //
+    // There are some circumstances where we *NEVER* want to send notifications upward.  If this is so, just
+    // ignore the invalidation.  It is either not needed or will happen later.
+    //
+    if (!m_cacheInvalidationDisabled)
     {
-        return E_UNEXPECTED;
+        IDebugServiceManager *pServiceManager = GetServiceManager();
+        if (pServiceManager == nullptr)
+        {
+            return E_UNEXPECTED;
+        }
+
+        ComPtr<SymbolCacheInvalidateArguments> spArgs;
+        IfFailedReturn(MakeAndInitialize<SymbolCacheInvalidateArguments>(&spArgs, m_spModule.Get(), this));
+
+        HRESULT hrEvent;
+        IfFailedReturn(pServiceManager->FireEventNotification(DEBUG_SVCEVENT_SYMBOLCACHEINVALIDATE, spArgs.Get(), &hrEvent));
     }
-
-    ComPtr<SymbolCacheInvalidateArguments> spArgs;
-    IfFailedReturn(MakeAndInitialize<SymbolCacheInvalidateArguments>(&spArgs, m_spModule.Get(), this));
-
-    HRESULT hrEvent;
-    IfFailedReturn(pServiceManager->FireEventNotification(DEBUG_SVCEVENT_SYMBOLCACHEINVALIDATE, spArgs.Get(), &hrEvent));
 
     //
     // While we get a sink result if some handler decided to return a failure from their handling of the event, we

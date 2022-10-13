@@ -227,10 +227,11 @@ public:
                            _In_ SvcSymbolTypeKind typeKind,
                            _In_ ULONG64 parentId,
                            _In_opt_ PCWSTR pwszSymbolName = nullptr,
-                           _In_opt_ PCWSTR pwszQualifiedName = nullptr)
+                           _In_opt_ PCWSTR pwszQualifiedName = nullptr,
+                           _In_ ULONG64 reservedId = 0)
     {
         HRESULT hr = S_OK;
-        IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, kind, parentId, pwszSymbolName, pwszQualifiedName));
+        IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, kind, parentId, pwszSymbolName, pwszQualifiedName, true, reservedId));
         m_typeKind = typeKind;
         m_typeSize = 0;
         m_typeAlignment = 1;
@@ -400,7 +401,8 @@ public:
 
     HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                    _In_ ULONG64 pointerToId,
-                                   _In_ SvcSymbolPointerKind pointerKind);
+                                   _In_ SvcSymbolPointerKind pointerKind,
+                                   _In_ ULONG64 reservedId = 0);
 
     // AppendPtrChar():
     //

@@ -217,7 +217,7 @@ public:
             }
             if (newSymbol)
             {
-                return InitializeNewSymbol();
+                return InitializeNewSymbol(id);
             }
             else
             {
@@ -454,7 +454,7 @@ private:
     // Called to initialize a new symbol.  This adds it to the symbol set's list, assigns a unique id,
     // etc...
     //
-    HRESULT InitializeNewSymbol();
+    HRESULT InitializeNewSymbol(_In_ ULONG64 reservedId = 0);
 };
 
 // ChildEnumerator:

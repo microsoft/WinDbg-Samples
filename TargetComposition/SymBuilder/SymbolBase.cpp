@@ -30,9 +30,9 @@ namespace SymbolBuilder
 // Base Symbols:
 //
 
-HRESULT BaseSymbol::InitializeNewSymbol()
+HRESULT BaseSymbol::InitializeNewSymbol(_In_ ULONG64 reservedId)
 {
-    return m_pSymbolSet->AddNewSymbol(this, &m_id);
+    return m_pSymbolSet->AddNewSymbol(this, &m_id, reservedId);
 }
 
 HRESULT BaseSymbol::RemoveChild(_In_ ULONG64 uniqueId)

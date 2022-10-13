@@ -188,7 +188,8 @@ HRESULT PointerTypeSymbol::GetBaseType(_Out_ ISvcSymbol **ppBaseType)
 
 HRESULT PointerTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                                   _In_ ULONG64 pointerToId,
-                                                  _In_ SvcSymbolPointerKind pointerKind)
+                                                  _In_ SvcSymbolPointerKind pointerKind,
+                                                  _In_ ULONG64 reservedId)
 {
     //
     // We cannot let a C++ exception escape.
@@ -232,7 +233,8 @@ HRESULT PointerTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                                       SvcSymbolTypePointer,
                                                       0,
                                                       ptrName.empty() ? nullptr : ptrName.c_str(),
-                                                      ptrQualifiedName.empty() ? nullptr : ptrQualifiedName.c_str()));
+                                                      ptrQualifiedName.empty() ? nullptr : ptrQualifiedName.c_str(),
+                                                      reservedId));
 
         m_pointerKind = pointerKind;
         m_pointerToId = pointerToId;
