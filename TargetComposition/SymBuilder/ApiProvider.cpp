@@ -860,14 +860,18 @@ std::wstring BaseTypeObject<TType>::ToString(_In_ const Object& /*typeObject*/,
 {
     std::wstring const& name = spTypeSymbol->InternalGetQualifiedName();
 
-    wchar_t buf[512];
-    swprintf_s(buf, ARRAYSIZE(buf), L"%s: %s ( size = %d, align = %d )",
-               m_pwszConvTag,
-               name.empty() ? L"<Unknown>" : name.c_str(),
+    std::wstring displayString = m_pwszConvTag;
+    displayString += L": ";
+    displayString += (name.empty() ? L"<Unknown>" : name.c_str());
+
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L" ( size = %d, align = %d )",
                (ULONG)spTypeSymbol->InternalGetTypeSize(),
                (ULONG)spTypeSymbol->InternalGetTypeAlignment());
 
-    return (std::wstring)buf;
+    displayString += buf;
+
+    return displayString;
 }
 
 template<typename TType>
@@ -1105,9 +1109,10 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
                                    _In_ ComPtr<FieldSymbol>& spFieldSymbol,
                                    _In_ const Metadata& /*metadata*/)
 {
-    wchar_t buf[512];
-
     std::wstring const& fieldName = spFieldSymbol->InternalGetName();
+
+    std::wstring displayString;
+    wchar_t buf[128];
 
     ULONG64 fieldTypeId = spFieldSymbol->InternalGetSymbolTypeId();
 
@@ -1117,10 +1122,11 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
         // The only way this is legal is if it is a constant valued enumerant!
         //
         std::wstring value = ValueToString(spFieldSymbol->InternalGetSymbolValue());
+        displayString = L"Enumerant : ";
+        displayString += (fieldName.empty() ? L"<Unknown>" : fieldName.c_str());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Enumerant: %s (value = %s)",
-                   fieldName.empty() ? L"<Unknown>" : fieldName.c_str(),
-                   value.c_str());
+        swprintf_s(buf, ARRAYSIZE(buf), L" (value = %s)", value.c_str());
+        displayString += buf;
     }
     else if (spFieldSymbol->InternalIsConstantValue())
     {
@@ -1128,24 +1134,29 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
         std::wstring const& fieldTypeName = pFieldTypeSymbol->InternalGetQualifiedName();
         std::wstring value = ValueToString(spFieldSymbol->InternalGetSymbolValue());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Field: %s (type = '%s', value = %s )",
-                   fieldName.empty() ? L"<Unknown>" : fieldName.c_str(),
-                   fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str(),
-                   value.c_str());
+        displayString = L"Field: ";
+        displayString += (fieldName.empty() ? L"<Unknown>" : fieldName.c_str());
+        displayString += L" (type = '";
+        displayString += (fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str());
 
+        swprintf_s(buf, ARRAYSIZE(buf), L"', value = %s )", value.c_str());
+        displayString += buf;
     }
     else
     {
         BaseSymbol *pFieldTypeSymbol = spFieldSymbol->InternalGetSymbolSet()->InternalGetSymbol(fieldTypeId);
         std::wstring const& fieldTypeName = pFieldTypeSymbol->InternalGetQualifiedName();
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Field: %s ( type = '%s', offset = %d )",
-                   fieldName.empty() ? L"<Unknown>" : fieldName.c_str(),
-                   fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str(),
-                   (ULONG)spFieldSymbol->InternalGetActualSymbolOffset());
+        displayString = L"Field: ";
+        displayString += (fieldName.empty() ? L"<Unknown>" : fieldName.c_str());
+        displayString += L" ( type = '";
+        displayString += (fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str());
+
+        swprintf_s(buf, ARRAYSIZE(buf), L"', offset = %d )", (ULONG)spFieldSymbol->InternalGetActualSymbolOffset());
+        displayString += buf;
     }
 
-    return (std::wstring)buf;
+    return displayString;
 }
 
 void FieldObject::Delete(_In_ const Object& /*fieldObject*/,
@@ -1379,12 +1390,15 @@ std::wstring BaseClassObject::ToString(_In_ const Object& /*baseClassObject*/,
 
     std::wstring const& baseClassTypeName = pBaseClassTypeSymbol->InternalGetQualifiedName();
 
-    wchar_t buf[512];
-    swprintf_s(buf, ARRAYSIZE(buf), L"Base Class: ( type = '%s', offset = %d )",
-               baseClassTypeName.empty() ? L"<Unknown>" : baseClassTypeName.c_str(),
-               (ULONG)spBaseClassSymbol->InternalGetActualSymbolOffset());
+    std::wstring displayString;
+    displayString = L"Base Class: ( type = '";
+    displayString += (baseClassTypeName.empty() ? L"<Unknown>" : baseClassTypeName.c_str());
 
-    return (std::wstring)buf;
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L"', offset = %d )", (ULONG)spBaseClassSymbol->InternalGetActualSymbolOffset());
+    displayString += buf;
+
+    return displayString;
 }
 
 void BaseClassObject::Delete(_In_ const Object& /*baseClassObject*/,
@@ -1587,7 +1601,8 @@ std::wstring GlobalDataObject::ToString(_In_ const Object& /*globalDataObject*/,
                                         _In_ ComPtr<GlobalDataSymbol>& spGlobalDataSymbol,
                                         _In_ const Metadata& /*metadata*/)
 {
-    wchar_t buf[512];
+    std::wstring displayString;
+    wchar_t buf[128];
 
     std::wstring const& dataName = spGlobalDataSymbol->InternalGetQualifiedName();
 
@@ -1599,23 +1614,31 @@ std::wstring GlobalDataObject::ToString(_In_ const Object& /*globalDataObject*/,
         std::wstring const& dataTypeName = pDataTypeSymbol->InternalGetQualifiedName();
         std::wstring value = ValueToString(spGlobalDataSymbol->InternalGetSymbolValue());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Global Data: %s (type = '%s', value = %s )",
-                   dataName.empty() ? L"<Unknown>" : dataName.c_str(),
-                   dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str(),
-                   value.c_str());
+        displayString = L"Global Data: ";
+        displayString += (dataName.empty() ? L"<Unknown>" : dataName.c_str());
+        displayString += L" (type = '";
+        displayString += (dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str());
+
+        swprintf_s(buf, ARRAYSIZE(buf), L"', value = %s )", value.c_str());
+        displayString += buf;
     }
     else
     {
         BaseSymbol *pDataTypeSymbol = spGlobalDataSymbol->InternalGetSymbolSet()->InternalGetSymbol(dataTypeId);
         std::wstring const& dataTypeName = pDataTypeSymbol->InternalGetQualifiedName();
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Global Data: %s ( type = '%s', module offset = %d )",
-                   dataName.empty() ? L"<Unknown>" : dataName.c_str(),
-                   dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str(),
+        displayString = L"Global Data: ";
+        displayString += (dataName.empty() ? L"<Unknown>" : dataName.c_str());
+        displayString += L" (type = '";
+        displayString += (dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str());
+
+        swprintf_s(buf, ARRAYSIZE(buf), L"', module offset = %d )", 
                    (ULONG)spGlobalDataSymbol->InternalGetActualSymbolOffset());
+
+        displayString += buf;
     }
 
-    return (std::wstring)buf;
+    return displayString;
 }
 
 void GlobalDataObject::Delete(_In_ const Object& /*globalDataObject*/,
@@ -1738,14 +1761,12 @@ std::wstring FunctionObject::ToString(_In_ const Object& /*functionObject*/,
                                       _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
                                       _In_ const Metadata& /*metadata*/)
 {
-    wchar_t buf[512];
-
     std::wstring const& functionName = spFunctionSymbol->InternalGetQualifiedName();
 
-    swprintf_s(buf, ARRAYSIZE(buf), L"Function: %s",
-               functionName.empty() ? L"<Unknown>" : functionName.c_str());
+    std::wstring displayString = L"Function: ";
+    displayString += (functionName.empty() ? L"<Unknown>" : functionName.c_str());
 
-    return (std::wstring)buf;
+    return displayString;
 }
 
 Object FunctionObject::GetLocalVariables(_In_ const Object& /*functionObject*/,
