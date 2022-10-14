@@ -75,4 +75,5 @@ BEGIN
     SYMBOLBUILDER_IDS_PARAMETER_MOVEBEFORE          "MoveBefore(pos) - Moves this parameter to a location in its parent function before the given parameter.  Note that 'pos' may either be a parameter object or it may be a zero based ordinal indicating its position within the list of parameters"
     SYMBOLBUILDER_IDS_PUBLICS_CREATE                "Create(name, offset) - Adds a new public symbol at 'offset' bytes into the module"
     SYMBOLBUILDER_IDS_PUBLIC_OFFSET                 "The offset of the public symbol into the module"
+    SYMBOLBUILDER_IDS_PUBLIC_PROMOTETOFUNCTION      "PromoteToFunction([codeSize], [returnType], [parameter]...) - Converts the public symbol to a function symbol as if Functions.Create had been called.  If the 'codeSize' is specified as zero, the disassembler will be used to find the extent of the function"
 END

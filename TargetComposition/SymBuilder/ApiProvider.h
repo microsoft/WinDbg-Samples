@@ -1105,6 +1105,32 @@ public:
     // 
     ULONG64 GetOffset(_In_ const Object& publicObject, _In_ ComPtr<PublicSymbol>& spPublicSymbol);
 
+    // PromoteToFunction():
+    //
+    // Bound method which will take the public symbol and convert it into a function symbol instead.
+    // The original public symbol is deleted and a new function symbol is created.  The signature
+    // of this method is:
+    //
+    //     PromoteToFunction([codeSize], [returnType], [parameters]...)
+    //
+    // Where:
+    //
+    //     'codeSize' - The size of the function code.  If this is specified as zero or is unspecified, the 
+    //                  method will disassemble the code in order to discover the address ranges of the function
+    //                  based on the public symbol being the base address of the function.
+    //
+    //     'returnType' - The return type of the function.  If unspecified, this is assumed to be 'void'
+    //
+    //     'parameters' - Identical to the parameters argument within Functions.Create, this takes a
+    //                    set of objects with properties 'Name' and 'Type' which create the set of parameters
+    //                    for the function.
+    //     
+    Object PromoteToFunction(_In_ const Object& publicObject, 
+                             _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                             _In_ std::optional<ULONG64> codeSize,
+                             _In_ std::optional<Object> returnType,
+                             _In_ size_t argCount,                 // [parameter]...
+                             _In_reads_(argCount) Object *pArgs);
 };
 
 //*************************************************

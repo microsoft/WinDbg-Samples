@@ -662,6 +662,7 @@ Object SymbolObjectHelpers::BoxSymbol(_In_ BaseSymbol *pSymbol)
             ComPtr<PublicSymbol> spPublicSymbol = pPublicSymbol;
             PublicObject& publicFactory = ApiProvider::Get().GetPublicFactory();
             symbolObject = publicFactory.CreateInstance(spPublicSymbol);
+            break;
         }
 
         default:
@@ -2324,6 +2325,163 @@ ULONG64 PublicObject::GetOffset(_In_ const Object& /*publicObject*/,
     return spPublicSymbol->InternalGetOffset();
 }
 
+Object PublicObject::PromoteToFunction(_In_ const Object& publicObject, 
+                                       _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                                       _In_ std::optional<ULONG64> codeSize,
+                                       _In_ std::optional<Object> returnType,
+                                       _In_ size_t argCount,                 // [parameter]...
+                                       _In_reads_(argCount) Object *pArgs)
+{
+    SymbolSet *pSymbolSet = spPublicSymbol->InternalGetSymbolSet();
+    if (!returnType.has_value())
+    {
+        returnType = L"void";
+    }
+
+    BaseTypeSymbol *pReturnType = UnboxType(pSymbolSet, returnType);
+
+    //
+    // If the code size was specified as zero (or was left out of the argument list), we will go down
+    // to the disassembler and ask it to do some work for us.  Note that the data model disassembler is provided
+    // by another key extension to the debugger (the API extension).  If that extension isn't available,
+    // accessing these properties will throw (and the promotion will fail).
+    //
+    if (codeSize.value_or(0) == 0)
+    {
+        ULONG64 codeEntryVa = spPublicSymbol->InternalGetOffset();
+        ISvcModule *pModule = pSymbolSet->GetModule();
+
+        ULONG64 moduleBase;
+        CheckHr(pModule->GetBaseAddress(&moduleBase));
+        codeEntryVa += moduleBase;
+
+        //
+        // Many of the debugger's "API" type of extensions are somewhere under Debugger.Utility.  The data model
+        // disassembler places itself under "Debugger.Utility.Code".
+        //
+        Object codeNamespace = Object::RootNamespace().KeyValue(L"Debugger")
+                                                      .KeyValue(L"Utility")
+                                                      .KeyValue(L"Code");
+
+        Object disassembler = codeNamespace.CallMethod(L"CreateDisassembler");
+
+        //
+        // Calling .DisassembleFunction will have the data model disassembler perform a disassembly across the
+        // entire function doing flow analysis to form a basic block graph.  The returned object will have
+        //
+        //     .BasicBlocks - a list of basic blocks
+        //
+        // Where each basic block will have:
+        //
+        //     .StartAddress         - the start address of the block
+        //     .EndAddress           - one byte past the end of the block
+        //     .Instructions         - a list of instructions in the block
+        //     .InboundControlFlows  - a list of inbound edges to this block in the control flow graph
+        //     .OutboundControlFlows - a list of outbound edges from this block in the control flow graph
+        //
+        Object bbs = disassembler.CallMethod(L"DisassembleFunction", codeEntryVa)
+                                 .KeyValue(L"BasicBlocks");
+
+        //
+        // Make sure that the list of basic blocks is ordered by their start address...  then go find how much
+        // of the code is contiguous forwards in VA space from the entry point VA.  Some optimizations or things
+        // like a BBT will cause discontiguous code.
+        //
+        // We cannot *YET* express that in the *SAMPLE* but will be able to eventually.  In either case, the
+        // primary block (with the entry point VA) is the base of the function and we need to know that.
+        //
+        Object bbsOrdered = bbs.CallMethod(L"OrderBy", [&](_In_ const Object& /*ctx*/, _In_ Object bb)
+                                                       { return bb.KeyValue(L"StartAddress"); });
+
+        ULONG64 contigEndVa = codeEntryVa;
+        bool foundPrimaryBlock = false;
+
+        for(Object bb : bbsOrdered)
+        {
+            ULONG64 blockStart = (ULONG64)bb.KeyValue(L"StartAddress");
+            ULONG64 blockEnd = (ULONG64)bb.KeyValue(L"EndAddress");
+
+            //
+            // Bear in mind certain transformations might put some of the function *BEFORE* the "base"
+            // (or entry point) of the function!
+            //
+            if (!foundPrimaryBlock) 
+            {
+                if (codeEntryVa >= blockStart && codeEntryVa < blockEnd)
+                {
+                    foundPrimaryBlock = true;
+                    contigEndVa = blockEnd;
+                }
+            }
+            
+            //
+            // As we *GUARANTEED* the basic blocks are sorted by start address in calling .OrderBy,
+            // it's only contiguous under the simple condition given below.
+            //
+            else if (blockStart == contigEndVa)
+            {
+                contigEndVa = blockEnd;
+            }
+
+            //
+            // We've hit a discontiguous range.  It's not relevant at this point.  We have found the
+            // extents of the primary contiguous piece of code.
+            //
+            else
+            {
+                break;
+            }
+        }
+
+        if (contigEndVa == codeEntryVa)
+        {
+            throw std::runtime_error("disassembler is unable to find code extent from function entry");
+        }
+
+        codeSize = contigEndVa - codeEntryVa;
+    }
+
+    ComPtr<FunctionSymbol> spFunction;
+    CheckHr(MakeAndInitialize<FunctionSymbol>(&spFunction,
+                                              pSymbolSet,
+                                              0,
+                                              pReturnType->InternalGetId(),
+                                              spPublicSymbol->InternalGetOffset(),
+                                              codeSize.value(),
+                                              spPublicSymbol->InternalGetName().c_str(),
+                                              nullptr));
+
+    //
+    // If there are optional parameters in the pArgs... list, apply them one by one.  The method
+    // will currently expect objects that look like:
+    //
+    // { Name: <name>, Type: <type> }
+    //
+    for (size_t i = 0; i < argCount; ++i)
+    {
+        Object paramInfo = pArgs[i];
+        std::wstring paramName = (std::wstring)paramInfo.KeyValue(L"Name");
+        Object paramType = paramInfo.KeyValue(L"Type");
+
+        BaseTypeSymbol *pParamType = UnboxType(pSymbolSet, paramType);
+
+        ComPtr<VariableSymbol> spParameter;
+        CheckHr(MakeAndInitialize<VariableSymbol>(&spParameter, 
+                                                  pSymbolSet,
+                                                  SvcSymbolDataParameter,
+                                                  spFunction->InternalGetId(),
+                                                  pParamType->InternalGetId(),
+                                                  paramName.c_str()));
+    }
+
+    FunctionObject& functionFactory = ApiProvider::Get().GetFunctionFactory();
+    Object functionObject = functionFactory.CreateInstance(spFunction);
+
+    CheckHr(spPublicSymbol->Delete());
+
+    return functionObject;
+}
+
 //*************************************************
 // Data Model Bindings:
 //
@@ -2693,6 +2851,8 @@ PublicObject::PublicObject()
     AddReadOnlyProperty(L"Offset", this, &PublicObject::GetOffset, 
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_OFFSET }));
 
+    AddMethod(L"PromoteToFunction", this, &PublicObject::PromoteToFunction,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_PROMOTETOFUNCTION }));
 }
 
 } // SymbolBuilder
