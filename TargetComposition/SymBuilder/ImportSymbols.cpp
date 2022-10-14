@@ -905,6 +905,46 @@ HRESULT SymbolImporter_DbgHelp::ImportFunctionType(_In_ ULONG symIndex, _Out_ UL
     return hr;
 }
 
+HRESULT SymbolImporter_DbgHelp::ImportPublicSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // Public symbols are just global sym->addr mappings.  There better not be a parent symbol!
+    //
+    if (parentId != 0)
+    {
+        return ImportFailure(E_UNEXPECTED);
+    }
+
+    WCHAR *pSymName;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMNAME, &pSymName))
+    {
+        return ImportFailure(E_FAIL);
+    }
+    localstr_ptr spSymName(pSymName);
+
+    ULONG64 publicAddr;
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_ADDRESS, &publicAddr))
+    {
+        return ImportFailure(E_FAIL);
+    }
+
+    ComPtr<PublicSymbol> spPublic;
+    hr = MakeAndInitialize<PublicSymbol>(&spPublic,
+                                         m_pOwningSet,
+                                         publicAddr - m_moduleBase,
+                                         pSymName,
+                                         nullptr);
+    if (FAILED(hr))
+    {
+        return ImportFailure(hr);
+    }
+
+    *pBuilderId = spPublic->InternalGetId();
+    return S_OK;
+}
+
 HRESULT SymbolImporter_DbgHelp::ImportFunction(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId)
 {
     HRESULT hr = S_OK;
@@ -919,27 +959,45 @@ HRESULT SymbolImporter_DbgHelp::ImportFunction(_In_ ULONG symIndex, _Out_ ULONG6
     ULONG64 funcAddr;
     ULONG64 funcSize;
     ULONG funcTypeId;
-    ULONG funcReturnTypeId;
     if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_ADDRESS, &funcAddr) ||
         !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_LENGTH, &funcSize) ||
-        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_TYPEID, &funcTypeId) ||
-        !SymGetTypeInfo(m_symHandle, m_moduleBase, funcTypeId, TI_GET_TYPEID, &funcReturnTypeId))
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_TYPEID, &funcTypeId))
     {
         return ImportFailure(E_FAIL);
     }
 
+    //
+    // On stripped public symbols, it is entirely possible to find "functions" for which we cannot get
+    // any return type.  In this case, lie and say it's void.
+    //
+    ULONG funcReturnTypeId;
+    bool hasFuncReturnType = !!SymGetTypeInfo(m_symHandle, m_moduleBase, funcTypeId, TI_GET_TYPEID, &funcReturnTypeId);
+
     ULONG64 funcReturnTypeBuilderId;
-    IfFailedReturn(ImportSymbol(funcReturnTypeId, &funcReturnTypeBuilderId));
+    if (hasFuncReturnType)
+    {
+        IfFailedReturn(ImportSymbol(funcReturnTypeId, &funcReturnTypeBuilderId));
+    }
+    else
+    {
+        auto fn = [&]()
+        {
+            std::wstring fakeReturnType = L"void";
+            IfFailedReturn(m_pOwningSet->FindTypeByName(fakeReturnType, &funcReturnTypeBuilderId, nullptr, false));
+            return S_OK;
+        };
+        IfFailedReturn(ConvertException(fn));
+    }
 
     ComPtr<FunctionSymbol> spFunction;
     hr = MakeAndInitialize<FunctionSymbol>(&spFunction,
                                            m_pOwningSet,
-                                          parentId,
-                                          funcReturnTypeBuilderId,
-                                          funcAddr - m_moduleBase,
-                                          funcSize,
-                                          pSymName,
-                                          nullptr);
+                                           parentId,
+                                           funcReturnTypeBuilderId,
+                                           funcAddr - m_moduleBase,
+                                           funcSize,
+                                           pSymName,
+                                           nullptr);
     if (FAILED(hr))
     {
         return ImportFailure(hr);
@@ -1205,6 +1263,10 @@ HRESULT SymbolImporter_DbgHelp::ImportSymbol(_In_ ULONG symIndex, _Out_ ULONG64 
 
             case SymTagBaseClass:
                 hr = ImportBaseClass(symIndex, pBuilderId, parentId);
+                break;
+
+            case SymTagPublicSymbol:
+                hr = ImportPublicSymbol(symIndex, pBuilderId, parentId);
                 break;
 
             default:

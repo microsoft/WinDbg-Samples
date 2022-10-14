@@ -30,6 +30,121 @@ namespace SymbolBuilder
 // General Symbol Set:
 //
 
+bool PublicList::FindNearestSymbols(_In_ ULONG64 address, _Out_ SymbolList const** pSymbolList)
+{
+    if (m_addresses.size() == 0)
+    {
+        return false;
+    }
+
+    auto it = std::lower_bound(m_addresses.begin(), m_addresses.end(), address,
+                               [&](_In_ const Address& symAddr, _In_ ULONG64 address)
+                               {
+                                   return symAddr.Addr < address;
+                               });
+
+    //
+    // Remember that it points to the first element in the list where search_address <= list_address.
+    // If it happens to point to an element which is equal, we want this.  Otherwise, we need to step backwards
+    // one element because, in lacking an exact match, we want address below the search address which is
+    // CLOSEST to it!
+    //
+    if (it == m_addresses.end() || it->Addr != address)
+    {
+        if (it == m_addresses.begin())
+        {
+            return false;
+        }
+
+        --it;
+    }
+
+    *pSymbolList = &(it->Symbols);
+    return true;
+}
+
+HRESULT PublicList::AddSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+{
+    //
+    // We cannot let a C++ exception escape.
+    //
+    auto fn = [&]()
+    {
+        auto it = std::lower_bound(m_addresses.begin(), m_addresses.end(), address,
+                                   [&](_In_ const Address& symAddr, _In_ ULONG64 address)
+                                   {
+                                       return symAddr.Addr < address;
+                                   });
+
+        //
+        // If there are no public symbols which are >= the new public address, the new one can just be put
+        // at the end of the list and we are done.
+        //
+        if (it == m_addresses.end())
+        {
+            m_addresses.push_back( { address, { symbol } } );
+            return S_OK;
+        }
+
+        //
+        // If the found element happens to be at the same address, there are *MULTIPLE* public symbols covering
+        // the same address and they go into a singular list.
+        //
+        if (it->Addr == address)
+        {
+            it->Symbols.push_back(symbol);
+            return S_OK;
+        }
+
+        //
+        // Otherwise, 'it' refers to the first element > address.  We need to insert the new public in the list
+        // immediately before 'it'.
+        //
+        m_addresses.insert(it, { address, { symbol } });
+        return S_OK;
+    };
+    return ConvertException(fn);
+}
+
+HRESULT PublicList::RemoveSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+{
+    //
+    // We cannot let a C++ exception escape.
+    //
+    auto fn = [&]()
+    {
+        auto it = std::lower_bound(m_addresses.begin(), m_addresses.end(), address,
+                                   [&](_In_ const Address& symAddr, _In_ ULONG64 address)
+                                   {
+                                       return symAddr.Addr < address;
+                                   });
+
+        if (it == m_addresses.end() || it->Addr != address)
+        {
+            //
+            // We could not find this address.  It's not a failure per-se.  Just return S_FALSE to the caller
+            // to let them know nothing was actually removed!
+            //
+            return S_FALSE;
+        }
+
+        RemoveSymbolFromList(it->Symbols, symbol);
+
+        //
+        // If there are no public symbols matching this particular list any longer, we need to remove the entire
+        // address entry from the table.  To do otherwise would result in us missing the most appropriate symbol
+        // as we could find an address with an empty list!
+        //
+        if (it->Symbols.size() == 0)
+        {
+            m_addresses.erase(it);
+        }
+
+        return S_OK;
+    };
+    return ConvertException(fn);
+}
+
 bool SymbolRangeList::FindSymbols(_In_ ULONG64 address, _Out_ SymbolList const** pSymbolList)
 {
     auto it = std::lower_bound(m_ranges.begin(), m_ranges.end(), address,
@@ -471,6 +586,10 @@ HRESULT SymbolSet::GetSymbolById(_In_ ULONG64 symbolId,
     }
 
     ISvcSymbol *pSymbol = m_symbols[static_cast<size_t>(symbolId)].Get();
+    if (pSymbol == nullptr)
+    {
+        return E_INVALIDARG;
+    }
 
     if (isScopeBoundVariable)
     {
@@ -776,13 +895,27 @@ HRESULT SymbolSet::FindSymbolByOffset(_In_ ULONG64 moduleOffset,
         (void)m_spImporter->ImportForOffsetQuery(SvcSymbol, moduleOffset);
     }
 
+    BaseSymbol *pSymbol = nullptr;
+
     SymbolRangeList::SymbolList const* pSymbols;
     if (!m_symbolRanges.FindSymbols(moduleOffset, &pSymbols) || pSymbols->size() == 0)
     {
-        return E_BOUNDS;
+        //
+        // Is there a public symbol which happens to be "closest" to this address...?
+        //
+        PublicList::SymbolList const* pPublics;
+        if (!m_publicAddresses.FindNearestSymbols(moduleOffset, &pPublics) || pPublics->size() == 0)
+        {
+            return E_BOUNDS;
+        }
+
+        pSymbol = InternalGetSymbol((*pPublics)[0]);
+    }
+    else
+    {
+        pSymbol = InternalGetSymbol((*pSymbols)[0]);
     }
 
-    BaseSymbol *pSymbol = InternalGetSymbol((*pSymbols)[0]);
 
     ULONG64 symbolOffset;
     IfFailedReturn(pSymbol->GetOffset(&symbolOffset));

@@ -106,6 +106,12 @@ private:
     //
     Object GetFunctions(_In_ const Object& /*symbolSetObject*/, _In_ ComPtr<SymbolSet>& spSymbolSet);
 
+    // GetPublics():
+    //
+    // Property accessor which gets the public symbols on this symbol set.
+    //
+    Object GetPublics(_In_ const Object& /*symbolSetObject*/, _In_ ComPtr<SymbolSet>& spSymbolSet);
+
 };
 
 //*************************************************
@@ -1041,6 +1047,67 @@ private:
 };
 
 //*************************************************
+// Publics:
+//
+
+// PublicsObject:
+//
+// Represents the list of public symbols (and public symbol APIs) available on a symbol set.
+//
+class PublicsObject : public TypedInstanceModel<ComPtr<SymbolSet>>,
+                      public SymbolObjectHelpers
+{
+public:
+
+    PublicsObject();
+
+private:
+
+    // Create():
+    //
+    // Bound API which will create a new public symbol and return an object representing it.
+    //
+    Object Create(_In_ const Object& typesObject, 
+                  _In_ ComPtr<SymbolSet>& spSymbolSet,
+                  _In_ std::wstring publicName,
+                  _In_ ULONG64 publicOffset);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over public symbols within a symbol set.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& publicsObject,
+                                                     _In_ ComPtr<SymbolSet>& spSymbolSet);
+
+};
+
+// PublicObject:
+//
+// Represents a public symbol boxed into the data model.
+//
+class PublicObject : public BaseSymbolObject<PublicSymbol>
+{
+public:
+
+    PublicObject();
+	
+    // ToString():
+    //
+    // Bound function that is the string conversion for public symbols.
+    //
+    std::wstring ToString(_In_ const Object& publicbject,
+                          _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                          _In_ const Metadata& metadata);
+
+    // GetOffset():
+    //
+    // Bound property accessor which returns the offset of the public symbol.
+    // 
+    ULONG64 GetOffset(_In_ const Object& publicObject, _In_ ComPtr<PublicSymbol>& spPublicSymbol);
+
+};
+
+//*************************************************
 // Extension Points:
 //
 
@@ -1119,6 +1186,7 @@ public:
     TypesObject& GetTypesFactory() const { return *m_spTypesFactory.get(); }
     DataObject& GetDataFactory() const { return *m_spDataFactory.get(); }
     FunctionsObject& GetFunctionsFactory() const { return *m_spFunctionsFactory.get(); }
+    PublicsObject& GetPublicsFactory() const { return *m_spPublicsFactory.get(); }
 
     //
     // Types:
@@ -1142,7 +1210,12 @@ public:
     //
 
     FunctionObject& GetFunctionFactory() const { return *m_spFunctionFactory.get(); }
-    
+
+    //
+    // Publics:
+    //
+
+    PublicObject& GetPublicFactory() const { return *m_spPublicFactory.get(); }
 
     //
     // Other Symbols:
@@ -1181,6 +1254,7 @@ private:
     std::unique_ptr<TypesObject> m_spTypesFactory;
     std::unique_ptr<DataObject> m_spDataFactory;
     std::unique_ptr<FunctionsObject> m_spFunctionsFactory;
+    std::unique_ptr<PublicsObject> m_spPublicsFactory;
 
     //
     // Types:
@@ -1204,6 +1278,12 @@ private:
     //
 
     std::unique_ptr<FunctionObject> m_spFunctionFactory;
+
+    //
+    // Publics:
+    //
+
+    std::unique_ptr<PublicObject> m_spPublicFactory;
 
     //
     // Other Symbols:

@@ -293,6 +293,12 @@ private:
     // General Symbol Import:
     //
 
+    // ImportPublicSymbol():
+    //
+    // Imports the given public symbol into the symbol builder.
+    //
+    HRESULT ImportPublicSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId = 0);
+
     // ImportFunction():
     //
     // Imports the given function into the symbol builder.

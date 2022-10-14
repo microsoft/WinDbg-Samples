@@ -31,6 +31,72 @@ class SymbolBuilderManager;
 // Overall Symbol Set:
 //
 
+// PublicList:
+//
+// Provides a list of addresses in sorted order which can be binary searched for the "nearest" symbol(s) to
+// a given address.
+//
+class PublicList
+{
+public:
+
+    using SymbolList = std::vector<ULONG64>;
+
+    // PublicList():
+    //
+    // Creates a new public symbol list.  Initially, there are no symbols in the list.
+    //
+    PublicList()
+    {
+    }
+
+    // FindNearestSymbols():
+    //
+    // Find the list of symbols which are closest to a given address.  If such can be found, true is returned and
+    // an output pointer to the list of symbol ids is passed in 'pSymbolList'
+    //
+    bool FindNearestSymbols(_In_ ULONG64 address, _Out_ SymbolList const** pSymbolList);
+
+    // AddSymbol():
+    //
+    // Adds a public symbol to the list.
+    //
+    HRESULT AddSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol);
+
+    // RemoveSymbol():
+    //
+    // Removes a symbol from the list.
+    //
+    HRESULT RemoveSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol);
+
+private:
+    
+    struct Address
+    {
+        ULONG64 Addr;
+        SymbolList Symbols;
+    };
+
+    // RemoveSymbolFromList():
+    //
+    // Removes a symbol from the given list.
+    //
+    void RemoveSymbolFromList(_Inout_ SymbolList& list, _In_ ULONG64 symbol)
+    {
+        for (auto it = list.begin(); it != list.end(); ++it)
+        {
+            if (*it == symbol)
+            {
+                list.erase(it);
+                break;
+            }
+        }
+    }
+
+    std::vector<Address> m_addresses;
+
+};
+
 // SymbolRangeList:
 //
 // Provides a list of address ranges in sorted order which can be binary searched for a given symbol or set
@@ -371,6 +437,24 @@ public:
         return m_symbolRanges.RemoveSymbol(start, end, symbol);
     }
 
+    // InternalAddPublicSymbol():
+    //
+    // Adds a mapping of [address] to the existing symbol.
+    //
+    HRESULT InternalAddPublicSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+    {
+        return m_publicAddresses.AddSymbol(address, symbol);
+    }
+
+    // InternalRemovePublicSymbol():
+    //
+    // Removes a mapping of [address] from the existing symbol.
+    //
+    HRESULT InternalRemovePublicSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+    {
+        return m_publicAddresses.RemoveSymbol(address, symbol);
+    }
+
     std::vector<Microsoft::WRL::ComPtr<ISvcSymbol>> const& InternalGetSymbols() { return m_symbols; }
     std::vector<ULONG64> const& InternalGetGlobalSymbols() const { return m_globalSymbols; }
     IDebugServiceManager* GetServiceManager() const;
@@ -417,6 +501,9 @@ private:
 
     // Tracks the address ranges associated with global symbols.
     SymbolRangeList m_symbolRanges;
+
+    // Tracks the addresses associated with public symbols.
+    PublicList m_publicAddresses;
 
     // If we have an importer that will automatically pull in underlying symbols, this points
     // to it. 

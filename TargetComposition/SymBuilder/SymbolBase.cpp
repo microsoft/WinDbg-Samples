@@ -259,6 +259,24 @@ HRESULT ChildEnumerator::GetNext(_COM_Outptr_ ISvcSymbol **ppSymbol)
     return E_BOUNDS;
 }
 
+//*************************************************
+// Publics:
+//
+
+HRESULT PublicSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                             _In_ ULONG64 offset,
+                                             _In_ PCWSTR pwszName,
+                                             _In_opt_ PCWSTR pwszQualifiedName)
+{
+    HRESULT hr = S_OK;
+    IfFailedReturn(BaseInitialize(pSymbolSet, SvcSymbolPublic, 0, pwszName, pwszQualifiedName));
+
+    m_offset = offset;
+    IfFailedReturn(pSymbolSet->InternalAddPublicSymbol(offset, InternalGetId()));
+
+    return hr;
+}
+
 } // SymbolBuilder
 } // Services
 } // TargetComposition

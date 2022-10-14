@@ -251,6 +251,7 @@ public:
             case SvcSymbolType:
             case SvcSymbolData:
             case SvcSymbolFunction:
+            case SvcSymbolPublic:
                 return true;
 
             default:
@@ -515,6 +516,77 @@ private:
     size_t m_pos;
 };
 
+// PublicSymbol:
+//
+// Represents a public symbol (untyped associated with a single address).
+//
+class PublicSymbol :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseSymbol
+        >
+{
+public:
+
+    //*************************************************
+    // ISvcSymbol:
+    //
+
+    // GetOffset():
+    //
+    // Gets the offset of the symbol (if said symbol has such).  Note that if the symbol has multiple
+    // disjoint address ranges associated with it, this method may return S_FALSE to indicate that the
+    // symbol does not necessarily have a simple "base address" for an offset.
+    //
+    IFACEMETHOD(GetOffset)(_Out_ ULONG64 *pSymbolOffset)
+    {
+        *pSymbolOffset = m_offset;
+        return S_OK;
+    }
+
+    //*************************************************
+    // ISvcSymbolInfo:
+    //
+
+    // GetType():
+    //
+    // Gets the type of the symbol.
+    //
+    IFACEMETHOD(GetType)(_COM_Outptr_ ISvcSymbol **ppSymbolType)
+    {
+        //
+        // Public symbols have no type.
+        //
+        *ppSymbolType = nullptr;
+        return E_FAIL;
+    }
+
+    // GetLocation():
+    //
+    // Gets the location of the symbol.
+    //
+    IFACEMETHOD(GetLocation)(_Out_ SvcSymbolLocation *pLocation)
+    {
+        pLocation->Kind = SvcSymbolLocationImageOffset;
+        pLocation->Offset = m_offset;
+        return S_OK;
+    }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                   _In_ ULONG64 offset,
+                                   _In_ PCWSTR pwszName,
+                                   _In_opt_ PCWSTR pwszQualifiedName);
+
+    ULONG64 InternalGetOffset() const { return m_offset; }
+
+private:
+
+    ULONG64 m_offset;
+};
 
 } // SymbolBuilder
 } // Services

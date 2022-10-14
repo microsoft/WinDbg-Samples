@@ -19,6 +19,7 @@ BEGIN
     SYMBOLBUILDER_IDS_SYMBOLSET_TYPES               "The list of available types"
     SYMBOLBUILDER_IDS_SYMBOLSET_DATA                "The list of available global data"
     SYMBOLBUILDER_IDS_SYMBOLSET_FUNCTIONS           "The list of available functions"
+    SYMBOLBUILDER_IDS_SYMBOLSET_PUBLICS             "The list of available public symbols"
     SYMBOLBUILDER_IDS_TYPES_ADDBASICCTYPES          "AddBasicCTypes() - For symbol builder symbols created without default C types, this adds the default C types to the type system"
     SYMBOLBUILDER_IDS_TYPES_CREATE                  "Create(typeName, [qualifiedTypeName]) - Creates a new user defined type.  An explicit 'qualifiedTypeName' may be optionally provided if different than the base name"
     SYMBOLBUILDER_IDS_TYPES_CREATEARRAY             "CreateArray(baseType, arraySize) - Creates a new array type.  'baseType' may either be a type object or a type name.  'arraySize' is the size of the array"
@@ -72,4 +73,6 @@ BEGIN
     SYMBOLBUILDER_IDS_LIVERANGE_LOCATION            "A string description of the location of the variable in this live range"
     SYMBOLBUILDER_IDS_LIVERANGE_DELETE              "Delete() - Deletes the live range"
     SYMBOLBUILDER_IDS_PARAMETER_MOVEBEFORE          "MoveBefore(pos) - Moves this parameter to a location in its parent function before the given parameter.  Note that 'pos' may either be a parameter object or it may be a zero based ordinal indicating its position within the list of parameters"
+    SYMBOLBUILDER_IDS_PUBLICS_CREATE                "Create(name, offset) - Adds a new public symbol at 'offset' bytes into the module"
+    SYMBOLBUILDER_IDS_PUBLIC_OFFSET                 "The offset of the public symbol into the module"
 END

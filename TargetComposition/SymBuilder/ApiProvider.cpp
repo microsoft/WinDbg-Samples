@@ -249,6 +249,7 @@ ApiProvider::ApiProvider()
     m_spTypesFactory = std::make_unique<TypesObject>();
     m_spDataFactory = std::make_unique<DataObject>();
     m_spFunctionsFactory = std::make_unique<FunctionsObject>();
+    m_spPublicsFactory = std::make_unique<PublicsObject>();
 
     //
     // Types:
@@ -272,6 +273,12 @@ ApiProvider::ApiProvider()
     //
 
     m_spFunctionFactory = std::make_unique<FunctionObject>();
+
+    //
+    // Publics:
+    //
+
+    m_spPublicFactory = std::make_unique<PublicObject>();
 
     //
     // Other Symbols:
@@ -472,6 +479,13 @@ Object SymbolSetObject::GetFunctions(_In_ const Object& /*symbolSetObject*/,
     return functionsFactory.CreateInstance(spSymbolSet);
 }
 
+Object SymbolSetObject::GetPublics(_In_ const Object& /*symbolSetObject*/,
+                                   _In_ ComPtr<SymbolSet>& spSymbolSet)
+{
+    PublicsObject& publicsFactory = ApiProvider::Get().GetPublicsFactory();
+    return publicsFactory.CreateInstance(spSymbolSet);
+}
+
 //*************************************************
 // General Symbol Helpers:
 //
@@ -640,6 +654,14 @@ Object SymbolObjectHelpers::BoxSymbol(_In_ BaseSymbol *pSymbol)
             FunctionObject& functionFactory = ApiProvider::Get().GetFunctionFactory();
             symbolObject = functionFactory.CreateInstance(spFunctionSymbol); 
             break;
+        }
+
+        case SvcSymbolPublic:
+        {
+            PublicSymbol *pPublicSymbol = static_cast<PublicSymbol *>(pSymbol);
+            ComPtr<PublicSymbol> spPublicSymbol = pPublicSymbol;
+            PublicObject& publicFactory = ApiProvider::Get().GetPublicFactory();
+            symbolObject = publicFactory.CreateInstance(spPublicSymbol);
         }
 
         default:
@@ -2228,6 +2250,81 @@ void LiveRangeObject::Delete(_In_ const Object& /*liveRangeObject*/,
 }
 
 //*************************************************
+// Publics APIs
+// 
+
+Object PublicsObject::Create(_In_ const Object& typesObject, 
+                             _In_ ComPtr<SymbolSet>& spSymbolSet,
+                             _In_ std::wstring publicName,
+                             _In_ ULONG64 publicOffset)
+{
+    ComPtr<PublicSymbol> spPublic;
+    CheckHr(MakeAndInitialize<PublicSymbol>(&spPublic,
+                                            spSymbolSet.Get(),
+                                            publicOffset,
+                                            publicName.c_str(),
+                                            nullptr));
+
+    PublicObject& publicFactory = ApiProvider::Get().GetPublicFactory();
+    return publicFactory.CreateInstance(spPublic);
+}
+
+std::experimental::generator<Object> PublicsObject::GetIterator(_In_ const Object& /*publicsObject*/,
+                                                                _In_ ComPtr<SymbolSet>& spSymbolSet)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& globalSymbols = spSymbolSet->InternalGetGlobalSymbols();
+        if (cur >= globalSymbols.size())
+        {
+            break;
+        }
+
+        ULONG64 nextGlobal = globalSymbols[cur];
+        ++cur;
+
+        BaseSymbol *pNextSymbol = spSymbolSet->InternalGetSymbol(nextGlobal);
+        if (pNextSymbol->InternalGetKind() != SvcSymbolPublic)
+        {
+            continue;
+        }
+
+        PublicSymbol *pNextPublic = static_cast<PublicSymbol *>(pNextSymbol);
+        Object publicObject = BoxSymbol(pNextPublic);
+        co_yield publicObject;
+    }
+}
+
+std::wstring PublicObject::ToString(_In_ const Object& /*publicObject*/,
+                                    _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                                    _In_ const Metadata& /*metadata*/)
+{
+    std::wstring const& publicName = spPublicSymbol->InternalGetQualifiedName();
+
+    std::wstring displayString = L"Public Symbol: ";
+    displayString += (publicName.empty() ? L"<Unknown>" : publicName.c_str());
+
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L" (offset = 0x%I64x)", spPublicSymbol->InternalGetOffset());
+
+    displayString += buf;
+
+    return displayString;
+}
+
+ULONG64 PublicObject::GetOffset(_In_ const Object& /*publicObject*/, 
+                                _In_ ComPtr<PublicSymbol>& spPublicSymbol)
+{
+    return spPublicSymbol->InternalGetOffset();
+}
+
+//*************************************************
 // Data Model Bindings:
 //
 // The constructors for our extension points & typed model / factory objects set up all of the available properties,
@@ -2255,6 +2352,9 @@ SymbolSetObject::SymbolSetObject() :
 
     AddReadOnlyProperty(L"Functions", this, &SymbolSetObject::GetFunctions,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_FUNCTIONS }));
+
+    AddReadOnlyProperty(L"Publics", this, &SymbolSetObject::GetPublics,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_PUBLICS }));
 
     AddReadOnlyProperty(L"Types", this, &SymbolSetObject::GetTypes,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_TYPES }));
@@ -2574,6 +2674,25 @@ SymbolBuilderNamespace::SymbolBuilderNamespace() :
     AddMethod(L"CreateSymbols", this, &SymbolBuilderNamespace::CreateSymbols,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_CREATESYMBOLS },
                        L"PreferShow", true));
+}
+
+PublicsObject::PublicsObject() :
+    TypedInstanceModel()
+{
+    AddMethod(L"Create", this, &PublicsObject::Create,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLICS_CREATE },
+                       L"PreferShow", true));
+
+    AddGeneratorFunction(this, &PublicsObject::GetIterator);
+}
+
+PublicObject::PublicObject()
+{
+    AddStringDisplayableFunction(this, &PublicObject::ToString);
+
+    AddReadOnlyProperty(L"Offset", this, &PublicObject::GetOffset, 
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_OFFSET }));
+
 }
 
 } // SymbolBuilder
