@@ -207,7 +207,27 @@ HRESULT SymbolImporter_DbgHelp::InternalConnectToSource()
         return E_FAIL;
     }
 
-    return S_OK;
+    auto fn = [&]()
+    {
+        std::wstring info;
+        switch(modInfo.SymType)
+        {
+            case SymPdb:
+                info += L"PDB: ";
+                info += modInfo.LoadedPdbName;
+                break;
+            case SymExport:
+                info += L"Export Symbols";
+                break;
+            default:
+                info += L"Other";
+                break;
+        }
+        m_importerInfo = info;
+        return S_OK;
+    };
+
+    return ConvertException(fn);
 }
 
 void SymbolImporter_DbgHelp::DisconnectFromSource()
@@ -216,6 +236,7 @@ void SymbolImporter_DbgHelp::DisconnectFromSource()
     {
         SymCleanup(m_symHandle);
         m_symHandle = NULL;
+        m_importerInfo.clear();
     }
 }
 

@@ -196,6 +196,14 @@ public:
     {
     }
 
+    ~SymbolSet()
+    {
+        if (HasImporter())
+        {
+            m_spImporter->DisconnectFromSource();
+        }
+    }
+
     //*************************************************
     // ISvcSymbolSet:
     //
@@ -280,12 +288,28 @@ public:
     //
     IFACEMETHOD(GetDescription)(_Out_ BSTR *pObjectDescription)
     {
-        //
-        // Give the symbol set a description so that commands in the debugger (e.g.: lm) can show something
-        // useful for what kind of symbols are loaded.
-        //
-        *pObjectDescription = SysAllocString(L"Symbol Builder Symbols");
-        return (*pObjectDescription == nullptr ? E_OUTOFMEMORY : S_OK);
+        auto fn = [&]()
+        {
+            HRESULT hr = S_OK;
+            std::wstring desc = L"Symbol Builder Symbols";
+            if (HasImporter())
+            {
+                std::wstring importerInfo;
+                IfFailedReturn(m_spImporter->GetImporterDescription(&importerInfo));
+
+                desc += L" (with demand import from ";
+                desc += importerInfo;
+                desc += L")";
+            }
+
+            //
+            // Give the symbol set a description so that commands in the debugger (e.g.: lm) can show something
+            // useful for what kind of symbols are loaded.
+            //
+            *pObjectDescription = SysAllocString(desc.c_str());
+            return (*pObjectDescription == nullptr ? E_OUTOFMEMORY : S_OK);
+        };
+        return ConvertException(fn);
     }
 
     //*************************************************

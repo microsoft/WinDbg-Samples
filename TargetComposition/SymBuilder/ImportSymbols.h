@@ -169,6 +169,12 @@ public:
     virtual HRESULT ImportForRegExQuery(_In_ SvcSymbolKind searchKind,
                                         _In_opt_ PCWSTR pwszRegEx) =0;
 
+    // GetImporterDescription():
+    //
+    // Gets a description of where the import is taking place from.
+    //
+    virtual HRESULT GetImporterDescription(_Out_ std::wstring *pImporterInfo) =0;
+
     // ImportFailure():
     //
     // Any failure from the import process as a result of import error (and not something like out
@@ -207,6 +213,11 @@ public:
         m_symHandle(NULL),
         m_fullGlobalImport(false)
     {
+    }
+
+    ~SymbolImporter_DbgHelp()
+    {
+        DisconnectFromSource();
     }
 
     // ConnectToSource():
@@ -248,6 +259,24 @@ public:
                                         _In_opt_ PCWSTR /*pwszRegEx*/)
     {
         return S_FALSE;
+    }
+
+    // GetImporterDescription():
+    //
+    // Gets a description of where the import is taking place from.
+    //
+    virtual HRESULT GetImporterDescription(_Out_ std::wstring *pImporterInfo)
+    {
+        auto fn = [&]()
+        {
+            if (m_importerInfo.empty())
+            {
+                return E_NOT_SET;
+            }
+            *pImporterInfo = m_importerInfo;
+            return S_OK;
+        };
+        return ConvertException(fn);
     }
 
 private:
@@ -497,6 +526,9 @@ private:
 
     // The search path for symbols
     std::wstring m_searchPath;
+
+    // The importer information string
+    std::wstring m_importerInfo;
 
     // Information about our module
     ULONG64 m_moduleBase;
