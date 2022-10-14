@@ -790,6 +790,11 @@ public:
     //
     Object GetParameters(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 
+    // GetAddressRanges():
+    //
+    // Property accessor which gets the address ranges of the code bytes of this function.
+    //
+    Object GetAddressRanges(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 };
 
 // ParametersObject:
@@ -1046,6 +1051,56 @@ private:
 
 };
 
+// AddressRangesObject:
+//
+// Represents the list of address ranges for the code bytes of a function
+//
+class AddressRangesObject : public TypedInstanceModel<ComPtr<FunctionSymbol>>,
+                            public SymbolObjectHelpers
+{
+public:
+
+    AddressRangesObject();
+
+private:
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for the address range list.
+    //
+    std::wstring ToString(_In_ const Object& functionObject,
+                          _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                          _In_ const Metadata& metadata);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over address ranges of the code bytes of a function.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& addressRangesObject,
+                                                     _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+};
+
+// AddressRangeObject:
+//
+// Represents a single address range.
+//
+class AddressRangeObject : public TypedInstanceModel<std::pair<ULONG64, ULONG64>>
+{
+public:
+
+    AddressRangeObject();
+
+private:
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for an address range.
+    //
+    std::wstring ToString(_In_ const Object& addressRangeObject,
+                          _In_ std::pair<ULONG64, ULONG64>& addressRange,
+                          _In_ const Metadata& metadata);
+};
+
 //*************************************************
 // Publics:
 //
@@ -1258,6 +1313,8 @@ public:
     LocalVariableObject& GetLocalVariableFactory() { return *m_spLocalVariableFactory.get(); }
     LiveRangesObject& GetLiveRangesFactory() const { return *m_spLiveRangesFactory.get(); }
     LiveRangeObject& GetLiveRangeFactory() const { return *m_spLiveRangeFactory.get(); }
+    AddressRangesObject& GetAddressRangesFactory() const { return *m_spAddressRangesFactory.get(); }
+    AddressRangeObject& GetAddressRangeFactory() const { return *m_spAddressRangeFactory.get(); }
 
     // Get():
     //
@@ -1326,6 +1383,8 @@ private:
     std::unique_ptr<LocalVariableObject> m_spLocalVariableFactory;
     std::unique_ptr<LiveRangesObject> m_spLiveRangesFactory;
     std::unique_ptr<LiveRangeObject> m_spLiveRangeFactory;
+    std::unique_ptr<AddressRangesObject> m_spAddressRangesFactory;
+    std::unique_ptr<AddressRangeObject> m_spAddressRangeFactory;
 
     //*************************************************
     // Extension Points:

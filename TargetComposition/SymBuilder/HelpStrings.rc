@@ -61,6 +61,7 @@ BEGIN
     SYMBOLBUILDER_IDS_FUNCTION_RETURNTYPE           "The return type of the function"
     SYMBOLBUILDER_IDS_FUNCTION_PARAMETERS           "The list of the parameters of the function"
     SYMBOLBUILDER_IDS_FUNCTION_LOCALVARIABLES       "The list of local variables of the function"
+    SYMBOLBUILDER_IDS_FUNCTION_ADDRESSRANGES        "The list of address ranges for code bytes of the function.  The first address range is the primary one and defines the entry point of the function"
     SYMBOLBUILDER_IDS_PARAMETERS_ADD                "Add(name, parameterType) - Adds a new parameter of the given name and type"
     SYMBOLBUILDER_IDS_LOCALVARIABLES_ADD            "Add(name, localVariableType) - Adds a new local variable (non parameter) of the given name and type"
     SYMBOLBUILDER_IDS_VARIABLE_NAME                 "The name of the variable (parameter or local)"
@@ -76,4 +77,6 @@ BEGIN
     SYMBOLBUILDER_IDS_PUBLICS_CREATE                "Create(name, offset) - Adds a new public symbol at 'offset' bytes into the module"
     SYMBOLBUILDER_IDS_PUBLIC_OFFSET                 "The offset of the public symbol into the module"
     SYMBOLBUILDER_IDS_PUBLIC_PROMOTETOFUNCTION      "PromoteToFunction([codeSize], [returnType], [parameter]...) - Converts the public symbol to a function symbol as if Functions.Create had been called.  If the 'codeSize' is specified as zero, the disassembler will be used to find the extent of the function"
+    SYMBOLBUILDER_IDS_ADDRESSRANGE_START            "The starting address or offset of the address range"
+    SYMBOLBUILDER_IDS_ADDRESSRANGE_SIZE             "The size of the address range"
 END

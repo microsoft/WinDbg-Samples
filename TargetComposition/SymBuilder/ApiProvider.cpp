@@ -295,6 +295,8 @@ ApiProvider::ApiProvider()
     m_spLocalVariableFactory = std::make_unique<LocalVariableObject>();
     m_spLiveRangesFactory = std::make_unique<LiveRangesObject>();
     m_spLiveRangeFactory = std::make_unique<LiveRangeObject>();
+    m_spAddressRangesFactory = std::make_unique<AddressRangesObject>();
+    m_spAddressRangeFactory = std::make_unique<AddressRangeObject>();
 }
 
 ApiProvider::~ApiProvider()
@@ -1806,6 +1808,13 @@ Object FunctionObject::GetParameters(_In_ const Object& /*functionObject*/,
     return parametersFactory.CreateInstance(spFunctionSymbol);
 }
 
+Object FunctionObject::GetAddressRanges(_In_ const Object& /*functionObject*/, 
+                                        _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    AddressRangesObject& addressRangesFactory = ApiProvider::Get().GetAddressRangesFactory();
+    return addressRangesFactory.CreateInstance(spFunctionSymbol);
+}
+
 Object FunctionObject::GetReturnType(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
     return BoxRelatedType(spFunctionSymbol.Get(), spFunctionSymbol->InternalGetReturnTypeId());
@@ -2248,6 +2257,69 @@ void LiveRangeObject::Delete(_In_ const Object& /*liveRangeObject*/,
                              _In_ LiveRangeInformation const& liveRangeInfo)
 {
     liveRangeInfo.Variable->InternalDeleteLiveRange(liveRangeInfo.LiveRangeIdentity);
+}
+
+std::experimental::generator<Object> AddressRangesObject::GetIterator(_In_ const Object& /*addressRangesObject*/,
+                                                                      _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& ranges = spFunctionSymbol->InternalGetAddressRanges();
+        if (cur >= ranges.size())
+        {
+            break;
+        }
+
+        std::pair<ULONG64, ULONG64> range = ranges[cur];
+        ++cur;
+
+        AddressRangeObject& addressRangeFactory = ApiProvider::Get().GetAddressRangeFactory();
+        Object addressRangeObj = addressRangeFactory.CreateInstance(range);
+        co_yield addressRangeObj;
+    }
+}
+
+std::wstring AddressRangesObject::ToString(_In_ const Object& /*functionObject*/,
+                                           _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                                           _In_ const Metadata& /*metadata*/)
+{
+    std::wstring displayString = L"";
+    bool first = true;
+
+    auto&& ranges = spFunctionSymbol->InternalGetAddressRanges();
+    for(auto&& range : ranges)
+    {
+        wchar_t buf[128];
+        swprintf_s(buf, ARRAYSIZE(buf), L"[%I64x, %I64x)", range.first, range.first + range.second);
+        if (!first)
+        {
+            displayString += L", ";
+        }
+        displayString += buf;
+        first = false;
+    }
+
+    if (first)
+    {
+        displayString = L"[)";
+    }
+
+    return displayString;
+}
+
+std::wstring AddressRangeObject::ToString(_In_ const Object& /*addressRangeObject*/,
+                                           _In_ std::pair<ULONG64, ULONG64>& addressRange,
+                                           _In_ const Metadata& /*metadata*/)
+{
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L"[%I64x, %I64x)", addressRange.first, addressRange.first + addressRange.second);
+    return buf;
 }
 
 //*************************************************
@@ -2734,6 +2806,9 @@ FunctionObject::FunctionObject()
 {
     AddStringDisplayableFunction(this, &FunctionObject::ToString);
 
+    AddReadOnlyProperty(L"AddressRanges", this, &FunctionObject::GetAddressRanges,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_ADDRESSRANGES }));
+
     AddReadOnlyProperty(L"LocalVariables", this, &FunctionObject::GetLocalVariables,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_LOCALVARIABLES }));
 
@@ -2822,6 +2897,27 @@ LiveRangeObject::LiveRangeObject() :
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_LIVERANGE_DELETE }));
 
     AddStringDisplayableFunction(this, &LiveRangeObject::ToString);
+}
+
+AddressRangesObject::AddressRangesObject() :
+    TypedInstanceModel()
+{
+    AddStringDisplayableFunction(this, &AddressRangesObject::ToString);
+
+    AddGeneratorFunction(this, &AddressRangesObject::GetIterator);
+}
+
+AddressRangeObject::AddressRangeObject() :
+    TypedInstanceModel()
+{
+    AddStringDisplayableFunction(this, &AddressRangeObject::ToString);
+
+    BindReadOnlyProperty(L"Start", &std::pair<ULONG64, ULONG64>::first, 
+                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_ADDRESSRANGE_START }));
+
+    BindReadOnlyProperty(L"Size", &std::pair<ULONG64, ULONG64>::second, 
+                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_ADDRESSRANGE_SIZE }));
+
 }
 
 SymbolBuilderNamespace::SymbolBuilderNamespace() :
