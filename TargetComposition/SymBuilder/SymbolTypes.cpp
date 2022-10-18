@@ -639,6 +639,76 @@ HRESULT EnumTypeSymbol::LayoutEnum()
     return S_OK;
 }
 
+//*************************************************
+// Function Types:
+//
+
+HRESULT FunctionTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                                   _In_ ULONG64 returnTypeId,
+                                                   _In_ ULONG64 paramCount,
+                                                   _In_reads_(paramCount) ULONG64 *pParamTypes)
+{
+    auto fn = [&]()
+    {
+        HRESULT hr = S_OK;
+
+        if (paramCount > std::numeric_limits<size_t>::max())
+        {
+            return E_INVALIDARG;
+        }
+
+        m_returnType = returnTypeId;
+        for (ULONG64 i = 0; i < paramCount; ++i)
+        {
+            m_paramTypes.push_back(pParamTypes[static_cast<size_t>(i)]);
+        }
+
+        IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, SvcSymbolType, 0, nullptr, nullptr));
+
+        return hr;
+    };
+    return ConvertException(fn);
+}
+
+HRESULT FunctionTypeSymbol::GetFunctionReturnType(_COM_Outptr_ ISvcSymbol **ppReturnType)
+{
+    HRESULT hr = S_OK;
+    *ppReturnType = nullptr;
+
+    BaseSymbol *pReturnTypeSymbol = InternalGetSymbolSet()->InternalGetSymbol(m_returnType);
+    if (pReturnTypeSymbol == nullptr || pReturnTypeSymbol->InternalGetKind() != SvcSymbolType)
+    {
+        return E_INVALIDARG;
+    }
+
+    ComPtr<ISvcSymbol> spReturnType = pReturnTypeSymbol;
+    *ppReturnType = spReturnType.Detach();
+    return hr;
+}
+
+HRESULT FunctionTypeSymbol::GetFunctionParameterTypeAt(_In_ ULONG64 i,
+                                                       _COM_Outptr_ ISvcSymbol **ppParameterType)
+{
+    HRESULT hr = S_OK;
+    *ppParameterType = nullptr;
+
+    if (i >= m_paramTypes.size())
+    {
+        return E_INVALIDARG;
+    }
+
+    ULONG64 paramType = m_paramTypes[static_cast<size_t>(i)];
+
+    BaseSymbol *pParamTypeSymbol = InternalGetSymbolSet()->InternalGetSymbol(paramType);
+    if (pParamTypeSymbol == nullptr || pParamTypeSymbol->InternalGetKind() != SvcSymbolType)
+    {
+        return E_UNEXPECTED;
+    }
+
+    ComPtr<ISvcSymbol> spParameterType = pParamTypeSymbol;
+    *ppParameterType = spParameterType.Detach();
+    return hr;
+}
 
 } // SymbolBuilder
 } // Services

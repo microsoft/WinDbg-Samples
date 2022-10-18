@@ -25,6 +25,8 @@ namespace Services
 namespace SymbolBuilder
 {
 
+class BaseScope;
+
 // BaseDataSymbol:
 //
 // Base class for a variety of data symbols (e.g.: fields, enumerants, global variables, etc...)
@@ -78,6 +80,15 @@ public:
     //
     IFACEMETHOD(GetOffset)(_Out_ ULONG64 *pSymbolOffset)
     {
+        //
+        // Function locals and parameters have more complex locations than a simple offset.
+        // We need to get location through a scope/scope frame.
+        //
+        if (InternalGetKind() == SvcSymbolDataParameter || InternalGetKind() == SvcSymbolDataLocal)
+        {
+            return E_FAIL;
+        }
+                   
         *pSymbolOffset = m_symOffset;
         return S_OK;
     }
@@ -111,8 +122,24 @@ public:
         // The offset for global data is relative to the base of the module (where it loaded).  The offset
         // for a field is relative to the beginning of the structure (unless it is static).
         //
-        pLocation->Kind = (InternalGetKind() == SvcSymbolData ? SvcSymbolLocationImageOffset :
-                                                                SvcSymbolLocationStructureRelative);
+        switch(InternalGetKind())
+        {
+            case SvcSymbolData:
+                pLocation->Kind = SvcSymbolLocationImageOffset;
+                break;
+
+            case SvcSymbolDataParameter:
+            case SvcSymbolDataLocal:
+                //
+                // You need to go through a scope/scope frame to get the more complex notions of
+                // location that vary by instruction within the function.
+                //
+                return E_FAIL;
+
+            default:
+                pLocation->Kind = SvcSymbolLocationStructureRelative;
+            
+        }
 
         pLocation->Offset = InternalGetActualSymbolOffset();
         return S_OK;
@@ -129,11 +156,13 @@ public:
     //
     HRESULT BaseInitialize(_In_ SymbolSet *pSymbolSet,
                            _In_ SvcSymbolKind symKind,
-                           _In_ ULONG64 owningTypeId,
+                           _In_ ULONG64 owningSymbolId,
                            _In_ ULONG64 symOffset,
                            _In_ ULONG64 symTypeId,
                            _In_opt_ PCWSTR pwszName,
-                           _In_opt_ PCWSTR pwszQualifiedName);
+                           _In_opt_ PCWSTR pwszQualifiedName,
+                           _In_ bool newSymbol = true,
+                           _In_ ULONG64 id = 0);
 
     // BaseInitialize():
     //
@@ -142,11 +171,13 @@ public:
     //
     HRESULT BaseInitialize(_In_ SymbolSet *pSymbolSet,
                            _In_ SvcSymbolKind symKind,
-                           _In_ ULONG64 owningTypeId,
+                           _In_ ULONG64 owningSymbolId,
                            _In_ VARIANT *pValue,
                            _In_ ULONG64 symTypeId,
                            _In_ PCWSTR pwszName,
-                           _In_opt_ PCWSTR pwszQualifiedName);
+                           _In_opt_ PCWSTR pwszQualifiedName,
+                           _In_ bool newSymbol = true,
+                           _In_ ULONG64 id = 0);
 
     // Delete():
     //
@@ -226,6 +257,159 @@ public:
                                    _In_opt_ PCWSTR pwszQualifiedName);
 
 
+};
+
+// VariableSymbol:
+//
+// Represents a variable (parameter / local) within a function.
+//
+class VariableSymbol :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        BaseDataSymbol
+        >
+{
+public:
+
+    // LiveRange:
+    //
+    // Describes a range of the owning function where this variable is live.
+    //
+    struct LiveRange
+    {
+        ULONG64 UniqueId;                       // Unique identifier for the range within this var
+        ULONG64 Offset;                         // Function relative offset of the range
+        ULONG64 Size;                           // Size of the range
+        SvcSymbolLocation VariableLocation;     // Where the var is within this range
+    };
+
+    //*************************************************
+    // ISvcSymbol:
+    //
+
+    // GetOffset():
+    //
+    // Gets the offset of the symbol (if said symbol has such).  Note that if the symbol has multiple
+    // disjoint address ranges associated with it, this method may return S_FALSE to indicate that the symbol
+    // does not necessarily have a simple "base address" for an offset.
+    //
+    IFACEMETHOD(GetOffset)(_Out_ ULONG64 *pSymbolOffset);
+
+    //*************************************************
+    // ISvcSymbolInfo:
+    //
+
+    // GetLocation()
+    //
+    // Gets the location of the symbol.
+    //
+    IFACEMETHOD(GetLocation)(_Out_ SvcSymbolLocation *pLocation);
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                   _In_ SvcSymbolKind symKind,
+                                   _In_ ULONG64 parentId,
+                                   _In_ ULONG64 parameterTypeId,
+                                   _In_ PCWSTR pwszName);
+
+    HRESULT RuntimeClassInitialize(_In_ VariableSymbol *pSourceSymbol,
+                                   _In_ BaseScope *pBoundScope);
+
+    // ValidateLiveRange():
+    //
+    // Validates that a live range of [rangeOffset, rangeOffset + rangeSize) is valid in that
+    // it does not extend outside the bounds of the function or overlap with another live range.
+    // Note that if ignoreRange is a range id (non-zero), that range will be ignored for the live
+    // range overlap check.
+    //
+    bool ValidateLiveRange(_In_ ULONG64 rangeOffset,
+                           _In_ ULONG64 rangeSize,
+                           _In_ ULONG64 ignoreRange = 0);
+
+    // AddLiveRange():
+    //
+    // Adds varLocation as the location of this variable within the half open function relative
+    // address range [rangeOffset, rangeOffset + rangeSize).  This will return a unique handle to the
+    // live range if it succeeds.
+    //
+    HRESULT AddLiveRange(_In_ ULONG64 rangeOffset,
+                         _In_ ULONG64 rangeSize,
+                         _In_ SvcSymbolLocation const& varLocation,
+                         _Out_ ULONG64 *pUniqueId);
+
+    // BindToScope():
+    //
+    // Binds this variable to a particular scope (or scope frame) and thus a location within
+    // a function.  This allows the location returning APIs to return the particular location for
+    // this variable at this place in the function.
+    //
+    HRESULT BindToScope(_In_ BaseScope *pScope,
+                        _COM_Outptr_ VariableSymbol **ppBoundVariable)
+    {
+        *ppBoundVariable = nullptr;
+        return Microsoft::WRL::MakeAndInitialize<VariableSymbol>(ppBoundVariable,
+                                                                 this,
+                                                                 pScope);
+    }
+
+    // MoveToBefore():
+    //
+    // Moves this *PARAMETER* symbol to before another one in order.  This rearranges the containing
+    // function's parameter list.
+    //
+    HRESULT MoveToBefore(_In_ ULONG64 position);
+
+    // GetLiveRange():
+    //
+    // Gets the live range for a given unique id.
+    //
+    LiveRange *GetLiveRange(_In_ ULONG64 uniqueId) 
+    {
+        auto it = m_liveRanges.find(uniqueId);
+        if (it != m_liveRanges.end())
+        {
+            return &(it->second);
+        }
+
+        return nullptr;
+    }
+
+    // GetLiveRangeByOffset():
+    //
+    // Gets the appropriate live range for this variable by the given scope(function) relative
+    // offset.
+    //
+    LiveRange const *GetLiveRangeByOffset(_In_ ULONG64 srelOffset) const
+    {
+        for (LiveRange *pRange : m_liveRangeList)
+        {
+            if (srelOffset >= pRange->Offset && srelOffset < (pRange->Offset + pRange->Size))
+            {
+                return pRange;
+            }
+        }
+
+        return nullptr;
+    }
+
+    std::vector<LiveRange *> const &InternalGetLiveRanges() const { return m_liveRangeList; }
+    bool IsBoundToScope() const { return m_spBoundScope.Get() != nullptr; }
+    BaseScope *GetBoundScope() const;
+
+    bool InternalSetLiveRangeOffset(_In_ ULONG64 id, _In_ ULONG64 offset);
+    bool InternalSetLiveRangeSize(_In_ ULONG64 id, _In_ ULONG64 size);
+    bool InternalSetLiveRangeLocation(_In_ ULONG64 id, _In_ SvcSymbolLocation const& location);
+    bool InternalDeleteLiveRange(_In_ ULONG64 id);
+
+private:
+
+    ULONG64 m_curId;
+    std::unordered_map<ULONG64, LiveRange> m_liveRanges;
+    std::vector<LiveRange *> m_liveRangeList;
+    Microsoft::WRL::ComPtr<ISvcSymbolSetScope> m_spBoundScope;
 };
 
 } // SymbolBuilder

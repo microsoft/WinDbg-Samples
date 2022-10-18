@@ -308,6 +308,11 @@ ISvcMachineArchitecture* SymbolSet::GetArchInfo() const
     return m_pOwningProcess->GetArchInfo();
 }
 
+SymbolBuilderManager* SymbolSet::GetSymbolBuilderManager() const
+{
+    return m_pOwningProcess->GetSymbolBuilderManager();
+}
+
 HRESULT SymbolSet::AddBasicCTypes()
 {
     HRESULT hr = S_OK;
@@ -340,12 +345,17 @@ HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUn
     auto fn = [&]()
     {
         ULONG64 uniqueId = GetUniqueId();
+        if (uniqueId > std::numeric_limits<size_t>::max())
+        {
+            return E_FAIL;
+        }
+
         if (m_symbols.size() <= uniqueId + 1)
         {
             m_symbols.resize(static_cast<size_t>(uniqueId + 1));
         }
 
-        m_symbols[uniqueId] = pBaseSymbol;
+        m_symbols[static_cast<size_t>(uniqueId)] = pBaseSymbol;
 
         if (pBaseSymbol->IsGlobal())
         {
@@ -423,6 +433,56 @@ HRESULT SymbolSet::DeleteExistingSymbol(_In_ ULONG64 uniqueId)
         return S_OK;
     };
     return ConvertException(fn);
+}
+
+HRESULT SymbolSet::GetSymbolById(_In_ ULONG64 symbolId,
+                                 _COM_Outptr_ ISvcSymbol **ppSymbol)
+{
+    HRESULT hr = S_OK;
+
+    bool isScopeBoundVariable = (symbolId & ScopeBoundIdFlag) != 0;
+    std::pair<ULONG64, ULONG64> scopeBinding;
+    if (isScopeBoundVariable)
+    {
+        symbolId &= ~ScopeBoundIdFlag;
+        if (symbolId >= m_scopeBindings.size())
+        {
+            return E_INVALIDARG;
+        }
+
+        scopeBinding = m_scopeBindings[static_cast<size_t>(symbolId)];
+        symbolId = scopeBinding.first;
+    }
+
+    *ppSymbol = nullptr;
+    if (symbolId >= m_symbols.size())
+    {
+        return E_INVALIDARG;
+    }
+
+    ISvcSymbol *pSymbol = m_symbols[static_cast<size_t>(symbolId)].Get();
+
+    if (isScopeBoundVariable)
+    {
+        VariableSymbol *pVariable = static_cast<VariableSymbol *>(pSymbol);
+
+        Microsoft::WRL::ComPtr<ISvcSymbolSetScope> spScope;
+        IfFailedReturn(FindScopeByOffset(scopeBinding.second, &spScope));
+
+        BaseScope *pScope = static_cast<BaseScope *>(spScope.Get());
+
+        Microsoft::WRL::ComPtr<VariableSymbol> spBoundVariable;
+        IfFailedReturn(pVariable->BindToScope(pScope, &spBoundVariable));
+
+        Microsoft::WRL::ComPtr<ISvcSymbol> spSymbol = spBoundVariable;
+        *ppSymbol = spSymbol.Detach();
+    }
+    else
+    {
+        Microsoft::WRL::ComPtr<ISvcSymbol> spSymbol = pSymbol;
+        *ppSymbol = spSymbol.Detach();
+    }
+    return S_OK;
 }
 
 HRESULT SymbolSet::EnumerateAllSymbols(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnumerator)
@@ -694,6 +754,219 @@ HRESULT SymbolSet::FindSymbolByOffset(_In_ ULONG64 moduleOffset,
     *pSymbolOffset = (moduleOffset - symbolOffset);
     *ppSymbol = spSymbol.Detach();
     return S_OK;
+}
+
+HRESULT SymbolSet::GetGlobalScope(_COM_Outptr_ ISvcSymbolSetScope **ppScope)
+{
+    HRESULT hr = S_OK;
+    *ppScope = nullptr;
+
+    ComPtr<GlobalScope> spGlobalScope;
+    IfFailedReturn(MakeAndInitialize<GlobalScope>(&spGlobalScope, this));
+
+    *ppScope = spGlobalScope.Detach();
+    return hr;
+}
+
+HRESULT SymbolSet::FindScopeByOffset(_In_ ULONG64 moduleOffset,
+                                     _COM_Outptr_ ISvcSymbolSetScope **ppScope)
+{
+    HRESULT hr = S_OK;
+    *ppScope = nullptr;
+
+    SymbolRangeList::SymbolList const* pSymbols;
+    if (!m_symbolRanges.FindSymbols(moduleOffset, &pSymbols) || pSymbols->size() == 0)
+    {
+        return E_BOUNDS;
+    }
+
+    for (size_t i = 0; i < pSymbols->size(); ++i)
+    {
+        BaseSymbol *pSymbol = InternalGetSymbol((*pSymbols)[i]);
+        if (pSymbol->InternalGetKind() == SvcSymbolFunction)
+        {
+            FunctionSymbol *pFunction = static_cast<FunctionSymbol *>(pSymbol);
+
+            ULONG64 functionOffset;
+            IfFailedReturn(pFunction->GetOffset(&functionOffset));
+
+            ULONG64 srelOffset = moduleOffset - functionOffset;
+
+            ComPtr<Scope> spScope;
+            IfFailedReturn(MakeAndInitialize<Scope>(&spScope, this, pFunction, srelOffset));
+
+            *ppScope = spScope.Detach();
+            return S_OK;
+        }
+    }
+
+    return E_FAIL;
+}
+
+HRESULT SymbolSet::FindScopeFrame(_In_ ISvcProcess *pProcess,
+                                  _In_ ISvcRegisterContext *pRegisterContext,
+                                  _COM_Outptr_ ISvcSymbolSetScopeFrame **ppScopeFrame)
+{
+    HRESULT hr = S_OK;
+    *ppScopeFrame = nullptr;
+
+    //
+    // We must find the scope from @pc.  We must fetch the register and convert it back to a
+    // module relative offset that everything else here is based upon.
+    //
+    ULONG64 pc;
+    IfFailedReturn(pRegisterContext->GetAbstractRegisterValue64(SvcAbstractRegisterInstructionPointer,
+                                                                &pc));
+
+    ULONG64 moduleBase;
+    IfFailedReturn(m_spModule->GetBaseAddress(&moduleBase));
+
+    ULONG64 modRelPc = pc - moduleBase;
+
+    SymbolRangeList::SymbolList const* pSymbols;
+    if (!m_symbolRanges.FindSymbols(modRelPc, &pSymbols) || pSymbols->size() == 0)
+    {
+        return E_BOUNDS;
+    }
+
+    for (size_t i = 0; i < pSymbols->size(); ++i)
+    {
+        BaseSymbol *pSymbol = InternalGetSymbol((*pSymbols)[i]);
+        if (pSymbol->InternalGetKind() == SvcSymbolFunction)
+        {
+            FunctionSymbol *pFunction = static_cast<FunctionSymbol *>(pSymbol);
+
+            ULONG64 functionOffset;
+            IfFailedReturn(pFunction->GetOffset(&functionOffset));
+
+            ULONG64 srelOffset = modRelPc - functionOffset;
+
+            ComPtr<ScopeFrame> spScopeFrame;
+            IfFailedReturn(MakeAndInitialize<ScopeFrame>(&spScopeFrame, 
+                                                         this, 
+                                                         pFunction, 
+                                                         srelOffset,
+                                                         pProcess,
+                                                         pRegisterContext));
+
+            *ppScopeFrame = spScopeFrame.Detach();
+            return S_OK;
+        }
+    }
+
+    return E_FAIL;
+}
+
+//*************************************************
+// Enumerators:
+//
+
+HRESULT ScopeEnumerator::GetNext(_COM_Outptr_ ISvcSymbol **ppSymbol)
+{
+    HRESULT hr = S_OK;
+    *ppSymbol = nullptr;
+
+    BaseScope *pScope = static_cast<BaseScope *>(m_spScope.Get());
+
+    FunctionSymbol *pFunction = pScope->InternalGetFunction();
+    auto&& functionChildren = pFunction->InternalGetChildren();
+
+    for(;;)
+    {
+        if (m_pos >= functionChildren.size())
+        {
+            break;
+        }
+
+        ULONG64 childId = functionChildren[m_pos];
+        ++m_pos;
+
+        BaseSymbol *pChildSymbol = InternalGetSymbolSet()->InternalGetSymbol(childId);
+        if (pChildSymbol == nullptr || !SymbolMatchesSearchCriteria(pChildSymbol))
+        {
+            continue;
+        }
+
+        //
+        // If the symbol is a variable, we need to bind it to the scope so that its
+        // location fetch can return useful information.
+        //
+        if (pChildSymbol->InternalGetKind() == SvcSymbolDataParameter ||
+            pChildSymbol->InternalGetKind() == SvcSymbolDataLocal)
+        {
+            VariableSymbol *pChildVariable = static_cast<VariableSymbol *>(pChildSymbol);
+
+            ComPtr<VariableSymbol> spBoundVariable;
+            IfFailedReturn(pChildVariable->BindToScope(pScope, &spBoundVariable));
+
+            *ppSymbol = spBoundVariable.Detach();
+            return S_OK;
+        }
+        else
+        {
+            ComPtr<ISvcSymbol> spSymbol = pChildSymbol;
+            *ppSymbol = spSymbol.Detach();
+            return S_OK;
+        }
+    }
+
+    return E_BOUNDS;
+}
+
+//*************************************************
+// Scopes:
+//
+
+
+HRESULT BaseScope::EnumerateArguments(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum)
+{
+    HRESULT hr = S_OK;
+    *ppEnum = nullptr;
+
+    ComPtr<ScopeEnumerator> spEnum;
+    IfFailedReturn(MakeAndInitialize<ScopeEnumerator>(&spEnum, 
+                                                      this, 
+                                                      SvcSymbolDataParameter,
+                                                      nullptr,
+                                                      nullptr));
+
+    *ppEnum = spEnum.Detach();
+    return hr;
+}
+
+HRESULT BaseScope::EnumerateLocals(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum)
+{
+    HRESULT hr = S_OK;
+    *ppEnum = nullptr;
+
+    ComPtr<ScopeEnumerator> spEnum;
+    IfFailedReturn(MakeAndInitialize<ScopeEnumerator>(&spEnum,
+                                                      this,
+                                                      SvcSymbolDataLocal,
+                                                      nullptr,
+                                                      nullptr));
+
+    *ppEnum = spEnum.Detach();
+    return hr;
+}
+
+HRESULT BaseScope::EnumerateChildren(_In_ SvcSymbolKind kind,
+                                     _In_opt_z_ PCWSTR pwszName,
+                                     _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
+                                     _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum)
+{
+    HRESULT hr = S_OK;
+    *ppChildEnum = nullptr;
+
+    ComPtr<ScopeEnumerator> spEnum;
+    IfFailedReturn(MakeAndInitialize<ScopeEnumerator>(&spEnum,
+                                                      this,
+                                                      kind,
+                                                      pwszName,
+                                                      pSearchInfo));
+
+    *ppChildEnum = spEnum.Detach();
+    return hr;
 }
 
 } // SymbolBuilder

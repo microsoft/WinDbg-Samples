@@ -195,7 +195,9 @@ public:
                            _In_ SvcSymbolKind kind,
                            _In_ ULONG64 parentId,
                            _In_opt_ PCWSTR pwszSymbolName = nullptr,
-                           _In_opt_ PCWSTR pwszQualifiedName = nullptr)
+                           _In_opt_ PCWSTR pwszQualifiedName = nullptr,
+                           _In_ bool newSymbol = true,
+                           _In_ ULONG64 id = 0)
     {
         //
         // We cannot let a C++ exception escape.
@@ -213,7 +215,19 @@ public:
             {
                 m_qualifiedName = pwszQualifiedName;
             }
-            return InitializeNewSymbol();
+            if (newSymbol)
+            {
+                return InitializeNewSymbol();
+            }
+            else
+            {
+                if (id == 0)
+                {
+                    return E_INVALIDARG;
+                }
+                m_id = id;
+                return S_OK;
+            }
         };
         return ConvertException(fn);
     }
@@ -236,6 +250,7 @@ public:
         {
             case SvcSymbolType:
             case SvcSymbolData:
+            case SvcSymbolFunction:
                 return true;
 
             default:
@@ -395,6 +410,13 @@ public:
     ULONG64 InternalGetId() const { return m_id; }
     ULONG64 InternalGetParentId() const { return m_parentId; }
     std::vector<ULONG64> const& InternalGetChildren() { return m_children; }
+    bool InternalSetName(_In_opt_ PCWSTR pwszName)
+    {
+        return SUCCEEDED(ConvertException([&](){
+            m_name = pwszName;
+            return S_OK;
+        }));
+    }
 
 protected:
 

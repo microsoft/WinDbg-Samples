@@ -82,6 +82,8 @@ layer.  Many pieces of data model implementation are based upon target compositi
 
     * SymbolData.[h/cpp]        - Classes necessary to implement data symbols (e.g.: fields, global variables, etc...)
 
+    * SymbolFunction.[h/cpp]    - Classes necessary to implement function symbols
+
     * SymManager.[h/cpp]        - A management service which is placed into the service container to keep track 
                                   of all of the synthetic symbols which have been created.  While this could have
                                   been placed within the symbol provider itself, it can often be easier for other
@@ -127,14 +129,16 @@ call.
         Contents        
         SymbolBuilderSymbols
 
-There are two properties on the symbol set object:
+There are three properties on the symbol set object:
 
     Symbol Set Object
     -----------------
         Data             [The list of available global data]
+        Functions        [The list of available functions]
         Types            [The list of available types]
 
-The "Data" and "Types" properties, in addition to being lists, also have APIs to create new types or data:
+The "Data", "Functions", and "Types" properties, in addition to being lists, also have APIs to create new 
+data, functions, or types:
 
     Types Object
     ------------
@@ -148,6 +152,10 @@ The "Data" and "Types" properties, in addition to being lists, also have APIs to
     Data Object
     -----------
         CreateGlobal     [CreateGlobal(name, type, offset, [qualifiedName]) - Adds new global data of a specified 'type' at 'offset' bytes into the module.  An explicit 'qualifiedName' may optionally be provided if different than the base name]
+
+    Functions Object
+    ----------------
+        Create           [Create(name, returnType, codeOffset, codeSize, [qualifiedName], [parameter]...) - Creates a new global function with the specified return type and code range.  Parameters are added separately through API calls on the returned object]
 
 UDTs (structs and classes) may be created through the "Create" call on the "Types" object:
 
@@ -273,6 +281,71 @@ Global data which is created with the "CreateGlobal" API has a set of available 
 
         Delete            [Delete() - Deletes the global data]
 
+Functions which are are created with the "Create" API have a set of available properties as well
+
+    Function Objects
+    ----------------
+        Name              [The name of the symbol]
+        QualifiedName     [The qualified name of the symbol]
+        LocalVariables    [The list of local variables of the function]
+        Parameters        [The list of the parameters of the function]
+        ReturnType        [The return type of the function]
+
+The "Parameters" and "LocalVariables" properties on a function have methods to create new parameters or
+local variables within the function scope:
+
+    Parameters Object
+    -----------------
+        Add               [Add(name, parameterType) - Adds a new parameter of the given name and type]
+
+    LocalVariables Object
+    ---------------------
+        Add               [Add(name, localVariableType) - Adds a new local variable (non parameter) of the given name and type]
+
+Any local variable (whether a parameter or a not) has the following properties:
+
+    Parameter or LocalVariable Object
+    ---------------------------------
+        Name              [The name of the variable (parameter or local)]
+        QualifiedName     [The qualified name of the symbol]
+        Parent            [The parent of the symbol]
+        Type              [The type of the variable (parameter or local)]
+        LiveRanges        [The list of live ranges for the variable (parameter or local)]
+
+        Delete            [Delete() - Deletes the variable (parameter or local)]
+
+Parameters also have unique methods:
+
+    Parameter Object
+    ----------------
+        MoveBefore        [MoveBefore(pos) - Moves this parameter to a location in its parent function before the given parameter.  Note that 'pos' may either be a parameter object or it may be a zero based ordinal indicating its position within the list of parameters]
+
+The "LiveRanges" property of any variable is a list of the locations within the function where the variable is live
+and where that variable is located.  It also contains several APIs:
+
+    LiveRanges Object
+    -----------------
+        Add               [Add(rangeOffset, rangeSize, locDesc) - Adds a new live range for the variable within its containing function.  All offsets are function relative]
+
+Note that the live range offsets are function relative and must be within the bounds of the function.  The present
+extension also verifies that no two live ranges for the same variable overlap.  Location descriptions given
+by the "locDesc" string can take one of several forms:
+
+    - A flat hex virtual address  (e.g.: 7ffc1840)
+    - A register location (e.g.: "@rcx")
+    - A register relative location with hex offset (e.g.: [@rsp + 1c])
+    - An indirect register relative location with hex offsets (e.g.: [@rsp + 1c] + 8)
+
+Each live range has the following properties and methods:
+
+    LiveRange Object
+    ----------------
+        Offset            [The function relative offset of the start of the live range]
+        Size              [The size (in code bytes) of the live range]
+        Location          [A string description of the location of the variable in this live range]
+
+        Delete            [Delete() - Deletes the live range]
+
 //*************************************************
 // STARTING OUT: A QUICK WALKTHROUGH
 //*************************************************
@@ -346,11 +419,11 @@ The general hierarchy of symbols (lower edge) presently in the plug-in:
 **************************************************************************
 
 BaseSymbol (the base class of any symbol)
-    (SymbolBase.[h/cpp]
+    (SymbolBase.[h/cpp])
     ^
     |
     |----- BaseTypeSymbol (the base class of any type)
-    |           (SymbolTypes.[h/cpp]
+    |           (SymbolTypes.[h/cpp])
     |           ^
     |           |
     |           |----- BasicTypeSymbol   (the implementation of intrinsic types like "int")
@@ -367,19 +440,27 @@ BaseSymbol (the base class of any symbol)
     |
     |
     |----- BaseDataSymbol (the base class of any "data")
-                (SymbolData.[h/cpp]
-                ^
-                |
-                |----- UdtPositionalSymbol (the base class for things positioned within a UDT)
-                |               (SymbolTypes.[h/cpp]
-                |               ^
-                |               |
-                |               |----- FieldSymbol     (the implementation of a field within a UDT or an enumerant)
-                |               |
-                |               |----- BaseClassSymbol (the implementation of a base class within a UDT)
-                |
-                |
-                |----- GlobalDataSymbol (the implementation of a global data symbol / global variable)
+    |           (SymbolData.[h/cpp])
+    |           ^
+    |           |
+    |           |----- UdtPositionalSymbol (the base class for things positioned within a UDT)
+    |           |               (SymbolTypes.[h/cpp]
+    |           |               ^
+    |           |               |
+    |           |               |----- FieldSymbol     (the implementation of a field within a UDT or an enumerant)
+    |           |               |
+    |           |               |----- BaseClassSymbol (the implementation of a base class within a UDT)
+    |           |
+    |           |
+    |           |----- GlobalDataSymbol (the implementation of a global data symbol / global variable)
+    |           |
+    |           |
+    |           |----- VariableSymbol (the implementation of a function parameter or local variable)
+    |
+    |
+    |----- FunctionSymbol (implementation of a function)
+                (SymbolFunction.[h/cpp])
+
 
 This hierarchy is *SOMEWHAT* mirrored on the API side (upper edge) within ApiProvider.[h/cpp]:
 **************************************************************************
@@ -418,6 +499,19 @@ TypedInstanceModel<ComPtr<TSym>> (the factory base for any symbol from DbgModelC
     |             |
     |             |         (TSym = GlobalDataSymbol)
     |             |----- GlobalDataObject (the projection for global data within a symbol set)
+    |             |
+    |             |         (TSym = FunctionSymbol)
+    |             |----- FunctionObject (the projection for a function within a symbol set)
+    |             |
+    |             |         (TSym = VariableSymbol)
+    |             |----- BaseVariableObject (the projection for a variable -- parameter or local -- within a function)
+    |                            ^
+    |                            |      
+    |                            |----- ParameterObject   (the projection for a function parameter)
+    |                            |
+    |                            |
+    |                            |----- LocalVariableObject (the projection for a function local variable)
+    | 
     | 
     |
     |   SymbolObjectHelpers       (helper class for symbols)
@@ -436,6 +530,23 @@ TypedInstanceModel<ComPtr<TSym>> (the factory base for any symbol from DbgModelC
     |     |
     |     |         (TSym = SymbolSet)
     |---------- TypesObject       (the projection for the list of types in a symbol set)
+    |     |
+    |     |         (TSym = SymbolSet)
+    |---------- FunctionsObject   (the projection for the list of functions in a symbol set)
+    |     |
+    |     |         (TSym = FunctionSymbol)
+    |---------- ParametersObject  (the projection for the list of parameters in a function)
+    |     |
+    |     |         (TSym = FunctionSymbol)
+    |---------- LocalVariablesObject (the projection for the list of local variables in a function)
+    |     |
+    |     |         (TSym = VariableSymbol)
+    |---------- LiveRangesObject  (the projection for the list of live ranges of a variable in a function)
+    |
+    |
+    |
+    |----- LiveRangeObject        (the projection for an individual live range of a variable in a function)
+
 
 //*************************************************
 // STARTING OUT: AN EXAMPLE
@@ -563,6 +674,188 @@ Set bu breakpoint
 
 (00007ffd`29db0100)   ntdll!test+0x9   
 
+//*************************************************
+// STARTING OUT: A SECOND MORE COMPLEX EXAMPLE
+//*************************************************
+
+Consider another example of debugging notepad after the introduction of symbol builder symbols:
+
+0:000> .load SymbolBuilderComposition.dll
+0:000> dx @$s = Debugger.Utility.SymbolBuilder.CreateSymbols("notepad.exe")
+@$s = Debugger.Utility.SymbolBuilder.CreateSymbols("notepad.exe")                
+    Data            
+    Functions       
+    Types           
+0:000> .reload
+........................................
+0:000> k3
+ # Child-SP          RetAddr               Call Site
+00 000000b5`3dd6fab8 00007ff9`27b51b3e     win32u!ZwUserGetMessage+0x14
+01 000000b5`3dd6fac0 00007ff7`1b7ab020     user32!GetMessageW+0x2e
+02 000000b5`3dd6fb20 00007ff7`1b7c3ec6     notepad+0xb020
+
+//
+// Let's introduce a function for notepad!wWinMain:
+//
+0:000> dx @$wWinMain = @$s.Functions.Create("wWinMain", "int", 0xad6c, 0x3bc)
+@$wWinMain = @$s.Functions.Create("wWinMain", "int", 0xad6c, 0x3bc)                 : Function: wWinMain
+    Name             : wWinMain
+    QualifiedName    : wWinMain
+    LocalVariables  
+    Parameters       : ()
+    ReturnType       : Basic Type: int ( size = 4, align = 4 )
+0:000> k3
+ # Child-SP          RetAddr               Call Site
+00 000000b5`3dd6fab8 00007ff9`27b51b3e     win32u!ZwUserGetMessage+0x14
+01 000000b5`3dd6fac0 00007ff7`1b7ab020     user32!GetMessageW+0x2e
+02 000000b5`3dd6fb20 00007ff7`1b7c3ec6     notepad!wWinMain+0x2b4
+0:000> .frame 2
+02 000000b5`3dd6fb20 00007ff7`1b7c3ec6     notepad!wWinMain+0x2b4
+0:000> dv
+
+//
+// And now let's introduce the 'msg' local variable of wWinMain and something like the tagMSG type that
+// it happens to be.  This depends on tagPOINT, so we'll create that first:
+//
+0:000> dx @$tagPOINT = @$s.Types.Create("tagPOINT")
+@$tagPOINT = @$s.Types.Create("tagPOINT")                 : UDT: tagPOINT ( size = 0, align = 1 )
+    Name             : tagPOINT
+    QualifiedName    : tagPOINT
+    Size             : 0x0
+    Alignment        : 0x1
+    BaseClasses     
+    Fields          
+0:000> dx @$tagPOINT.Fields.Add("x", "long")
+@$tagPOINT.Fields.Add("x", "long")                 : Field: x ( type = 'long', offset = 0 )
+    Name             : x
+    QualifiedName    : x
+    Parent           : UDT: tagPOINT ( size = 4, align = 4 )
+    IsAutomaticLayout : true
+    Type             : Basic Type: long ( size = 4, align = 4 )
+    Offset           : 0x0
+0:000> dx @$tagPOINT.Fields.Add("y", "long")
+@$tagPOINT.Fields.Add("y", "long")                 : Field: y ( type = 'long', offset = 4 )
+    Name             : y
+    QualifiedName    : y
+    Parent           : UDT: tagPOINT ( size = 8, align = 4 )
+    IsAutomaticLayout : true
+    Type             : Basic Type: long ( size = 4, align = 4 )
+    Offset           : 0x4
+
+//
+// Now for tagMSG (or something close):
+//
+0:000> dx @$tagMSG = @$s.Types.Create("tagMSG")
+@$tagMSG = @$s.Types.Create("tagMSG")                 : UDT: tagMSG ( size = 0, align = 1 )
+    Name             : tagMSG
+    QualifiedName    : tagMSG
+    Size             : 0x0
+    Alignment        : 0x1
+    BaseClasses     
+    Fields          
+0:000> dx @$tagMSG.Fields.Add("hwnd", "void *")
+@$tagMSG.Fields.Add("hwnd", "void *")                 : Field: hwnd ( type = 'void *', offset = 0 )
+    Name             : hwnd
+    QualifiedName    : hwnd
+    Parent           : UDT: tagMSG ( size = 8, align = 8 )
+    IsAutomaticLayout : true
+    Type             : Pointer: void * ( size = 8, align = 8 )
+    Offset           : 0x0
+0:000> dx @$tagMSG.Fields.Add("message", "unsigned int")
+@$tagMSG.Fields.Add("message", "unsigned int")                 : Field: message ( type = 'unsigned int', offset = 8 )
+    Name             : message
+    QualifiedName    : message
+    Parent           : UDT: tagMSG ( size = 16, align = 8 )
+    IsAutomaticLayout : true
+    Type             : Basic Type: unsigned int ( size = 4, align = 4 )
+    Offset           : 0x8
+0:000> dx @$tagMSG.Fields.Add("wParam", "unsigned __int64")
+@$tagMSG.Fields.Add("wParam", "unsigned __int64")                 : Field: wParam ( type = 'unsigned __int64', offset = 16 )
+    Name             : wParam
+    QualifiedName    : wParam
+    Parent           : UDT: tagMSG ( size = 24, align = 8 )
+    IsAutomaticLayout : true
+    Type             : Basic Type: unsigned __int64 ( size = 8, align = 8 )
+    Offset           : 0x10
+0:000> dx @$tagMSG.Fields.Add("lParam", "__int64")
+@$tagMSG.Fields.Add("lParam", "__int64")                 : Field: lParam ( type = '__int64', offset = 24 )
+    Name             : lParam
+    QualifiedName    : lParam
+    Parent           : UDT: tagMSG ( size = 32, align = 8 )
+    IsAutomaticLayout : true
+    Type             : Basic Type: __int64 ( size = 8, align = 8 )
+    Offset           : 0x18
+0:000> dx @$tagMSG.Fields.Add("time", "unsigned long")
+@$tagMSG.Fields.Add("time", "unsigned long")                 : Field: time ( type = 'unsigned long', offset = 32 )
+    Name             : time
+    QualifiedName    : time
+    Parent           : UDT: tagMSG ( size = 40, align = 8 )
+    IsAutomaticLayout : true
+    Type             : Basic Type: unsigned long ( size = 4, align = 4 )
+    Offset           : 0x20
+0:000> dx @$tagMSG.Fields.Add("pt", "tagPOINT")
+@$tagMSG.Fields.Add("pt", "tagPOINT")                 : Field: pt ( type = 'tagPOINT', offset = 36 )
+    Name             : pt
+    QualifiedName    : pt
+    Parent           : UDT: tagMSG ( size = 48, align = 8 )
+    IsAutomaticLayout : true
+    Type             : UDT: tagPOINT ( size = 8, align = 4 )
+    Offset           : 0x24
+0:000> dt notepad!tagMSG
+   +0x000 hwnd             : Ptr64 Void
+   +0x008 message          : Uint4B
+   +0x010 wParam           : Uint8B
+   +0x018 lParam           : Int8B
+   +0x020 time             : Uint4B
+   +0x024 pt               : tagPOINT
+
+//
+// Now, let's introduce this as a local variable within our newly created wWinMain function and take a look
+// at what the debugger says:
+//
+0:000> dx @$msg = @$wWinMain.LocalVariables.Add("msg", "tagMSG")
+@$msg = @$wWinMain.LocalVariables.Add("msg", "tagMSG")                 : tagMSG msg
+    Name             : msg
+    QualifiedName    : msg
+    Parent           : Function: wWinMain
+    Type             : UDT: tagMSG ( size = 48, align = 8 )
+    LiveRanges      
+    Delete           [Delete() - Deletes the variable (parameter or local)]
+0:000> dv
+            msg = <value unavailable>
+
+//
+// Now, let's add a live range at [@rsp + 58] for the tagMSG and see what the debugger says after the change:
+//
+0:000> dx @$msg.LiveRanges.Add(0, 0x3bc, "[@rsp + 58]")
+@$msg.LiveRanges.Add(0, 0x3bc, "[@rsp + 58]")                 : [0, 3bc): msg = [@rsp + 58]
+    Offset           : 0x0
+    Size             : 0x3bc
+    Location         : [@rsp + 58]
+0:000> dv /v
+000000b5`3dd6fb78             msg = {msg=0x113 wp=0x1 lp=0x0}
+
+//
+// It's **VERY IMPORTANT** to note that this type and local information flows throughout the debugger.  That means
+// that things like NatVis will work **SEAMLESSLY** in conjunction with it.  For example:
+//
+0:000> dx msg
+msg                 : {msg=0x113 wp=0x1 lp=0x0} [Type: tagMSG]
+    [<Raw View>]     [Type: tagMSG]
+
+//
+// You'll note that the "tagMSG" NatVis which is automatically included by the debugger was applied and clicking
+// the [<Raw View>] element gave us what we defined including with layout:
+//
+0:000> dx -r1 -nv (*((notepad!tagMSG *)0xb53dd6fb78))
+(*((notepad!tagMSG *)0xb53dd6fb78))                 : {msg=0x113 wp=0x1 lp=0x0} [Type: tagMSG]
+    [+0x000] hwnd             : 0xf0a2a [Type: void *]
+    [+0x008] message          : 0x113 [Type: unsigned int]
+    [+0x010] wParam           : 0x1 [Type: unsigned __int64]
+    [+0x018] lParam           : 0 [Type: __int64]
+    [+0x020] time             : 0x4f257c6 [Type: unsigned long]
+    [+0x024] pt               [Type: tagPOINT]
+
 ********** READ THIS **********
 
 A word of caution: the symbol builder will *CURRENTLY* allow the creation of constructs which are logically
@@ -586,12 +879,9 @@ useful.  Some of the future planned enhancements to this sample include:
    symbols for a given module.  This would allow the symbol builder to be used to simply "extend" the symbols already
    available for a module rather than replacing them.
 
-4) Support for functions, arguments, and scopes so that there are APIs to add function symbols with a prototype,
-   arguments, variables, and lifetime information.
-
-5) Support for using the data model disassembler to walk through a function tracing the position of function arguments
+4) Support for using the data model disassembler to walk through a function tracing the position of function arguments
    from a prototype and calling convention (e.g.: parameters in rcx, rdx, r8, and r9 on x64) so that you can get 
    consistent examination of parameters to public APIs on public symbols.
 
-6) Support for serializing and deserializing the symbol builder information for a given module.
+5) Support for serializing and deserializing the symbol builder information for a given module.
 

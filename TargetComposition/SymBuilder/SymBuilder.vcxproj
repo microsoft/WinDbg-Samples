@@ -23,6 +23,7 @@
     <ClCompile Include="Extension.cpp" />
     <ClCompile Include="SymbolBase.cpp" />
     <ClCompile Include="SymbolData.cpp" />
+    <ClCompile Include="SymbolFunction.cpp" />
     <ClCompile Include="SymbolServices.cpp" />
     <ClCompile Include="SymbolSet.cpp" />
     <ClCompile Include="SymbolTypes.cpp" />
@@ -35,6 +36,7 @@
     <ClInclude Include="ObjectModel.h" />
     <ClInclude Include="SymbolBase.h" />
     <ClInclude Include="SymbolData.h" />
+    <ClInclude Include="SymbolFunction.h" />
     <ClInclude Include="SymbolServices.h" />
     <ClInclude Include="SymbolSet.h" />
     <ClInclude Include="SymbolTypes.h" />

@@ -109,6 +109,7 @@ HRESULT DiagnosticLog(_In_opt_ ISvcDiagnosticLogging *pDiagnosticLogging,
 #include "SymbolBase.h"
 #include "SymbolData.h"
 #include "SymbolTypes.h"
+#include "SymbolFunction.h"
 #include "SymbolSet.h"
 #include "SymManager.h"
 #include "SymbolServices.h"

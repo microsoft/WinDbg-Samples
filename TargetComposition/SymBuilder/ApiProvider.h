@@ -99,6 +99,13 @@ private:
     // Property accessor which gets the data on this symbol set.
     //
     Object GetData(_In_ const Object& /*symbolSetObject*/, _In_ ComPtr<SymbolSet>& spSymbolSet);
+
+    // GetFunctions():
+    //
+    // Property accessor which gets the functions on this symbol set.
+    //
+    Object GetFunctions(_In_ const Object& /*symbolSetObject*/, _In_ ComPtr<SymbolSet>& spSymbolSet);
+
 };
 
 //*************************************************
@@ -699,6 +706,341 @@ private:
 };
 
 //*************************************************
+// Functions:
+//
+
+// FunctionsObject:
+//
+// Represents the list of functions (and function APIs) available on a symbol set.
+//
+class FunctionsObject : public TypedInstanceModel<ComPtr<SymbolSet>>,
+                        public SymbolObjectHelpers
+{
+public:
+
+    FunctionsObject();
+
+private:
+
+    // Create():
+    //
+    // Bound API which will create a new function and return an object representing it.
+    //
+    Object Create(_In_ const Object& typesObject, 
+                  _In_ ComPtr<SymbolSet>& spSymbolSet,
+                  _In_ std::wstring functionName,
+                  _In_ Object returnType,
+                  _In_ ULONG64 codeOffset,
+                  _In_ ULONG64 codeSize,
+                  _In_ size_t argCount,                 // [qualifiedName], [parameter]...
+                  _In_reads_(argCount) Object *pArgs);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over functions within a symbol set.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& functionsObject,
+                                                     _In_ ComPtr<SymbolSet>& spSymbolSet);
+
+};
+
+// FunctionObject:
+//
+// Represents a function boxed into the data model.
+//
+class FunctionObject : public BaseSymbolObject<FunctionSymbol>
+{
+public:
+
+    FunctionObject();
+	
+    // ToString():
+    //
+    // Bound function that is the string conversion for functions.
+    //
+    std::wstring ToString(_In_ const Object& functionObject,
+                          _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                          _In_ const Metadata& metadata);
+
+    // [Get/Set]ReturnType():
+    //
+    // Bound property accessor which returns the return type of the function.
+    //
+    Object GetReturnType(_In_ const Object& functionObject, 
+                         _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+    void SetReturnType(_In_ const Object& functionObject, 
+                       _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                       _In_ Object returnType);
+
+    // GetLocalVariables():
+    //
+    // Property accessor which gets the local variables of this function.
+    //
+    Object GetLocalVariables(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
+    // GetParameters():
+    //
+    // Property accessor which gets the parameters of this function.
+    //
+    Object GetParameters(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
+};
+
+// ParametersObject:
+//
+// Represents the list of parameters (and APIs) available on a function.
+//
+class ParametersObject : public TypedInstanceModel<ComPtr<FunctionSymbol>>,
+                         public SymbolObjectHelpers
+{
+public:
+
+    ParametersObject();
+
+private:
+
+    // Add():
+    //
+    // Adds a new parameter to the function.  The 'parameterType' may either be a fully qualified 
+    // type name or may be a type object returned from something like SymbolSet.CreateType().  
+    // The newly created parameter will be added at the end of the current parameter list.
+    // 
+    Object Add(_In_ const Object& parametersObject,
+               _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+               _In_ std::wstring parameterName,
+               _In_ Object parameterType);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over parameters within a function.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& parametersObject,
+                                                     _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for parameters
+    //
+    std::wstring ToString(_In_ const Object& parametersObject,
+                          _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                          _In_ const Metadata& metadata);
+
+};
+
+// LocalVariablesObject:
+//
+// Represents the list of local variables (and APIs) available on a function.
+//
+class LocalVariablesObject : public TypedInstanceModel<ComPtr<FunctionSymbol>>,
+                             public SymbolObjectHelpers
+{
+public:
+
+    LocalVariablesObject();
+
+private:
+
+    // Add():
+    //
+    // Adds a new local variable to the function.  The 'localVariableType' may either be a fully 
+    // qualified  type name or may be a type object returned from something like 
+    // SymbolSet.CreateType().  
+    // 
+    Object Add(_In_ const Object& localVariablesObject,
+               _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+               _In_ std::wstring localVariableName,
+               _In_ Object localVariableType);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over local variables within a function.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& localVariablesObject,
+                                                     _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
+};
+
+// BaseVariableObject:
+//
+// A base class for variable objects boxed into the data model.  This may represent a parameter
+// or a local variable.
+//
+class BaseVariableObject : public BaseSymbolObject<VariableSymbol>
+{
+public:
+
+    BaseVariableObject();
+
+protected:
+
+    // [Get/Set]Name():
+    //
+    // Bound property accessor which returns the name of the variable.
+    //
+    Object GetName(_In_ const Object& variableObject, _In_ ComPtr<VariableSymbol>& spVariableSymbol);
+    void SetName(_In_ const Object& variableObject, _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                 _In_ std::wstring variableName);
+
+    // [Get/Set]Type():
+    //
+    // Bound property accessor which returns the type of the variable.
+    //
+    Object GetType(_In_ const Object& variableObject, _In_ ComPtr<VariableSymbol>& spVariableSymbol);
+    void SetType(_In_ const Object& variableObject, _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                 _In_ Object variableType);
+
+    // GetLiveRanges():
+    //
+    // Bound property accessor which returns the list of live ranges for this variable.
+    //
+    Object GetLiveRanges(_In_ const Object& variableObject, _In_ ComPtr<VariableSymbol>& spVariableSymbol);
+
+    // Delete():
+    //
+    // Bound method which will delete a function variable
+    //
+    void Delete(_In_ const Object& variableObject, _In_ ComPtr<VariableSymbol>& spVariableSymbol);
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for a function variable.
+    //
+    std::wstring ToString(_In_ const Object& variableObject,
+                          _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+                          _In_ const Metadata& metadata);
+};
+
+// ParameterObject:
+//
+// Represents a function parameter boxed into the data model.
+//
+class ParameterObject : public BaseVariableObject
+{
+public:
+
+    ParameterObject();
+
+private:
+
+
+    // MoveBefore():
+    //
+    // Bound method which moves the parameter to before another parameter.  The 'beforeObj' 
+    // may either be another parameter or it may be the numeric index of a parameter.
+    //
+    void MoveBefore(_In_ const Object& parameterObject, _In_ ComPtr<VariableSymbol>& spParameterSymbol,
+                    _In_ Object beforeObj);
+
+
+};
+
+// LocalVariableObject:
+//
+// Represents a local variable boxed into the data model.
+//
+class LocalVariableObject : public BaseVariableObject
+{
+public:
+
+    LocalVariableObject();
+};
+
+// LiveRangesObject:
+//
+// Represents the list of live ranges for a given parameter or local variable of a function.
+//
+class LiveRangesObject : public TypedInstanceModel<ComPtr<VariableSymbol>>,
+                         public SymbolObjectHelpers
+{
+public:
+
+    LiveRangesObject();
+
+private:
+
+    // Add():
+    //
+    // Adds a new live range to the parameter or local variable. 
+    // 
+    Object Add(_In_ const Object& liveRangesObject,
+               _In_ ComPtr<VariableSymbol>& spVariableSymbol,
+               _In_ ULONG64 rangeOffset,
+               _In_ ULONG64 rangeSize,
+               _In_ std::wstring locDesc);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over parameters within a function.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& liveRangesObject,
+                                                     _In_ ComPtr<VariableSymbol>& spVariableSymbol);
+};
+
+struct LiveRangeInformation
+{
+    ComPtr<VariableSymbol> Variable;
+    ULONG64 LiveRangeIdentity;
+};
+
+// LiveRangeObject:
+//
+// Represents a particular live range for a variable within a function.
+//
+class LiveRangeObject : public TypedInstanceModel<LiveRangeInformation>
+{
+public:
+
+    LiveRangeObject();
+
+private:
+
+    // [Get/Set]Offset
+    //
+    // Gets/sets the offset of the live range into the function.
+    //
+    ULONG64 GetOffset(_In_ const Object& liveRangeObject, 
+                      _In_ LiveRangeInformation const& liveRangeInfo);
+    void SetOffset(_In_ const Object& liveRangeObject, 
+                   _In_ LiveRangeInformation const& liveRangeInfo,
+                   _In_ ULONG64 offset);
+
+    // [Get/Set]Size
+    //
+    // Gets/sets the size of the live range
+    //
+    ULONG64 GetSize(_In_ const Object& liveRangeObject,
+                    _In_ LiveRangeInformation const& liveRangeInfo);
+    void SetSize(_In_ const Object& liveRangeObject,
+                 _In_ LiveRangeInformation const& liveRangeInfo,
+                 _In_ ULONG64 size);
+
+    // [Get/Set]Location
+    //
+    // Gets/sets the location of the live range as a string description.
+    //
+    std::wstring GetLocation(_In_ const Object& liveRangeObject,
+                             _In_ LiveRangeInformation const& liveRangeInfo);
+    void SetLocation(_In_ const Object& liveRangeObject,
+                     _In_ LiveRangeInformation const& liveRangeInfo,
+                     _In_ std::wstring location);
+
+    // Delete():
+    //
+    // Bound method which will delete a live range.
+    //
+    void Delete(_In_ const Object& liveRangeObject, _In_ LiveRangeInformation const& liveRangeInfo);
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for a live range.
+    //
+    std::wstring ToString(_In_ const Object& liveRangeObject,
+                          _In_ LiveRangeInformation const& liveRangeInfo,
+                          _In_ const Metadata& metadata);
+
+};
+
+//*************************************************
 // Extension Points:
 //
 
@@ -774,6 +1116,7 @@ public:
     SymbolSetObject& GetSymbolSetFactory() const { return *m_spSymbolSetFactory.get(); }
     TypesObject& GetTypesFactory() const { return *m_spTypesFactory.get(); }
     DataObject& GetDataFactory() const { return *m_spDataFactory.get(); }
+    FunctionsObject& GetFunctionsFactory() const { return *m_spFunctionsFactory.get(); }
 
     //
     // Types:
@@ -793,6 +1136,13 @@ public:
     GlobalDataObject& GetGlobalDataFactory() const { return *m_spGlobalDataFactory.get(); }
 
     //
+    // Functions:
+    //
+
+    FunctionObject& GetFunctionFactory() const { return *m_spFunctionFactory.get(); }
+    
+
+    //
     // Other Symbols:
     //
 
@@ -801,6 +1151,12 @@ public:
     BaseClassesObject& GetBaseClassesFactory() const { return *m_spBaseClassesFactory.get(); }
     BaseClassObject& GetBaseClassFactory() const { return *m_spBaseClassFactory.get(); }
     EnumerantsObject& GetEnumerantsFactory() const { return *m_spEnumerantsFactory.get(); }
+    ParametersObject& GetParametersFactory() const { return *m_spParametersFactory.get(); }
+    ParameterObject& GetParameterFactory() const { return *m_spParameterFactory.get(); }
+    LocalVariablesObject& GetLocalVariablesFactory() const { return *m_spLocalVariablesFactory.get(); }
+    LocalVariableObject& GetLocalVariableFactory() { return *m_spLocalVariableFactory.get(); }
+    LiveRangesObject& GetLiveRangesFactory() const { return *m_spLiveRangesFactory.get(); }
+    LiveRangeObject& GetLiveRangeFactory() const { return *m_spLiveRangeFactory.get(); }
 
     // Get():
     //
@@ -822,6 +1178,7 @@ private:
     std::unique_ptr<SymbolSetObject> m_spSymbolSetFactory;
     std::unique_ptr<TypesObject> m_spTypesFactory;
     std::unique_ptr<DataObject> m_spDataFactory;
+    std::unique_ptr<FunctionsObject> m_spFunctionsFactory;
 
     //
     // Types:
@@ -839,7 +1196,12 @@ private:
     //
 
     std::unique_ptr<GlobalDataObject> m_spGlobalDataFactory;
-    
+
+    //
+    // Functions:
+    //
+
+    std::unique_ptr<FunctionObject> m_spFunctionFactory;
 
     //
     // Other Symbols:
@@ -850,6 +1212,12 @@ private:
     std::unique_ptr<BaseClassesObject> m_spBaseClassesFactory;
     std::unique_ptr<BaseClassObject> m_spBaseClassFactory;
     std::unique_ptr<EnumerantsObject> m_spEnumerantsFactory;
+    std::unique_ptr<ParametersObject> m_spParametersFactory;
+    std::unique_ptr<ParameterObject> m_spParameterFactory;
+    std::unique_ptr<LocalVariablesObject> m_spLocalVariablesFactory;
+    std::unique_ptr<LocalVariableObject> m_spLocalVariableFactory;
+    std::unique_ptr<LiveRangesObject> m_spLiveRangesFactory;
+    std::unique_ptr<LiveRangeObject> m_spLiveRangeFactory;
 
     //*************************************************
     // Extension Points:
