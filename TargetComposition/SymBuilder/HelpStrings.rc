@@ -56,7 +56,7 @@ BEGIN
     SYMBOLBUILDER_IDS_GLOBALDATA_TYPE               "The type of the global data"
     SYMBOLBUILDER_IDS_GLOBALDATA_OFFSET             "The offset of the global data within its loaded module"
     SYMBOLBUILDER_IDS_GLOBALDATA_DELETE             "Delete() - Deletes the global data"
-    SYMBOLBUILDER_IDS_FUNCTIONS_CREATE              "Create(name, returnType, codeOffset, codeSize, [qualifiedName], [parameter]...) - Creates a new global function with the specified return type and code range.  Parameters are added separately through API calls on the returned object"
+    SYMBOLBUILDER_IDS_FUNCTIONS_CREATE              "Create(name, returnType, codeOffset, codeSize, [qualifiedName], [parameter]...) - Creates a new global function with the specified return type and code range.  Parameters may optionally be specified by the '[parameter]...' arguments.  Each such argument must be an object with a 'Name' and 'Type' property and behaves as if .Parameters.Add were called with said 'Name' and 'Type'"
     SYMBOLBUILDER_IDS_FUNCTION_RETURNTYPE           "The return type of the function"
     SYMBOLBUILDER_IDS_FUNCTION_PARAMETERS           "The list of the parameters of the function"
     SYMBOLBUILDER_IDS_FUNCTION_LOCALVARIABLES       "The list of local variables of the function"
