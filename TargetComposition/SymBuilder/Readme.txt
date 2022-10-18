@@ -910,13 +910,16 @@ stack overflows).
 We expect to grow this sample over time to explore more of the symbol API surface and make it more generally
 useful.  Some of the future planned enhancements to this sample include:
 
-1) Improved validation of the type system created (e.g.: no cyclic base classes or fields)
+1) Support for nested types, member functions, and other "symbol children" which are not fully supported
+   today -- particularly by the importer.
 
-2) Hooking up the synthetic types JavaScript extension and its "C header parser" up to this extension.
+2) Improved validation of the type system created (e.g.: no cyclic base classes or fields)
 
-3) Support for using the data model disassembler to walk through a function tracing the position of function arguments
+3) Hooking up the synthetic types JavaScript extension and its "C header parser" up to this extension.
+
+4) Support for using the data model disassembler to walk through a function tracing the position of function arguments
    from a prototype and calling convention (e.g.: parameters in rcx, rdx, r8, and r9 on x64) so that you can get 
    consistent examination of parameters to public APIs on public symbols.
 
-4) Support for serializing and deserializing the symbol builder information for a given module.
+5) Support for serializing and deserializing the symbol builder information for a given module.
 
