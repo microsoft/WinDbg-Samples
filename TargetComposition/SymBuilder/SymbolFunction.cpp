@@ -147,6 +147,18 @@ HRESULT FunctionSymbol::InternalSetReturnTypeId(_In_ ULONG64 returnTypeId)
     return hr;
 }
 
+HRESULT FunctionSymbol::Delete()
+{
+    for (auto&& range : m_addressRanges)
+    {
+        InternalGetSymbolSet()->InternalRemoveSymbolRange(range.first, 
+                                                          range.first + range.second,
+                                                          InternalGetId());
+    }
+
+    return BaseSymbol::Delete();
+}
+
 } // SymbolBuilder
 } // Services
 } // TargetComposition

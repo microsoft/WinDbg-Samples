@@ -795,6 +795,12 @@ public:
     // Property accessor which gets the address ranges of the code bytes of this function.
     //
     Object GetAddressRanges(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
+    // Delete():
+    //
+    // Bound method which will delete a function.
+    //
+    void Delete(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 };
 
 // ParametersObject:
@@ -1159,6 +1165,12 @@ public:
     // Bound property accessor which returns the offset of the public symbol.
     // 
     ULONG64 GetOffset(_In_ const Object& publicObject, _In_ ComPtr<PublicSymbol>& spPublicSymbol);
+
+    // Delete():
+    //
+    // Bound method which will delete a public symbol
+    //
+    void Delete(_In_ const Object& publicObject, _In_ ComPtr<PublicSymbol>& spPublicSymbol);
 
     // PromoteToFunction():
     //

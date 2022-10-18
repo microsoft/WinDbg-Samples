@@ -90,6 +90,13 @@ layer.  Many pieces of data model implementation are based upon target compositi
                                   services to access if it is within its own unique service (particularly if
                                   multiple symbol providers are aggregated together).
 
+    * ImportSymbols.[h/cpp]     - An "on demand" symbol importer which reads symbolic data from DbgHelp in an
+                                  on demand basis and copies it over to the symbol builder.  This allows the
+                                  builder to effectively be used to "add to" public symbols available from the
+                                  symbol server.  In reality, everything is still symbol builder symbols.  It is
+                                  just that every query is passed to the importer first to do an "on demand" import
+                                  of what is being queried for.
+
 3) The upper edge data model layer (using DbgModel.h and DbgModelClientEx.h)
 
     ApiProvider.[h/cpp]         - The API exposed to the data model allowing for manipulation of symbols, types,
@@ -114,7 +121,7 @@ The main point of access is a *CreateSymbols* API present on a namespace "Symbol
 
     Debugger.Utility.SymbolBuilder
     ------------------------------
-        CreateSymbols    [CreateSymbols(module) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object]
+        CreateSymbols    [CreateSymbols(module, [options]) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object.  'options' is an object with properties that configures the symbols.  'options' currently allows .AutoImportSymbols = true/false]
 
 The CreateSymbols API will return an object representing the set of symbols which were just created.  Note that once 
 symbol builder symbols have been created for a particular module, there will be a "SymbolBuilderSymbols" property
@@ -135,10 +142,11 @@ There are three properties on the symbol set object:
     -----------------
         Data             [The list of available global data]
         Functions        [The list of available functions]
+        Publics          [The list of available public symbols]
         Types            [The list of available types]
 
-The "Data", "Functions", and "Types" properties, in addition to being lists, also have APIs to create new 
-data, functions, or types:
+The "Data", "Functions", "Publics", and "Types" properties, in addition to being lists, also have APIs to create new 
+data, functions, public symbols, or types:
 
     Types Object
     ------------
@@ -156,6 +164,10 @@ data, functions, or types:
     Functions Object
     ----------------
         Create           [Create(name, returnType, codeOffset, codeSize, [qualifiedName], [parameter]...) - Creates a new global function with the specified return type and code range.  Parameters are added separately through API calls on the returned object]
+
+    Publics Object
+    ----------------
+        Create           [Create(name, offset) - Adds a new public symbol at 'offset' bytes into the module
 
 UDTs (structs and classes) may be created through the "Create" call on the "Types" object:
 
@@ -287,6 +299,7 @@ Functions which are are created with the "Create" API have a set of available pr
     ----------------
         Name              [The name of the symbol]
         QualifiedName     [The qualified name of the symbol]
+        AddressRanges     [The list of address ranges for code bytes of the function.  The first address range is the primary one and defines the entry point of the function]
         LocalVariables    [The list of local variables of the function]
         Parameters        [The list of the parameters of the function]
         ReturnType        [The return type of the function]
@@ -345,6 +358,17 @@ Each live range has the following properties and methods:
         Location          [A string description of the location of the variable in this live range]
 
         Delete            [Delete() - Deletes the live range]
+
+Public symbols have their own set of properties and methods:
+
+    Public Object
+    -------------
+        Name              [The name of the symbol]
+        QualifiedName     [The qualified name of the symbol]
+        Offset            [The offset of the public symbol into the module]
+
+        Delete            [Delete() - Deletes the public symbol]
+        PromoteToFunction [PromoteToFunction([codeSize], [returnType], [parameter]...) - Converts the public symbol to a function symbol as if Functions.Create had been called.  If the 'codeSize' is specified as zero, the disassembler will be used to find the extent of the function]
 
 //*************************************************
 // STARTING OUT: A QUICK WALKTHROUGH
@@ -426,17 +450,19 @@ BaseSymbol (the base class of any symbol)
     |           (SymbolTypes.[h/cpp])
     |           ^
     |           |
-    |           |----- BasicTypeSymbol   (the implementation of intrinsic types like "int")
+    |           |----- BasicTypeSymbol    (the implementation of intrinsic types like "int")
     |           |
-    |           |----- UdtTypeSymbol     (the implementation of any user defined type)
+    |           |----- UdtTypeSymbol      (the implementation of any user defined type)
     |           |
-    |           |----- PointerTypeSymbol (the implementation of any pointer type)
+    |           |----- PointerTypeSymbol  (the implementation of any pointer type)
     |           |
-    |           |----- ArrayTypeSymbol   (the implementation of any array type)
+    |           |----- ArrayTypeSymbol    (the implementation of any array type)
     |           |
-    |           |----- TypedefTypeSymbol (the implementation of any typedef type)
+    |           |----- TypedefTypeSymbol  (the implementation of any typedef type)
     |           |
-    |           |----- EnumTypeSymbol    (the implementation of any enum type)
+    |           |----- EnumTypeSymbol     (the implementation of any enum type)
+    |           |
+    |           |----- FunctionTypeSymbol (the implementation of a function type (e.g.: signature))
     |
     |
     |----- BaseDataSymbol (the base class of any "data")
@@ -459,7 +485,11 @@ BaseSymbol (the base class of any symbol)
     |
     |
     |----- FunctionSymbol (implementation of a function)
-                (SymbolFunction.[h/cpp])
+    |           (SymbolFunction.[h/cpp])
+    |
+    |----- PublicSymbol *(implementation of a public symbol)
+                (SymbolBase.[h/cpp])
+  
 
 
 This hierarchy is *SOMEWHAT* mirrored on the API side (upper edge) within ApiProvider.[h/cpp]:
@@ -500,6 +530,9 @@ TypedInstanceModel<ComPtr<TSym>> (the factory base for any symbol from DbgModelC
     |             |         (TSym = GlobalDataSymbol)
     |             |----- GlobalDataObject (the projection for global data within a symbol set)
     |             |
+    |             |         (TSym = PublicSymbol)
+    |             |----- PublicObject     (the projection for a public symbol within a symbol set)
+    |             |
     |             |         (TSym = FunctionSymbol)
     |             |----- FunctionObject (the projection for a function within a symbol set)
     |             |
@@ -531,8 +564,14 @@ TypedInstanceModel<ComPtr<TSym>> (the factory base for any symbol from DbgModelC
     |     |         (TSym = SymbolSet)
     |---------- TypesObject       (the projection for the list of types in a symbol set)
     |     |
+    |     |         (TSym = SymbolSEt)
+    |---------- PublicsObject     (the projection for the list of public symbols in a symbol set)
+    |     |
     |     |         (TSym = SymbolSet)
     |---------- FunctionsObject   (the projection for the list of functions in a symbol set)
+    |     |
+    |     |         (TSym = FunctionSymbol)
+    |---------- AddressRangesObject (the projection for the list of address ranges of the code bytes of a function)
     |     |
     |     |         (TSym = FunctionSymbol)
     |---------- ParametersObject  (the projection for the list of parameters in a function)
@@ -544,8 +583,9 @@ TypedInstanceModel<ComPtr<TSym>> (the factory base for any symbol from DbgModelC
     |---------- LiveRangesObject  (the projection for the list of live ranges of a variable in a function)
     |
     |
-    |
     |----- LiveRangeObject        (the projection for an individual live range of a variable in a function)
+    |
+    |----- AddressRangeObject     (the projection for an individual address range of the code bytes of a function)
 
 
 //*************************************************
@@ -874,14 +914,9 @@ useful.  Some of the future planned enhancements to this sample include:
 
 2) Hooking up the synthetic types JavaScript extension and its "C header parser" up to this extension.
 
-3) The ability to "import" data from other symbol sources (or stack on top of them) so that the sample is not
-   an "either-or" choice of using the symbol builder or using the generally available (whether public or private) 
-   symbols for a given module.  This would allow the symbol builder to be used to simply "extend" the symbols already
-   available for a module rather than replacing them.
-
-4) Support for using the data model disassembler to walk through a function tracing the position of function arguments
+3) Support for using the data model disassembler to walk through a function tracing the position of function arguments
    from a prototype and calling convention (e.g.: parameters in rcx, rdx, r8, and r9 on x64) so that you can get 
    consistent examination of parameters to public APIs on public symbols.
 
-5) Support for serializing and deserializing the symbol builder information for a given module.
+4) Support for serializing and deserializing the symbol builder information for a given module.
 

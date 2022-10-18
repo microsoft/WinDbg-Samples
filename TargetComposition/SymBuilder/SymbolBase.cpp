@@ -277,6 +277,12 @@ HRESULT PublicSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
     return hr;
 }
 
+HRESULT PublicSymbol::Delete()
+{
+    InternalGetSymbolSet()->InternalRemovePublicSymbol(InternalGetOffset(), InternalGetId());
+    return BaseSymbol::Delete();
+}
+
 } // SymbolBuilder
 } // Services
 } // TargetComposition

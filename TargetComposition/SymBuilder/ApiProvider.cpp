@@ -1794,6 +1794,12 @@ std::wstring FunctionObject::ToString(_In_ const Object& /*functionObject*/,
     return displayString;
 }
 
+void FunctionObject::Delete(_In_ const Object& /*functionObject*/,
+                            _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    CheckHr(spFunctionSymbol->Delete());
+}
+
 Object FunctionObject::GetLocalVariables(_In_ const Object& /*functionObject*/,
                                          _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
@@ -2397,6 +2403,12 @@ ULONG64 PublicObject::GetOffset(_In_ const Object& /*publicObject*/,
     return spPublicSymbol->InternalGetOffset();
 }
 
+void PublicObject::Delete(_In_ const Object& /*publicObject*/, 
+                          _In_ ComPtr<PublicSymbol>& spPublicSymbol)
+{
+    CheckHr(spPublicSymbol->Delete());
+}
+
 Object PublicObject::PromoteToFunction(_In_ const Object& publicObject, 
                                        _In_ ComPtr<PublicSymbol>& spPublicSymbol,
                                        _In_ std::optional<ULONG64> codeSize,
@@ -2817,6 +2829,9 @@ FunctionObject::FunctionObject()
 
     AddProperty(L"ReturnType", this, &FunctionObject::GetReturnType, &FunctionObject::SetReturnType,
                 Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_RETURNTYPE }));
+
+    AddMethod(L"Delete", this, &FunctionObject::Delete,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_DELETE }));
 }
 
 ParametersObject::ParametersObject() :
@@ -2946,6 +2961,9 @@ PublicObject::PublicObject()
 
     AddReadOnlyProperty(L"Offset", this, &PublicObject::GetOffset, 
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_OFFSET }));
+
+    AddMethod(L"Delete", this, &PublicObject::Delete,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_DELETE }));
 
     AddMethod(L"PromoteToFunction", this, &PublicObject::PromoteToFunction,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_PROMOTETOFUNCTION }));
