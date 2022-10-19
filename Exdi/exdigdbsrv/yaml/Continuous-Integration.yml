@@ -2,7 +2,12 @@
 name: $(TeamProject)_$(BuildDefinitionName)_$(SourceBranchName)_$(Date:yyyyMMdd)$(Rev:.r)
 
 trigger:
-- master
+  branches:
+    include:
+    - master
+  paths:
+    include:
+    - Exdi/exdigdbsrv
 
 pool:
   vmImage: 'windows-2022'
