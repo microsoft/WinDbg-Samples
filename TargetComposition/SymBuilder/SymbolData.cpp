@@ -37,6 +37,8 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
                                        _In_ ULONG64 symTypeId,
                                        _In_opt_ PCWSTR pwszName,
                                        _In_opt_ PCWSTR pwszQualifiedName,
+                                       _In_ ULONG64 bitFieldLength,
+                                       _In_ ULONG64 bitFieldPosition,
                                        _In_ bool newSymbol,
                                        _In_ ULONG64 id)
 {
@@ -78,6 +80,36 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
 
     m_symTypeId = symTypeId;
     m_symOffset = symOffset;
+    
+    //
+    // If the request is for a bitfield, make sure the values make sense and that the type supports such!
+    //
+    if (bitFieldLength != 0)
+    {
+        bool canBeBitField;
+        ULONG64 typeSize;
+        IfFailedReturn(CanBeBitField(&canBeBitField, &typeSize));
+
+        if (!canBeBitField || bitFieldLength > typeSize * 8)
+        {
+            return E_INVALIDARG;
+        }
+
+        if ((symOffset == UdtPositionalSymbol::AutomaticAppendLayout) !=
+            (bitFieldPosition == UdtPositionalSymbol::AutomaticAppendLayout))
+        {
+            return E_INVALIDARG;
+        }
+
+        if (bitFieldPosition != UdtPositionalSymbol::AutomaticAppendLayout &&
+            bitFieldPosition + bitFieldLength > typeSize * 8)
+        {
+            return E_INVALIDARG;
+        }
+    }
+
+    m_bitFieldLength = bitFieldLength;
+    m_bitFieldPosition = bitFieldPosition;
 
     if (pOwningSymbol != nullptr && newSymbol)
     {
@@ -231,6 +263,8 @@ HRESULT BaseDataSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     m_symTypeId = symTypeId;
     m_symOffset = (pValue->vt == VT_EMPTY ? UdtPositionalSymbol::AutomaticIncreaseConstantValue 
                                           : UdtPositionalSymbol::ConstantValue);
+    m_bitFieldLength = 0;
+    m_bitFieldPosition = UdtPositionalSymbol::AutomaticAppendLayout;
 
     //
     // NOTE: This is safe and we don't need to do anything like VariantCopy/VariantClear specifically because
@@ -322,7 +356,228 @@ HRESULT BaseDataSymbol::InternalSetSymbolOffset(_In_ ULONG64 symOffset)
         return S_OK;
     }
 
+    //
+    // If this field happens to be a bitfield, we may need to propagate data into the bitfield 
+    // values when we switch from auto-layout to manual-layout or vice-versa.
+    //
+    if (InternalIsBitField() &&
+            (symOffset == UdtPositionalSymbol::AutomaticAppendLayout) !=
+            (m_symOffset == UdtPositionalSymbol::AutomaticAppendLayout))
+    {
+        if (symOffset == UdtPositionalSymbol::AutomaticAppendLayout)
+        {
+            m_bitFieldPosition = symOffset;
+        }
+        else
+        {
+            m_bitFieldPosition = InternalGetActualBitFieldPosition();
+        }
+    }
+
     m_symOffset = symOffset;
+
+    HRESULT hr = NotifyDependentChange();
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to create the symbol if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+
+    return hr;
+}
+
+HRESULT BaseDataSymbol::CanBeBitField(_Out_ bool *pCanBeBitField, _Out_ ULONG64 *pTypeSize)
+{
+    HRESULT hr = S_OK;
+
+    ULONG64 typeId = m_symTypeId;
+    for(;;)
+    {
+        BaseSymbol *pTypeSymbol = InternalGetSymbolSet()->InternalGetSymbol(typeId);
+        if (pTypeSymbol == nullptr || pTypeSymbol->InternalGetKind() != SvcSymbolType)
+        {
+            //
+            // If it's orphan or constructed incorrectly, just fail.
+            //
+            return E_FAIL;
+        }
+
+        BaseTypeSymbol *pType = static_cast<BaseTypeSymbol *>(pTypeSymbol);
+
+        auto typeKind = pType->InternalGetTypeKind();
+        switch(typeKind)
+        {
+            //
+            // If it's an intrinsic, make sure it's ordinal and not something like a floating point value!
+            //
+            case SvcSymbolTypeEnum:
+            case SvcSymbolTypeIntrinsic:
+            {
+                SvcSymbolIntrinsicKind intrinsicKind;
+
+                if (typeKind == SvcSymbolTypeEnum)
+                {
+                    EnumTypeSymbol *pEnumType = static_cast<EnumTypeSymbol *>(pType);
+                    intrinsicKind = pEnumType->InternalGetEnumIntrinsicKind();
+                }
+                else
+                {
+                    BasicTypeSymbol *pBasicType = static_cast<BasicTypeSymbol *>(pType);
+                    intrinsicKind = pBasicType->InternalGetIntrinsicKind();
+                }
+
+                switch(intrinsicKind)
+                {
+                    case SvcSymbolIntrinsicVoid:
+                    case SvcSymbolIntrinsicFloat:
+                    {
+                        *pCanBeBitField = false;
+                        *pTypeSize = 0;
+                        return S_OK;
+                    }
+
+                    default:
+                    {
+                        *pTypeSize = pType->InternalGetTypeSize();
+                        *pCanBeBitField = true;
+                        return S_OK;
+                    }
+                }
+
+                return E_UNEXPECTED;
+            }
+
+            //
+            // If it's a typedef, chase down the underlying type and ask that.
+            //
+            case SvcSymbolTypeTypedef:
+            {
+                TypedefTypeSymbol *pTypedefType = static_cast<TypedefTypeSymbol *>(pType);
+                typeId = pTypedefType->InternalGetTypedefOfTypeId();
+                break;
+            }
+
+            default:
+            {
+                *pCanBeBitField = false;
+                *pTypeSize = 0;
+                return S_OK;
+            }
+        }
+    }
+}
+
+HRESULT BaseDataSymbol::InternalSetBitFieldLength(_In_ ULONG64 bitFieldLength)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // It's *MUCH* easier here if nothing changes.
+    //
+    if (bitFieldLength == m_bitFieldLength)
+    {
+        return S_OK;
+    }
+
+    //
+    // Make *CERTAIN* that a bitfield makes sense!
+    //
+    if (bitFieldLength != 0)
+    {
+        bool canBeBitField;
+        ULONG64 typeSize;
+        IfFailedReturn(CanBeBitField(&canBeBitField, &typeSize));
+
+        //
+        // If the type is non-ordinal (e.g.: a UDT) or the size of the bit field is greater than the
+        // size of the type, this request is gibberish.  Reject it.
+        //
+        if (!canBeBitField || bitFieldLength > typeSize * 8)
+        {
+            return E_INVALIDARG;
+        }
+
+        //
+        // If there is a manually specified bitfield position and the length is changed to make the request
+        // nonsensical, adjust the bitfield position manually to put it back into range.
+        //
+        if (m_bitFieldPosition != UdtPositionalSymbol::AutomaticAppendLayout &&
+            m_bitFieldPosition > typeSize * 8 - bitFieldLength)
+        {
+            m_bitFieldPosition = (typeSize * 8 - bitFieldLength);
+        }
+    }
+
+    m_bitFieldLength = bitFieldLength;
+
+    hr = NotifyDependentChange();
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to create the symbol if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+
+    return hr;
+}
+
+HRESULT BaseDataSymbol::InternalSetBitFieldPosition(_In_ ULONG64 bitFieldPosition)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // It's much easier here if nothing changes.
+    //
+    if (bitFieldPosition == m_bitFieldPosition)
+    {
+        return S_OK;
+    }
+
+    //
+    // Note we will *NOT* reject a request to set this even if bitFieldLength == 0.  This allows someone
+    // to change the position/field largely independently.
+    //
+    bool canBeBitField;
+    ULONG64 typeSize;
+    IfFailedReturn(CanBeBitField(&canBeBitField, &typeSize));
+
+    //
+    // If the type can't be a bitfield or the position/length combination does not make sense, reject
+    // the request.
+    //
+    if (!canBeBitField)
+    {
+        return E_INVALIDARG;
+    }
+
+    if (bitFieldPosition != UdtPositionalSymbol::AutomaticAppendLayout &&
+        bitFieldPosition + m_bitFieldLength > typeSize * 8)
+    {
+        return E_INVALIDARG;
+    }
+
+    hr = NotifyDependentChange();
+
+    // 
+    // Send an advisory notification upwards that everyone should flush caches.  Do not consider this
+    // a failure to create the symbol if something goes wrong.  At worst, an explicit .reload will be
+    // required in the debugger.
+    //
+    (void)InternalGetSymbolSet()->InvalidateExternalCaches();
+
+    return hr;
+}
+
+HRESULT BaseDataSymbol::InternalSetSymbolValue(_In_ VARIANT const *pVal)
+{
+    //
+    // This is *ONLY* safe because an outer layer has verified that this is an ordinal VT_[U]I[1-8].
+    // We do not need to VariantCopy and the like because of this.
+    //
+    m_symValue = *pVal;
 
     HRESULT hr = NotifyDependentChange();
 
@@ -453,7 +708,7 @@ HRESULT VariableSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
     }
 
     m_curId = 0;
-    return BaseInitialize(pSymbolSet, symKind, parentId, 0ull, parameterTypeId, pwszName, nullptr, true);
+    return BaseInitialize(pSymbolSet, symKind, parentId, 0ull, parameterTypeId, pwszName, nullptr, 0, 0, true);
 }
 
 HRESULT VariableSymbol::RuntimeClassInitialize(_In_ VariableSymbol *pSourceSymbol,
@@ -473,6 +728,8 @@ HRESULT VariableSymbol::RuntimeClassInitialize(_In_ VariableSymbol *pSourceSymbo
                                       pSourceSymbol->InternalGetSymbolTypeId(),
                                       pSourceSymbol->InternalGetName().c_str(),
                                       nullptr,
+                                      0,
+                                      0,
                                       false,
                                       pSourceSymbol->InternalGetId()));
 

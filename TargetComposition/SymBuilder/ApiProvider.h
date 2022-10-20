@@ -52,7 +52,14 @@ public:
     // to a BaseTypeSymbol.  Note that no reference count is returned on the resulting pointer.  It is valid
     // solely by the fact that it is in the global symbol table of the symbol set.
     //
-    BaseTypeSymbol *UnboxType(_In_ SymbolSet *pSymbolSet, _In_ Object typeObject, _In_ bool allowAutoCreations = true);
+    // Note: If 'pBitFieldLength' is non-zero and the typeObject is a string, it will accept strings like
+    //       "int :3" where the returned type is "int" but *pBitFieldLength is set to 3.  If pBitFieldLength
+    //       is nullptr, typeObject as a string *CANNOT* validly contain the colon.
+    //
+    BaseTypeSymbol *UnboxType(_In_ SymbolSet *pSymbolSet, 
+                              _In_ Object typeObject, 
+                              _In_ bool allowAutoCreations = true,
+                              _Out_opt_ ULONG64 *pBitFieldLength = nullptr);
 
     // BoxRelatedType():
     //
@@ -228,7 +235,7 @@ private:
     //
     Object Create(_In_ const Object& typesObject, 
                   _In_ ComPtr<SymbolSet>& spSymbolSet,
-                  _In_ std::wstring typeName,
+                  _In_ std::optional<std::wstring> typeName,
                   _In_ std::optional<std::wstring> qualifiedTypeName);
 
     // CreatePointer():
@@ -428,7 +435,8 @@ private:
                _In_ ComPtr<UdtTypeSymbol>& spUdtTypeSymbol,
                _In_ std::wstring fieldName,
                _In_ Object fieldType,
-               _In_ std::optional<ULONG64> fieldOffset);
+               _In_ size_t argCount,                        // [fieldOffset], [details]
+               _In_reads_(argCount) Object *pArgs);
 
     // GetIterator():
     //
@@ -510,6 +518,30 @@ private:
     std::optional<ULONG64> GetOffset(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol);
     void SetOffset(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol,
                    _In_ ULONG64 fieldOffset);
+
+    // [Get/Set]Value():
+    //
+    // Bound property accessor which returns the value of the field.
+    //
+    std::optional<Object> GetValue(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol);
+    void SetValue(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol,
+                  _In_ Object fieldValue);
+
+    // [Get/Set]BitFieldLength():
+    //
+    // Bound property accessor which returns the bitfield length *IF* the field is a bitfield.
+    //
+    std::optional<ULONG64> GetBitFieldLength(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol);
+    void SetBitFieldLength(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol,
+                           _In_ ULONG64 bitFieldLength);
+
+    // [Get/Set]BitFieldPosition():
+    //
+    // Bound property accessor which returns the bitfield position *IF* the field is a bitfield.
+    //
+    std::optional<ULONG64> GetBitFieldPosition(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol);
+    void SetBitFieldPosition(_In_ const Object& fieldObject, _In_ ComPtr<FieldSymbol>& spFieldSymbol,
+                             _In_ ULONG64 bitFieldPosition);
 
     // Delete():
     //
