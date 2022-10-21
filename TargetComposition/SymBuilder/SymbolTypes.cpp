@@ -42,9 +42,8 @@ HRESULT UdtPositionalSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     // the actual offset the same as the offset.  Any triggering of type layout will change this if such
     // is marked as automatic.
     //
-    HRESULT hr = BaseDataSymbol::BaseInitialize(pSymbolSet, symKind, owningTypeId, symOffset, symTypeId, pwszName, nullptr);
-    m_symOffsetActual = m_symOffset;
-    return hr;
+    m_symOffsetActual = symOffset;
+    return BaseDataSymbol::BaseInitialize(pSymbolSet, symKind, owningTypeId, symOffset, symTypeId, pwszName, nullptr);
 }
 
 HRESULT UdtPositionalSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
