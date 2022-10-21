@@ -11,6 +11,10 @@
     <PackageReference Include="Microsoft.Debugging.Platform.DbgX" Version="20220510.3.0" />
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="Microsoft.Debugging.Platform.DbgEng" Version="20220912.1623.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="$(MicrosoftDebuggingPlatformDbgEngContent)**\*" CopyToOutputDirectory="Always" Visible="False" Link="%(RecursiveDir)%(FileName)%(Extension)" />
+  </ItemGroup>
 </Project>
