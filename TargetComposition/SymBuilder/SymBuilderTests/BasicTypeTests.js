@@ -115,16 +115,6 @@ function Test_CreateAndDestroyEmptyUdt()
     return true;
 }
 
-// Test_AutoLayoutAlignment:
-//
-// Verifies that we can create a UDT and place increasingly sized (and aligned) fields and that the alignment
-// padding is properly inserted by automatic layout.
-//
-function Test_AutoLayoutAlignment()
-{
-    throw new Error("fubar");
-}
-
 // Test_UdtWithBasicFields:
 //
 // Verifies that we can create a UDT and add basic fields to the UDT and it will lay out as expected.  This is
@@ -187,6 +177,88 @@ function Test_UdtWithBasicFields()
 
     __VERIFY(host.evaluateExpression("sizeof(" + name + ")") == 8, "Unexpected sizeof() in EE after second field");
 
+    foo.Delete();
+    return true;
+}
+
+// Test_AutoLayoutAlignment:
+//
+// Verifies that we can create a UDT and place increasingly sized (and aligned) fields and that the alignment
+// padding is properly inserted by automatic layout.
+//
+function Test_AutoLayoutAlignment()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+    var fldA = foo.Fields.Add("a", "char");                 // [0, 1)
+    var fldB = foo.Fields.Add("b", "short");                // [2, 4)
+    var fldC = foo.Fields.Add("c", "int");                  // [4, 8)
+    var fldD = foo.Fields.Add("d", "char");                 // [8, 9)
+    var fldE = foo.Fields.Add("e", "__int64");              // [16, 24)
+    var fldF = foo.Fields.Add("f", "char");                 // [24, 25)
+
+    __VERIFY(fldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fldB.Offset == 2, "unexpected offset of 'b'");
+    __VERIFY(fldC.Offset == 4, "unexpected offset of 'c'");
+    __VERIFY(fldD.Offset == 8, "unexpected offset of 'd'");
+    __VERIFY(fldE.Offset == 16, "unexpected offset of 'e'");
+    __VERIFY(fldF.Offset == 24, "unexpected offset of 'f'");
+
+    //
+    // It should be padded out to its own natural alignment.
+    //
+    __VERIFY(foo.Size == 32, "unexpected overall size of type");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_NestedStructsWithAutoAlignment:
+//
+// Verifies that we can create two UDTs and place one within the other getting proper alignment padding
+// in auto layout mode.
+//
+function Test_NestedStructsWithAutoAlignment()
+{
+    var fooName = __getUniqueName("foo");
+    var barName = __getUniqueName("bar");
+
+    var foo = __symbolBuilderSymbols.Types.Create(fooName);
+    var fooFldA = foo.Fields.Add("a", "char");          // [0, 1)
+
+    var bar = __symbolBuilderSymbols.Types.Create(barName);
+    var barFldJ = bar.Fields.Add("j", "int");           // [0, 4)
+    var barFldK = bar.Fields.Add("k", "char");          // [4, 5) <-- +pad to 8
+
+    //
+    // Add by name for the "first" attempt and add by type object for the "second" attempt
+    //
+    var fooFldB = foo.Fields.Add("b", barName);         // [4, 12)
+    var fooFldC = foo.Fields.Add("c", bar);             // [12, 20)
+
+    //
+    // Now go and verify things through the symbol builder's API:
+    //
+    __VERIFY(barFldJ.Offset == 0 && barFldK.Offset == 4 && bar.Size == 8 && bar.Alignment == 4,
+             "unexpected layout of 'bar' type");
+
+    __VERIFY(fooFldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fooFldB.Offset == 4, "unexpected offset of 'b'");
+    __VERIFY(fooFldC.Offset == 12, "unexpected offset of 'c'");
+    __VERIFY(foo.Size == 20, "unexpected size of 'foo'");
+
+    //
+    // Do some basic sanity checking against the underlying type system.
+    //
+    var fooTy = host.getModuleType("notepad.exe", fooName);
+    var fooTyFldB = fooTy.fields.b;
+    __VERIFY(fooTyFldB !== undefined, "cannot find 'b'");
+    __VERIFY(fooTyFldB.offset == 4, "unexpected type system offset of 'b'");
+    __VERIFY(fooTyFldB.type.name == barName, "unexpected type system type of 'b'");
+    __VERIFY(fooTyFldB.type.size == 8, "unexpected type system size of 'bar' via 'b'");
+
+    foo.Delete();
+    bar.Delete();
     return true;
 }
 
@@ -194,12 +266,18 @@ function Test_UdtWithBasicFields()
 // Initialization:
 //
 
+// __testSuite:
+//
+// Defines the test suite that we are going to run in the order it will be run.  This is returned
+// from the initializeTests() method to tell the harness what to run and what each test should be called.
+//
 var __testSuite =
 [
     { Name: "VerifyBuilderSymbols", Code: Test_VerifyBuilderSymbols },
     { Name: "CreateAndDestroyEmptyUdt", Code: Test_CreateAndDestroyEmptyUdt },
     { Name: "UdtWithBasicFields", Code: Test_UdtWithBasicFields },
-    { Name: "AutoLayoutAlignment", Code: Test_AutoLayoutAlignment }
+    { Name: "AutoLayoutAlignment", Code: Test_AutoLayoutAlignment },
+    { Name: "NestedStructsWithAutoAlignment", Code: Test_NestedStructsWithAutoAlignment }
 ];
 
 // initializeTests:
