@@ -46,6 +46,26 @@ function __generateUniqueName(symbolSet, prefix)
     return name;
 }
 
+// __pathOf():
+//
+// Strips the path out of a full path (or returns an empty string).
+//
+function __pathOf(path)
+{
+    var lastSlash = path.lastIndexOf("\\");
+    if (lastSlash == -1)
+    {
+        return "";
+    }
+    return path.substring(0, lastSlash + 1);
+}
+
+function __isAbsolute(path)
+{
+    return path.startsWith("\\") ||
+           (path.length > 3 && path.charAt(1) == ":" && path.charAt(2) == "\\");
+}
+
 //*************************************************
 // Simple C struct header parser.
 //
@@ -233,64 +253,67 @@ __tokenMappings["enum"] = __tokenTypes.Enum;
 __tokenMappings["true"] = __tokenTypes.True;
 __tokenMappings["false"] = __tokenTypes.False;
 
-// __remappedTypes:
+// __windowsTypedefs:
 //
 // Defines some types that we "know" are typedefs due to the Windows environment and remaps them
 //
-var __remappedTypes = {};
-__remappedTypes["UCHAR"] = "unsigned char";
-__remappedTypes["PUCHAR"] = "unsigned char *";
-__remappedTypes["UINT8"] = "unsigned char";
-__remappedTypes["PUINT8"] = "unsigned char *";
-__remappedTypes["CHAR"] = "char";
-__remappedTypes["PCHAR"] = "char *";
-__remappedTypes["USHORT"] = "unsigned short";
-__remappedTypes["PUSHORT"] = "unsigned short *";
-__remappedTypes["UINT16"] = "unsigned short";
-__remappedTypes["PUINT16"] = "unsigned short *";
-__remappedTypes["SHORT"] = "short";
-__remappedTypes["PSHORT"] = "short *";
-__remappedTypes["INT16"] = "short";
-__remappedTypes["PINT16"] = "short *";
-__remappedTypes["INT"] = "int";
-__remappedTypes["PINT"] = "int *";
-__remappedTypes["INT32"] = "int";
-__remappedTypes["PINT32"] = "int *";
-__remappedTypes["UINT"] = "unsigned int";
-__remappedTypes["PUINT"] = "unsigned int *";
-__remappedTypes["UINT32"] = "unsigned int";
-__remappedTypes["PUINT32"] = "unsigned int *";
-__remappedTypes["ULONG"] = "unsigned long";
-__remappedTypes["PULONG"] = "unsigned long *";
-__remappedTypes["LONG"] = "long";
-__remappedTypes["PLONG"] = "long *";
-__remappedTypes["ULONG64"] = "unsigned __int64";
-__remappedTypes["PULONG64"] = "unsigned __int64 *";
-__remappedTypes["UINT64"] = "unsigned __int64";
-__remappedTypes["PUINT64"] = "unsigned __int64 *";
-__remappedTypes["ULONGLONG"] = "unsigned __int64";
-__remappedTypes["PULONGLONG"] = "unsigned __int64 *";
-__remappedTypes["LONG64"] = "__int64";
-__remappedTypes["PLONG64"] = "__int64 *";
-__remappedTypes["LONGLONG"] = "__int64";
-__remappedTypes["PLONGLONG"] = "__int64 *";
-__remappedTypes["PVOID"] = "void *";
-__remappedTypes["HANDLE"] = "void *";
-__remappedTypes["BOOL"] = "unsigned long";
-__remappedTypes["PBOOL"] = "unsigned long *";
-__remappedTypes["BYTE"] = "unsigned char";
-__remappedTypes["PBYTE"] = "unsigned char *";
-__remappedTypes["WORD"] = "unsigned short";
-__remappedTypes["PWORD"] = "unsigned short *";
-__remappedTypes["DWORD"] = "unsigned long";
-__remappedTypes["PDWORD"] = "unsigned long *";
-__remappedTypes["DWORD64"] = "unsigned __int64";
-__remappedTypes["PDWORD64"] = "unsigned __int64 *";
-__remappedTypes["HRESULT"] = "unsigned int";
-__remappedTypes["PSTR"] = "char *";
-__remappedTypes["PCSTR"] = "char *";
-__remappedTypes["PWSTR"] = "wchar_t *";
-__remappedTypes["PCWSTR"] = "wchar_t *";
+var __windowsTypedefs = {};
+__windowsTypedefs["UCHAR"] = "unsigned char";
+__windowsTypedefs["PUCHAR"] = "unsigned char *";
+__windowsTypedefs["UINT8"] = "unsigned char";
+__windowsTypedefs["PUINT8"] = "unsigned char *";
+__windowsTypedefs["CHAR"] = "char";
+__windowsTypedefs["PCHAR"] = "char *";
+__windowsTypedefs["USHORT"] = "unsigned short";
+__windowsTypedefs["PUSHORT"] = "unsigned short *";
+__windowsTypedefs["UINT16"] = "unsigned short";
+__windowsTypedefs["PUINT16"] = "unsigned short *";
+__windowsTypedefs["SHORT"] = "short";
+__windowsTypedefs["PSHORT"] = "short *";
+__windowsTypedefs["INT16"] = "short";
+__windowsTypedefs["PINT16"] = "short *";
+__windowsTypedefs["INT"] = "int";
+__windowsTypedefs["PINT"] = "int *";
+__windowsTypedefs["INT32"] = "int";
+__windowsTypedefs["PINT32"] = "int *";
+__windowsTypedefs["UINT"] = "unsigned int";
+__windowsTypedefs["PUINT"] = "unsigned int *";
+__windowsTypedefs["UINT32"] = "unsigned int";
+__windowsTypedefs["PUINT32"] = "unsigned int *";
+__windowsTypedefs["ULONG"] = "unsigned long";
+__windowsTypedefs["PULONG"] = "unsigned long *";
+__windowsTypedefs["LONG"] = "long";
+__windowsTypedefs["PLONG"] = "long *";
+__windowsTypedefs["ULONG64"] = "unsigned __int64";
+__windowsTypedefs["PULONG64"] = "unsigned __int64 *";
+__windowsTypedefs["UINT64"] = "unsigned __int64";
+__windowsTypedefs["PUINT64"] = "unsigned __int64 *";
+__windowsTypedefs["ULONGLONG"] = "unsigned __int64";
+__windowsTypedefs["PULONGLONG"] = "unsigned __int64 *";
+__windowsTypedefs["LONG64"] = "__int64";
+__windowsTypedefs["PLONG64"] = "__int64 *";
+__windowsTypedefs["LONGLONG"] = "__int64";
+__windowsTypedefs["PLONGLONG"] = "__int64 *";
+__windowsTypedefs["PVOID"] = "void *";
+__windowsTypedefs["HANDLE"] = "void *";
+__windowsTypedefs["BOOL"] = "unsigned long";
+__windowsTypedefs["PBOOL"] = "unsigned long *";
+__windowsTypedefs["BYTE"] = "unsigned char";
+__windowsTypedefs["PBYTE"] = "unsigned char *";
+__windowsTypedefs["WORD"] = "unsigned short";
+__windowsTypedefs["PWORD"] = "unsigned short *";
+__windowsTypedefs["DWORD"] = "unsigned long";
+__windowsTypedefs["PDWORD"] = "unsigned long *";
+__windowsTypedefs["DWORD64"] = "unsigned __int64";
+__windowsTypedefs["PDWORD64"] = "unsigned __int64 *";
+__windowsTypedefs["HRESULT"] = "unsigned int";
+__windowsTypedefs["PSTR"] = "char *";
+__windowsTypedefs["PCSTR"] = "char *";
+__windowsTypedefs["PWSTR"] = "wchar_t *";
+__windowsTypedefs["PCWSTR"] = "wchar_t *";
+__windowsTypedefs["WCHAR"] = "wchar_t";
+__windowsTypedefs["PWCHAR"] = "wchar_t *";
+__windowsTypedefs["SIZE_T"] = "size_t";
 
 // __getOperatorForToken():
 //
@@ -540,7 +563,7 @@ class __CTokenStream
     //
     // Takes a text reader and produces a token stream.
     //
-    constructor(origin, startingMacros)
+    constructor(origin, startingMacros, overwriteStartingMacros, filePath, details)
     {
         if (typeof(origin) === "string")
         {
@@ -553,6 +576,18 @@ class __CTokenStream
         this.__done = false;
         this.__lineNumber = 1;
         this.__startingMacros = startingMacros;
+        this.__filePath = filePath;
+        this.__details = details;
+        this.__overwriteStartingMacros = overwriteStartingMacros;
+
+        if (details && details.allowIncludes !== undefined)
+        {
+            this.__allowIncludes = details.allowIncludes;
+        }
+        else
+        {
+            this.__allowIncludes = false;
+        }
     }
 
     throwError(msg)
@@ -756,6 +791,9 @@ class __CTokenStream
         macros["IN"] = "";
         macros["OUT"] = "";
         macros["ANYSIZE_ARRAY"] = "1";
+
+        macros["CONST"] = "";
+        macros["UNALIGNED"] = "";
         
         //
         // Treat a few key SAL annotations as empty macros.  We do not care.
@@ -765,6 +803,8 @@ class __CTokenStream
         macros["_Out_"] = "";
         macros["_Inout_"] = "";
         macros["_In_opt_"] = "";
+        macros["_Null_terminated_"] = "";
+        macros["_NullNull_terminated_"] = "";
     }
 
     // readLine():
@@ -812,8 +852,15 @@ class __CTokenStream
         var curTok = "";
         var line = "";
         var macros = {};
-        this.predefineWindowsMacros(macros);
-        this.populateStartingMacros(macros, this.__startingMacros);
+        if (this.__overwriteStartingMacros)
+        {
+            macros = this.__startingMacros;
+        }
+        else
+        {
+            this.predefineWindowsMacros(macros);
+            this.populateStartingMacros(macros, this.__startingMacros);
+        }
         var conditionals = [];
 
         while(!this.__done)
@@ -906,6 +953,112 @@ class __CTokenStream
                             }
                             var conditional = conditionals.pop();
                             conditionals.push(!conditional);
+                        }
+                    }
+                    else if (len >= 7 && line.startsWith("#include") && this.__allowIncludes)
+                    {
+                        if (isInCompilationScope)
+                        {
+                            var includeFile = line.substring(8);
+                            var startIdx = 0;
+                            for (; startIdx < includeFile.length; ++startIdx)
+                            {
+                                if(includeFile.charAt(startIdx) == '<' || includeFile.charAt(startIdx) == '"')
+                                {
+                                    break;
+                                }
+                            }
+                            var endIdx = startIdx + 1;
+                            for (; endIdx < includeFile.length; ++endIdx)
+                            {
+                                if (includeFile.charAt(endIdx) == '>' || includeFile.charAt(endIdx) == '"')
+                                {
+                                    break;
+                                }
+                            }
+
+                            if (startIdx < endIdx && endIdx < includeFile.length)
+                            {
+                                //
+                                // We have a file.  Combine it with our include path.
+                                //
+                                var filePath = includeFile.substring(startIdx + 1, endIdx);
+                                if (!__isAbsolute(filePath))
+                                {
+                                    if (this.__details.includePath && this.__details.includePath.length > 0)
+                                    {
+                                        filePath = this.__details.includePath + filePath;
+
+                                        if (__diag)
+                                        {
+                                            host.diagnostics.debugLog("Performing include of '", filePath, "'\n");
+                                        }
+
+                                        var includeFile = null;
+                                        var openedFile = false;
+                                        try
+                                        {
+                                            includeFile = __getAPI().FileSystem.OpenFile(filePath);
+                                            openedFile = true;
+                                        }
+                                        catch(exc)
+                                        {
+                                            if (__diag)
+                                            {
+                                                host.diagnostics.debugLog("Unable to open '", filePath, "': skipping\n");
+                                            }
+                                        }
+
+                                        //
+                                        // Read from the #include header.  Note that we will throw to the outer
+                                        // Import call if something fails, but we *ALWAYS* want to close the file
+                                        // before doing so!
+                                        //
+                                        if (openedFile)
+                                        {
+                                            var caughtException = null;
+                                            try
+                                            {
+                                                var reader = __getAPI().FileSystem.CreateTextReader(includeFile);
+                                                var parser = new __CParser(reader, macros, true, includeFile, this.__details);
+                                                parser.importInto(this.__details.symbolSet);
+                                            }
+                                            catch(caughtException)
+                                            {
+                                            }
+
+                                            includeFile.Close();
+
+                                            if (caughtException)
+                                            {
+                                                throw caughtException;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else if (len >= 11 && line.startsWith("#pragma once"))
+                    {
+                        if (this.__details !== undefined && this.__filePath !== undefined)
+                        {
+                            if (this.__details.Inclusions === undefined)
+                            {
+                                this.__details.Inclusions = { };
+                            }
+
+                            if (this.__details.Inclusions[this.__filePath])
+                            {
+                                if (__diag)
+                                {
+                                    host.diagnostics.debugLog("Skipping '", this.__filePath, "' due to #pragma once");
+                                }
+  
+                                this.__done = true;
+                            }
+
+                            this.__details.Inclusions[this.__filePath] = true;
                         }
                     }
 
@@ -1354,14 +1507,16 @@ function __evaluateStack(valStack, opStack)
 //
 class __CParser
 {
-    constructor(reader, startingMacros)
+    constructor(reader, startingMacros, overwriteStartingMacros, filePath, details)
     {
-        this.__tokenStream = new __CTokenStream(reader, startingMacros);
+        this.__tokenStream = new __CTokenStream(reader, startingMacros, overwriteStartingMacros, filePath, details);
         this.__iterator = (this.__tokenStream[Symbol.iterator])();
         this.__forwardTokenPos = [];
         this.__peekAhead = 0;
         this.__peekAheadDone = false;
         this.__inScopeEnumerants = {};
+        this.__filePath = filePath;
+        this.__details = details;
     }
 
     throwError(msg)
@@ -1516,20 +1671,6 @@ class __CParser
     //
     __resolveTypeName(typeName)
     {
-        for(;;)
-        {
-            var remap = __remappedTypes[typeName];
-            if (remap !== undefined)
-            {
-                if (typeName == remap)
-                {
-                    break;
-                }
-                typeName = remap;
-                continue;
-            }
-            break;
-        }
         return typeName;
     }
 
@@ -1846,17 +1987,10 @@ class __CParser
     //
     // Reads an enumerant definition within an enum.
     //
-    readEnumerant(symbolSet, enumType, priorValue)
+    readEnumerant(symbolSet, enumType)
     {
-        var enumVal;
-        if (priorValue)
-        {
-            enumVal = priorValue + 1;
-        }
-        else
-        {
-            enumVal = 0;
-        }
+        var hasEnumVal = false;
+        var enumVal = null;
 
         if (this.__curToken.__tokenType != __tokenTypes.Identifier)
         {
@@ -1869,6 +2003,7 @@ class __CParser
         {
             this.advance(true);
             enumVal = this.staticEvaluate(symbolSet);
+            hasEnumVal = true;
         }
 
         if (this.__curToken.__tokenType != __tokenTypes.Comma &&
@@ -1882,7 +2017,15 @@ class __CParser
             this.advance(true);
         }
 
-        var enumerant = enumType.Enumerants.Add(name, enumVal);
+        var enumerant = null;
+        if (hasEnumVal)
+        {
+            enumerant = enumType.Enumerants.Add(name, enumVal);
+        }
+        else
+        {
+            enumerant = enumType.Enumerants.Add(name);
+        }
         this.__inScopeEnumerants[name] = enumerant;
         return enumerant;
     }
@@ -2233,8 +2376,29 @@ class __CParser
 //*************************************************
 // Script Initialization and Extensions
 
+// __SymbolBuilderExtension:
+//
+// A class which represents our extension of the symbol builder's symbol set.
+//
 class __SymbolBuilderExtension
 {
+    // __AddWindowsTypedefs():
+    //
+    // Adds standard windows typedefs to the symbol set.  This only does so for types which are, up until
+    // this point, undefined.
+    //
+    __AddWindowsTypedefs()
+    {
+        var typedefNames = Object.getOwnPropertyNames(__windowsTypedefs);
+        for (var typedefName of typedefNames)
+        {
+            if (!this.Types.FindByName(typedefName))
+            {
+                this.Types.CreateTypedef(typedefName, __windowsTypedefs[typedefName]);
+            }
+        }
+    }
+
     // ImportFromHeader():
     //
     // Performs a limited understanding read of a C header file and generates synthetic types
@@ -2248,12 +2412,35 @@ class __SymbolBuilderExtension
             macros = attributes.Macros;
         }
 
+        var addWindowsTypedefs = true;
+        if (attributes && attributes.AddWindowsTypedefs !== undefined)
+        {
+            addWindowsTypedefs = attributes.AddWindowsTypedefs;
+        }
+
+        var allowIncludes = false;
+        if (attributes && attributes.AllowIncludes !== undefined)
+        {
+            allowIncludes = attributes.AllowIncludes;
+        }
+
+        var includePath = null;
+        if (allowIncludes)
+        {
+            includePath = __pathOf(path);
+        }
+
+        if (addWindowsTypedefs)
+        {
+            this.__AddWindowsTypedefs();
+        }
+
         var file = __getAPI().FileSystem.OpenFile(path);
         var capturedException;
         try
         {
             var reader = __getAPI().FileSystem.CreateTextReader(file);
-            var parser = new __CParser(reader, macros);
+            var parser = new __CParser(reader, macros, false, path, { allowIncludes: allowIncludes, includePath: includePath, symbolSet: this });
             parser.importInto(this);
         }
         catch(exc)
@@ -2284,6 +2471,10 @@ class __SymbolBuilderExtension
     }
 };
 
+// initializeScript:
+//
+// The main initializer for our extension.
+//
 function initializeScript()
 {
     return [new host.apiVersionSupport(1, 2),

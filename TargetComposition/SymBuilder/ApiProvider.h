@@ -275,6 +275,15 @@ private:
                       _In_ std::optional<Object> enumBasicType,
                       _In_ std::optional<std::wstring> qualifiedTypeName);
 
+    // FindByName():
+    //
+    // Bound API which will lookup a type by its name.
+    //
+    std::optional<Object> FindByName(_In_ const Object& typesObject,
+                                     _In_ ComPtr<SymbolSet>& spSymbolSet,
+                                     _In_ std::wstring typeName,
+                                     _In_ std::optional<bool> allowCreation);
+
     // GetIterator():
     //
     // Bound generator for iterating over types within a symbol set.

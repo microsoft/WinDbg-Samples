@@ -26,6 +26,7 @@ BEGIN
     SYMBOLBUILDER_IDS_TYPES_CREATEENUM              "CreateEnum(typeName, [basicType], [qualifiedTypeName]) - Creates a new enum type.  'basicType' is the type of the enum; if unspecified, the default is 'int'.  An explicit 'qualifiedTypeName' may optionally be provided if different than the base name"
     SYMBOLBUILDER_IDS_TYPES_CREATEPOINTER           "CreatePointer(baseType) - Creates a new pointer to the given type"
     SYMBOLBUILDER_IDS_TYPES_CREATETYPEDEF           "CreateTypedef(typeName, baseType, [qualifiedTypeName]) - Creates a new typedef to 'baseType'.  An explicit 'qualifiedTypeName' may optionally be provided if different than the base name"
+    SYMBOLBUILDER_IDS_TYPES_FINDBYNAME              "FindByName(typeName, [allowCreation]) - Looks up a type by name and returns it.  If the type is not found, <no value> is returned.  The 'allowCreation' optional argument (default: true) specifies whether types can be created by this method (e.g.: pointers and arrays)"
     SYMBOLBUILDER_IDS_SYMBOL_NAME                   "The name of the symbol"
     SYMBOLBUILDER_IDS_SYMBOL_QUALIFIEDNAME          "The qualified name of the symbol"
     SYMBOLBUILDER_IDS_SYMBOL_PARENT                 "The parent of the symbol"

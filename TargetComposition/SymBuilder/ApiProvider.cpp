@@ -55,6 +55,16 @@ namespace SymbolBuilder
 // Standard Helpers:
 //
 
+std::string ToString(_In_ const std::wstring& str)
+{
+    std::string newStr;
+    int sz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    newStr.resize(sz);
+    int rsz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, const_cast<char *>(newStr.data()), sz, nullptr, nullptr);
+    if (sz != rsz) { throw std::runtime_error("failed string conversion"); }
+    return newStr;
+}
+
 // ValueToString():
 //
 // Performs our string conversion of a constant valued symbol.
@@ -584,9 +594,28 @@ BaseTypeSymbol *SymbolObjectHelpers::UnboxType(_In_ SymbolSet *pSymbolSet,
         }
 
         ULONG64 typeId;
-        CheckHr(pSymbolSet->FindTypeByName(typeName, &typeId, &pBaseType, allowAutoCreations));
+        HRESULT hr = pSymbolSet->FindTypeByName(typeName, &typeId, &pBaseType, allowAutoCreations);
 
-        *pBitFieldLength = bitFieldLength;
+        //
+        // If this wasn't something like an "out of memory" error, make sure there's a reasonable exception
+        // message that can flow back to the caller.
+        //
+        if (hr == E_INVALIDARG)
+        {
+            std::string exceptionMessage = "unable to find type '";
+            exceptionMessage += ToString(typeName);
+            exceptionMessage += "'";
+            throw std::invalid_argument(exceptionMessage);
+        }
+        else
+        {
+            CheckHr(hr);
+        }
+
+        if (pBitFieldLength != nullptr)
+        {
+            *pBitFieldLength = bitFieldLength;
+        }
     }
 
     return pBaseType;
@@ -838,6 +867,26 @@ Object TypesObject::CreateEnum(_In_ const Object& /*typesObject*/,
 
     EnumTypeObject &enumTypeFactory = ApiProvider::Get().GetEnumTypeFactory();
     return enumTypeFactory.CreateInstance(spEnum);
+}
+
+std::optional<Object> TypesObject::FindByName(_In_ const Object& /*typesObject*/,
+                                              _In_ ComPtr<SymbolSet>& spSymbolSet,
+                                              _In_ std::wstring typeName,
+                                              _In_ std::optional<bool> allowCreation)
+{
+    std::optional<Object> typeObject;
+
+    //
+    // This will return <novalue> if the type is not found.  It will not throw/fail.
+    //
+    BaseTypeSymbol *pTypeSymbol;
+    ULONG64 typeId;
+    if (SUCCEEDED(spSymbolSet->FindTypeByName(typeName, &typeId, &pTypeSymbol, allowCreation.value_or(true))))
+    {
+        typeObject = BoxType(pTypeSymbol);
+    }
+
+    return typeObject;
 }
 
 std::experimental::generator<Object> TypesObject::GetIterator(_In_ const Object& /*typesObject*/,
@@ -2813,7 +2862,7 @@ SymbolSetObject::SymbolSetObject() :
 }
 
 TypesObject::TypesObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.Types"))
 {
     AddMethod(L"AddBasicCTypes", this, &TypesObject::AddBasicCTypes,
                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_ADDBASICCTYPES },
@@ -2837,6 +2886,10 @@ TypesObject::TypesObject() :
 
     AddMethod(L"CreateTypedef", this, &TypesObject::CreateTypedef,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_CREATETYPEDEF },
+                       L"PreferShow", true));
+
+    AddMethod(L"FindByName", this, &TypesObject::FindByName,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_FINDBYNAME },
                        L"PreferShow", true));
 
     AddGeneratorFunction(this, &TypesObject::GetIterator);
@@ -2922,7 +2975,7 @@ EnumTypeObject::EnumTypeObject() :
 }
 
 FieldsObject::FieldsObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.Fields"))
 {
     AddMethod(L"Add", this, &FieldsObject::Add,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELDS_ADD },
@@ -3024,7 +3077,7 @@ GlobalDataObject::GlobalDataObject()
 }
 
 FunctionsObject::FunctionsObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.Functions"))
 {
     AddMethod(L"Create", this, &FunctionsObject::Create,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTIONS_CREATE },
