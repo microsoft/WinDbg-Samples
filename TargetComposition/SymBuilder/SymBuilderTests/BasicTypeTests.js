@@ -262,6 +262,39 @@ function Test_NestedStructsWithAutoAlignment()
     return true;
 }
 
+// Test_StructManualLayout:
+//
+// Verifies that we can manually layout a struct.
+//
+function Test_StructManualLayout()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fooFldX = foo.Fields.Add("x", "int", 0);            // [0, 3)
+    var fooFldY = foo.Fields.Add("y", "int", 0);            // [0, 3)
+    var fooFldZ = foo.Fields.Add("z", "int", 1);            // [1, 4) <-- **EXPLICITLY UNALIGNED** <-- pad to 8
+
+    __VERIFY(fooFldX.Offset == 0, "unexpected offset of 'x'");
+    __VERIFY(!fooFldX.IsAutomaticLayout, "unexpected .IsAutomaticLayout for manual field");
+    __VERIFY(fooFldY.Offset == 0, "unexpected offset of 'y'");
+    __VERIFY(fooFldZ.Offset == 1, "unexpected offset of 'z'");
+    __VERIFY(foo.Size == 8, "unexpected overall size of manual layout type");
+    __VERIFY(foo.Alignment == 4, "unexpected alignment of manual layout type");
+
+    //
+    // Do some basic sanity checking against the underlying type system.
+    //
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.x.offset == 0, "unexpected underlying type system offset of 'x'");
+    __VERIFY(fooTy.fields.y.offset == 0, "unexpected underlying type system offset of 'y'");
+    __VERIFY(fooTy.fields.z.offset == 0, "unexpected underlying type system offset of 'z'");
+    __VERIFY(fooTy.size == 8, "unexpected underlying type system size of manual layout type");
+
+    foo.Delete();
+    return true;
+}
+
 //**************************************************************************
 // Initialization:
 //
@@ -277,7 +310,8 @@ var __testSuite =
     { Name: "CreateAndDestroyEmptyUdt", Code: Test_CreateAndDestroyEmptyUdt },
     { Name: "UdtWithBasicFields", Code: Test_UdtWithBasicFields },
     { Name: "AutoLayoutAlignment", Code: Test_AutoLayoutAlignment },
-    { Name: "NestedStructsWithAutoAlignment", Code: Test_NestedStructsWithAutoAlignment }
+    { Name: "NestedStructsWithAutoAlignment", Code: Test_NestedStructsWithAutoAlignment },
+    { Name: "StructManualLayout", Code: Test_StructManualLayout }
 ];
 
 // initializeTests:
