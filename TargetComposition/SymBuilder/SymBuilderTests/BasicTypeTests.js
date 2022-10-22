@@ -1,9 +1,18 @@
 "use strict";
+//
+// [Harness: run notepad.exe]
+//
 
 //**************************************************************************
 // BasicTypeTests.js
 //
 // Unit tests for basic types within the type builder. 
+//
+// NOTE: The test harness will read the script before opening the engine and having it execute it.
+//       During that process, it will read any comment lines at the beginning of the file (after any
+//       optional "use strict";) and will interpret // [Harness: <something>] as a command to the
+//       test harness.  Here, this script will be executed against "notepad.exe" because of the
+//       harness command.
 //
 // Any method named Test_* is a test case.  The "TestSuite" global array is what the test runner will
 // pick up on.  It has the format of { Name: <test name>, Code: <test function> }.  All tests will be
@@ -352,9 +361,9 @@ function Test_StructManualLayout()
     var name = __getUniqueName("foo");
     var foo = __symbolBuilderSymbols.Types.Create(name);
 
-    var fooFldX = foo.Fields.Add("x", "int", 0);            // [0, 3)
-    var fooFldY = foo.Fields.Add("y", "int", 0);            // [0, 3)
-    var fooFldZ = foo.Fields.Add("z", "int", 1);            // [1, 4) <-- **EXPLICITLY UNALIGNED** <-- pad to 8
+    var fooFldX = foo.Fields.Add("x", "int", 0);            // [0, 4)
+    var fooFldY = foo.Fields.Add("y", "int", 0);            // [0, 4)
+    var fooFldZ = foo.Fields.Add("z", "int", 1);            // [1, 5) <-- **EXPLICITLY UNALIGNED** <-- pad to 8
 
     __VERIFY(fooFldX.Offset == 0, "unexpected offset of 'x'");
     __VERIFY(!fooFldX.IsAutomaticLayout, "unexpected .IsAutomaticLayout for manual field");
@@ -376,6 +385,39 @@ function Test_StructManualLayout()
     return true;
 }
 
+// Test_StructMixedManualAutoLayout:
+//
+// Verifies that we can mix automatic and manual layout fields in a struct and get what we expect.
+//
+function Test_StructMixedManualAutoLayout()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fooFldA = foo.Fields.Add("a", "int");               // [0, 4)
+    var fooFldB = foo.Fields.Add("b", "int");               // [4, 8)
+    var fooFldC = foo.Fields.Add("c", "int", 20);           // [20, 24)
+    var fooFldD = foo.Fields.Add("d", "int");               // [24, 28)
+    var fooFldE = foo.Fields.Add("e", "char", 61);          // [61, 62)
+    var fooFldF = foo.Fields.Add("f", "__int64");           // [64, 72)
+
+    __VERIFY(fooFldD.Offset == 24, "unexpected offset of 'd'");
+    __VERIFY(fooFldF.Offset == 64, "unexpected offset of 'f'");
+    __VERIFY(foo.Size == 72, "unexpected size of type");
+    __VERIFY(foo.Alignment == 8, "unexpected alignment of type");
+
+    //
+    // Do some basic sanity checking against the underlying type system.
+    //
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.d.offset == 24, "unexpected underlying type system offset of 'd'");
+    __VERIFY(fooTy.fields.f.offset == 64, "unexpected underlying type system offset of 'd'");
+    __VERIFY(fooTy.size == 72, "unexpected underlying type system size");
+
+    foo.Delete();
+    return true;
+}
+
 //**************************************************************************
 // Initialization:
 //
@@ -392,7 +434,8 @@ var __testSuite =
     { Name: "UdtWithBasicFields", Code: Test_UdtWithBasicFields },
     { Name: "AutoLayoutAlignment", Code: Test_AutoLayoutAlignment },
     { Name: "NestedStructsWithAutoAlignment", Code: Test_NestedStructsWithAutoAlignment },
-    { Name: "StructManualLayout", Code: Test_StructManualLayout }
+    { Name: "StructManualLayout", Code: Test_StructManualLayout },
+    { Name: "StructMixedManualAutoLayout", Code: Test_StructMixedManualAutoLayout}
 ];
 
 // initializeTests:

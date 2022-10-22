@@ -2,11 +2,15 @@
 using DbgX.Interfaces.Services;
 using DbgX.Requests;
 using DbgX.Requests.Initialization;
+using Microsoft.PowerShell.Commands;
 using Nito.AsyncEx;
 
 using System;
 using System.IO;
+using System.Text;
+using System.Runtime.CompilerServices;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 /// <summary>
 /// Represents an execution of a test suite as found in a JavaScript test script.
@@ -28,6 +32,8 @@ class TestSuiteExecution
     {
         m_debuggerInstallPath = debuggerInstallPath;
         m_scriptPath = scriptPath;
+        m_allOutput = new List<string>();
+        m_lastOutput = new List<string>();
     }
 
     public class ExecutionResult
@@ -47,14 +53,23 @@ class TestSuiteExecution
     public ExecutionResult ExecuteTests()
     {
         ExecutionResult result = new ExecutionResult();
+        List<string>? loadOutput = null;
 
-        Console.WriteLine($"Executing Test Suite {m_scriptPath}:");
+        Console.WriteLine($"Executing Test Suite {Path.GetFileName(m_scriptPath)}:");
 
         AsyncContext.Run(async () =>
         {
             DebugEngine engine = new DebugEngine();
             engine.DmlOutput += EngineOutput;
-            await engine.SendRequestAsync(new CreateProcessRequest("notepad.exe", "", new EngineOptions()));
+
+            int commandsProcessed = await SetupEngineForScript(engine);
+            if (commandsProcessed == 0)
+            {
+                Console.WriteLine("    Unable to setup script: no harness commands recognized!");
+                return;
+            }
+
+            // await engine.SendRequestAsync(new CreateProcessRequest("notepad.exe", "", new EngineOptions()));
             await engine.SendRequestAsync(new ExecuteRequest(".load SymbolBuilderComposition.dll"));
 
             //
@@ -63,7 +78,12 @@ class TestSuiteExecution
             //
             string jsProviderPath = Path.Combine(m_debuggerInstallPath, "winext\\JsProvider.dll");
             await engine.SendRequestAsync(new ExecuteRequest(".load " + jsProviderPath));
+
+            ClearOutput();
             await engine.SendRequestAsync(new ExecuteRequest(".scriptload " + m_scriptPath));
+            loadOutput = m_lastOutput;
+            ClearOutput();
+
             await engine.SendRequestAsync(new ExecuteRequest("dx @$testInit = @$scriptContents.initializeTests()"));
 
             //
@@ -114,10 +134,95 @@ class TestSuiteExecution
                     }
                 }
             }
-
         });
 
+        if (result.TestsRun == 0)
+        {
+            Console.WriteLine("   WARNING: no tests were detected in execution of script test suite!");
+            Console.WriteLine("   Loader Output:");
+            Console.WriteLine("   ************************************************************");
+
+            if (loadOutput != null)
+            {
+                foreach (string outputStr in loadOutput)
+                {
+                    foreach (string line in outputStr.Split('\n'))
+                    {
+                        Console.WriteLine("        " + line);
+                    }
+                }
+            }
+        }
+
         return result;
+    }
+
+    /// <summary>
+    /// Performs a command within a "[Harness: (command)]" block at the start of the file
+    /// </summary>
+    /// <param name="cmd"></param>
+    async Task<bool> PerformHarnessCommand(DebugEngine engine, string cmd)
+    {
+        if (cmd.StartsWith("run "))
+        {
+            var cmdLine = cmd.Substring(4);
+            await engine.SendRequestAsync(new CreateProcessRequest(cmdLine, "", new EngineOptions()));
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Opens the script and does some very limited parsing for "setup" commands to run the test suite contained
+    /// in the script.  These must come in the form of comment lines immediately after any optional "use strict"
+    /// at the top of the file.
+    /// 
+    /// Instructions to the harness are of the form "// [Harness: <command>]".
+    /// 
+    /// Supported commands are:
+    /// 
+    ///     run <command-line>  : Starts the process as given by <command-line> and waits for it to start
+    ///     
+    /// </summary>
+    async Task<int> SetupEngineForScript(DebugEngine engine)
+    {
+        Regex harnessRe = new Regex(@"^//\s*\[Harness:\s*([^\\]+)\]");
+
+        int commandsProcessed = 0;
+        using (StreamReader reader = File.OpenText(m_scriptPath))
+        {
+            while(reader.Peek() >= 0)
+            {
+                string? line = reader.ReadLine();
+                if (line == null) { break; }
+
+                if (line.StartsWith("//"))
+                {
+                    Match match = harnessRe.Match(line);
+                    if (match.Success && await PerformHarnessCommand(engine, match.Groups[1].Value))
+                    {
+                            commandsProcessed++;
+                    }
+
+                    continue;
+                }
+                else if (String.IsNullOrWhiteSpace(line) || line.StartsWith("\"use strict\""))
+                {
+                    //
+                    // Just skip over any blank lines or "use strict" directives at the top of the .js file.
+                    //
+                    continue;
+                }
+                else
+                {
+                    //
+                    // Anything else and we are done.
+                    //
+                    break;
+                }
+            }
+        }
+        return commandsProcessed;
     }
 
     /// <summary>
@@ -168,13 +273,20 @@ class TestSuiteExecution
 
         return pass;
     }
-    static void EngineOutput(object? sender, OutputEventArgs e)
+    void ClearOutput()
     {
-        // Console.Write(e.Output);
+        m_lastOutput = new List<string>();
+    }
+    void EngineOutput(object? sender, OutputEventArgs e)
+    {
+        m_allOutput.Add(e.Output);
+        m_lastOutput.Add(e.Output);
     }
 
     string m_debuggerInstallPath;
     string m_scriptPath;
+    List<string> m_allOutput;
+    List<string> m_lastOutput;
 }
 
 public class Program
