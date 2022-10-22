@@ -32,12 +32,93 @@ var __uniqueId = 0;
 //**************************************************************************
 // Utility:
 //
+// Right now, these helpers are included in each script to make writing tests easier.  It would be nice
+// if the infrastructure could inject some of these into the test script context instead of duplicating
+// them into each test script.
+//
 
+// __Errorinfo:
+//
+// Parses the stack from an error to yield file names, line numbers, etc...
+// Note that this is ChakraCore specific and may need to change if the engine underneath
+// JsProvider ever changes.
+//
+class __Errorinfo
+{
+    constructor(err)
+    {
+        this.__err = err;
+        this.__errstack = err.stack;
+        this.__errlines = this.__errstack.split("\n");
+    }
+
+    *[Symbol.iterator]()
+    {
+        for (var line of this.__errlines)
+        {
+            var re = /at (\S+) \(([^:]*):(\d+):(\d+)\)/;
+            var result = re.exec(line);
+            if (result)
+            {
+                yield { FunctionName: result[1],
+                        SourceFile: result[2],
+                        SourceLine: result[3],
+                        SourceColumn: result[4] };
+            }
+        }
+    }
+}
+
+// __formerror:
+//
+// Takes an existing error object for a verification failure (and its stack) and reforms it into a new
+// one with a slightly different message.
+//
+function __formerror(e, str)
+{
+    var info = new __Errorinfo(e);
+    var callerInfo = null;
+    var idx = 0;
+    for (var frame of info)
+    {
+        if (++idx == 2)
+        {
+            callerInfo = frame;
+            break;
+        }
+    }
+
+    var msg = "Verification FAILED";
+    if (callerInfo)
+    {
+        msg += " @ ";
+        msg += callerInfo.FunctionName;
+        msg += ":";
+        msg += callerInfo.SourceLine;
+        msg += ":";
+        msg += callerInfo.SourceColumn;
+    }
+
+    if (str !== undefined)
+    {
+        msg += " (";
+        msg += str;
+        msg += ")";
+    }
+
+    return new Error(msg);
+}
+
+// __VERIFY:
+//
+// Helper to verify a boolean condition and throw an error (with optional message) if the verification
+// fails.
+//
 function __VERIFY(val, excStr)
 {
     if (!val)
     {
-        throw new Error(excStr);
+        throw __formerror(new Error("VERIFICATION FAILED"), excStr);
     }
 }
 
@@ -288,7 +369,7 @@ function Test_StructManualLayout()
     var fooTy = host.getModuleType("notepad.exe", name);
     __VERIFY(fooTy.fields.x.offset == 0, "unexpected underlying type system offset of 'x'");
     __VERIFY(fooTy.fields.y.offset == 0, "unexpected underlying type system offset of 'y'");
-    __VERIFY(fooTy.fields.z.offset == 0, "unexpected underlying type system offset of 'z'");
+    __VERIFY(fooTy.fields.z.offset == 1, "unexpected underlying type system offset of 'z'");
     __VERIFY(fooTy.size == 8, "unexpected underlying type system size of manual layout type");
 
     foo.Delete();

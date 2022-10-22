@@ -48,6 +48,8 @@ class TestSuiteExecution
     {
         ExecutionResult result = new ExecutionResult();
 
+        Console.WriteLine($"Executing Test Suite {m_scriptPath}:");
+
         AsyncContext.Run(async () =>
         {
             DebugEngine engine = new DebugEngine();
@@ -130,7 +132,7 @@ class TestSuiteExecution
         string? errorMsg = null;
         bool pass = false;
 
-        Console.Write($"Executing Test {testName}: ");
+        Console.Write($"    Executing Test {testName}: ");
         var execResult = await engine.SendRequestAsync(new ModelQueryRequest("@$testInit[" + testId.ToString() + "].Code()", false, DbgX.Interfaces.Enums.ModelQueryFlags.Default, recursionDepth : 1));
         XDocument modelDoc = XDocument.Parse(execResult);
         XElement? rootElement = modelDoc.Root?.Element("Element");
