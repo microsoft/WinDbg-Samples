@@ -11,6 +11,7 @@ using System.Text;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis.Operations;
 
 /// <summary>
 /// Represents an execution of a test suite as found in a JavaScript test script.
@@ -59,10 +60,28 @@ class TestSuiteExecution
 
         AsyncContext.Run(async () =>
         {
+            EngineOptions opts = new EngineOptions();
+            var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+            switch(arch)
+            {
+                case System.Runtime.InteropServices.Architecture.X86:
+                    opts.EngineBitness = EngineArchitecture.X86;
+                    break;
+                case System.Runtime.InteropServices.Architecture.X64:
+                    opts.EngineBitness = EngineArchitecture.X64;
+                    break;
+                case System.Runtime.InteropServices.Architecture.Arm:
+                    opts.EngineBitness = EngineArchitecture.ARM32;
+                    break;
+                case System.Runtime.InteropServices.Architecture.Arm64:
+                    opts.EngineBitness = EngineArchitecture.ARM64;
+                    break;
+            }
+
             DebugEngine engine = new DebugEngine();
             engine.DmlOutput += EngineOutput;
 
-            int commandsProcessed = await SetupEngineForScript(engine);
+            int commandsProcessed = await SetupEngineForScript(engine, opts);
             if (commandsProcessed == 0)
             {
                 Console.WriteLine("    Unable to setup script: no harness commands recognized!");
@@ -161,12 +180,12 @@ class TestSuiteExecution
     /// Performs a command within a "[Harness: (command)]" block at the start of the file
     /// </summary>
     /// <param name="cmd"></param>
-    async Task<bool> PerformHarnessCommand(DebugEngine engine, string cmd)
+    async Task<bool> PerformHarnessCommand(DebugEngine engine, EngineOptions opts, string cmd)
     {
         if (cmd.StartsWith("run "))
         {
             var cmdLine = cmd.Substring(4);
-            await engine.SendRequestAsync(new CreateProcessRequest(cmdLine, "", new EngineOptions()));
+            await engine.SendRequestAsync(new CreateProcessRequest(cmdLine, "", opts));
             return true;
         }
         return false;
@@ -184,7 +203,7 @@ class TestSuiteExecution
     ///     run <command-line>  : Starts the process as given by <command-line> and waits for it to start
     ///     
     /// </summary>
-    async Task<int> SetupEngineForScript(DebugEngine engine)
+    async Task<int> SetupEngineForScript(DebugEngine engine, EngineOptions opts)
     {
         Regex harnessRe = new Regex(@"^//\s*\[Harness:\s*([^\\]+)\]");
 
@@ -199,7 +218,7 @@ class TestSuiteExecution
                 if (line.StartsWith("//"))
                 {
                     Match match = harnessRe.Match(line);
-                    if (match.Success && await PerformHarnessCommand(engine, match.Groups[1].Value))
+                    if (match.Success && await PerformHarnessCommand(engine, opts, match.Groups[1].Value))
                     {
                             commandsProcessed++;
                     }
