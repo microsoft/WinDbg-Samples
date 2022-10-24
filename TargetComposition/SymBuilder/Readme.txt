@@ -47,6 +47,15 @@ types and symbol information via data model properties and methods.
 // SOURCES TOUR
 //*************************************************
 
+The included Visual Studio solution contains two projects:
+
+    - SymBuilder:      The plug-in itself (described below).  This is a native debugger extension built in C++
+                       using the target composition APIs and the debugger data model APIs (via a C++17 helper library)
+
+    - SymBuilderTests: A test suite for the plug-in (described in a section near the bottom of the document
+                       entitled "TESTING THE PLUG-IN".  This is a managed (C#) test harness utilizing the DbgX package
+                       to drive the debugger engine.  The tests themselves are written in JavaScript.
+
 This plug-in is separated into several distinct layers:
 
 1) The core extension (boilerplate necessary to be an extension and register):
@@ -862,6 +871,64 @@ A word of caution: the symbol builder will *CURRENTLY* allow the creation of con
 impossible (e.g.: having class X have a base class of Y...  and class Y having a base class of X...  or similar
 cyclic situations with fields).  The creation of such may lead the debugger into a bad state (including things like
 stack overflows).
+
+//*************************************************
+// TESTING THE PLUG-IN
+//*************************************************
+
+The SymBuilderTests project contains a set of unit tests written in JavaScript and driven by a small C# test harness
+which utilizes the DbgX NuGET package to drive the debugger.  As the JavaScript provider (JsProvider) is not currently
+available in a NuGET package, the test harness must be able to find and load a copy of JsProvider.dll.  If you have
+a Windows 10 SDK install (with the debugger installed as part of the SDK), the harness will look there.  If you have
+a Microsoft internal ring isntall of the debugger, the harness will look there as well.  If neither of these is
+installed, the first argument to the test harness must be a path to an appropriate architecture debugger install
+from which to load the JavaScript provider.
+
+NOTE: The structure and harness for these tests is still somewhat in flux.
+
+The layout of the unit test project
+
+    - Program.cs - The test harness itself
+    - *.js       - Individual test suites that run with the harness
+
+The test harness will open each *.js file contained within the project.  Each such file contains a header block
+giving directives to the harness.  This block must come **BEFORE ANYTHING ELSE** other than an optional "use strict"; 
+The header block contains a set of commands to the test harness structured as:
+
+// [Harness: <command>]
+
+Currently defined commands are:
+
+    - run <process> [<arguments>]...
+
+      Starts the debugger executing the given process with the given arguments
+
+Once the debugger engine has been spawned and all of the harness commands have been executed, the script is loaded
+and the initializeTests method is executed.  This method returns an array of entries which are:
+
+    { Name: <name of the test>, Code: <code for the test> }
+
+Each test case in this array is executed one at a time with the results being displayed to console.  Error messages
+will be displayed along with the line of code and which test case they occurred in.
+
+The unit tests are presently structured such that they can be easily debugged in a normal debugger installation
+OUTSIDE of the harness.  A typical setup for debugging unit tests would be:
+
+    - Start the debugger which will load the plug-in and load/execute scripts (whether WinDbg Classic or WinDbg Preview)
+    - Start an outer debugger which will debug the plug-in and attach it to the inner debugger
+        - NOTE: For WinDbg Classic, attach to "windbg.exe"; for WinDbg Preview, attach to "EngHost.exe"
+    - In the inner debugger
+        - .load SymbolBuilderComposition.dll
+        - .scriptload <test> (e.g.: ".scriptload BasicTypeTests.js")
+        - dx @$tests = @$scriptContents.initializeTests()
+        - (OPTIONAL): Start the script debugger (e.g.: ".scriptdebug BasicTypeTests.js")
+        - (OPTIONAL): Set a script breakpoint on line N of the script (in script debugger: e.g.: bp 243:1)
+        - (OPTIONAL): Exit script debugger (in script debugger: q)
+    - In the outer debugger
+        - Set any breakpoints of interest
+    - In the inner debugger
+        - Invoke the test case (e.g.: "dx @$scriptContents.Test_NestedStructsWithAutoAlignment()")
+    - Do your debugging where necessary between the script debugger and the native debugger
 
 //*************************************************
 // FUTURE ENHANCEMENTS
