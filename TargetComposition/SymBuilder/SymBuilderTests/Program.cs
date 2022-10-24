@@ -88,7 +88,7 @@ class TestSuiteExecution
                 return;
             }
 
-            // await engine.SendRequestAsync(new CreateProcessRequest("notepad.exe", "", new EngineOptions()));
+            await engine.SendRequestAsync(new ExecuteRequest(".extpath+ " + Directory.GetCurrentDirectory()));
             await engine.SendRequestAsync(new ExecuteRequest(".load SymbolBuilderComposition.dll"));
 
             //
@@ -310,7 +310,7 @@ class TestSuiteExecution
 
 public class Program
 {
-    static string AppendPlatformArch(string path)
+    static string AppendPlatformArch(string path, bool useArchName)
     {
         var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
         switch (arch)
@@ -318,9 +318,9 @@ public class Program
             case System.Runtime.InteropServices.Architecture.X86:
                 return Path.Combine(path, "x86");
             case System.Runtime.InteropServices.Architecture.X64:
-                return Path.Combine(path, "amd64");
+                return Path.Combine(path, useArchName ? "x64" : "amd64");
             case System.Runtime.InteropServices.Architecture.Arm:
-                return Path.Combine(path, "woa");
+                return Path.Combine(path, useArchName ? "x86" : "woa");
             case System.Runtime.InteropServices.Architecture.Arm64:
                 return Path.Combine(path, "arm64");
             default:
@@ -358,7 +358,7 @@ public class Program
                     string? line = reader.ReadLine();
                     if (line != null)
                     {
-                        installPath = AppendPlatformArch(Path.Combine(internalPath, line.Trim()));
+                        installPath = AppendPlatformArch(Path.Combine(internalPath, line.Trim()), false);
                     }
                 }
             }
@@ -369,13 +369,13 @@ public class Program
         //
         if (installPath == null)
         {
-            var installRootsKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("Software\\Windows Kits\\Installed Roots");
+            var installRootsKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots");
             if (installRootsKey != null)
             {
                 Object val = installRootsKey.GetValue("WindowsDebuggersRoot10");
                 if (val != null)
                 {
-                    installPath = AppendPlatformArch((string)val);
+                    installPath = AppendPlatformArch((string)val, true);
                 }
             }
         }
