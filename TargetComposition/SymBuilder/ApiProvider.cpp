@@ -1132,16 +1132,21 @@ void FieldObject::MoveBefore(_In_ const Object& /*fieldObject*/, _In_ ComPtr<Fie
     FieldObject& fieldFactory = ApiProvider::Get().GetFieldFactory();
     if (fieldFactory.IsObjectInstance(beforeObj))
     {
-        ComPtr<FieldSymbol> spFieldSymbol = fieldFactory.GetStoredInstance(beforeObj);
+        ComPtr<FieldSymbol> spFieldSymbolBefore = fieldFactory.GetStoredInstance(beforeObj);
 
-        SymbolSet *pSymbolSet = spFieldSymbol->InternalGetSymbolSet();
-        BaseSymbol *pParentSymbol = pSymbolSet->InternalGetSymbol(spFieldSymbol->InternalGetParentId());
-        if (pParentSymbol == nullptr)
+        if (spFieldSymbol->InternalGetParentId() != spFieldSymbolBefore->InternalGetParentId())
+        {
+            throw std::runtime_error("target position field reference cannot be in a differing type");
+        }
+
+        SymbolSet *pSymbolSet = spFieldSymbolBefore->InternalGetSymbolSet();
+        BaseSymbol *pParentSymbolBefore = pSymbolSet->InternalGetSymbol(spFieldSymbolBefore->InternalGetParentId());
+        if (pParentSymbolBefore == nullptr)
         {
             throw std::runtime_error("cannot rearrange an orphan field");
         }
 
-        CheckHr(pParentSymbol->GetChildPosition(spFieldSymbol->InternalGetId(), &pos));
+        CheckHr(pParentSymbolBefore->GetChildPosition(spFieldSymbolBefore->InternalGetId(), &pos));
     }
     else
     {

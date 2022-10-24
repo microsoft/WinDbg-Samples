@@ -418,6 +418,175 @@ function Test_StructMixedManualAutoLayout()
     return true;
 }
 
+// Test_StructDeleteFields:
+//
+// Verifies that we can delete fields of a struct and that layout will reflow around the deleted
+// field.
+//
+function Test_StructDeleteFields()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fooFldA = foo.Fields.Add("a", "__int64");           // [0, 8)
+    var fooFldB = foo.Fields.Add("b", "char");              // [8, 9)
+    var fooFldC = foo.Fields.Add("c", "int");               // [12, 16)
+
+    __VERIFY(foo.Size == 16, "unexpected size of type");
+    __VERIFY(fooFldC.Offset == 12, "unexpected offset of 'c'");
+
+    //
+    // Do some *PRE DELETE* sanity checks against the underlying type system.
+    //
+    var fooTy = host.getModuleType("notepad.exe", name);
+
+    __VERIFY(fooTy.fields.b.offset == 8, "unexpected underlying type system offset of 'b'");
+    __VERIFY(fooTy.fields.c.offset == 12, "unexpected underlying type system offset of 'c'");
+
+    fooFldB.Delete();
+
+    __VERIFY(foo.Size == 16, "unexpected size of type after field delete");
+    __VERIFY(fooFldC.Offset == 8, "unexpected offset of 'c' after 'b' delete");
+
+    fooTy = host.getModuleType("notepad.exe", name);
+
+    __VERIFY(fooTy.size == 16, "unexpected underlying type system size after field delete");
+    __VERIFY(fooTy.fields.b === undefined, "unexpected ability to find 'b' after field delete");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_StructChangeFieldType
+//
+// Verifies that we can change the type of a field and that layout will reflow around the changed
+// type.
+//
+function Test_StructChangeFieldType()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fooFldA = foo.Fields.Add("a", "__int64");           // [0, 8)
+    var fooFldB = foo.Fields.Add("b", "int");               // [8, 12)
+    var fooFldC = foo.Fields.Add("c", "short");             // [12, 14)
+    var fooFldD = foo.Fields.Add("d", "char");              // [14, 15)
+
+    //
+    // Do some *PRE DELETE* sanity checks against the underlying type system.
+    //
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.c.offset == 12, "unexpected underlying type system offset of 'c' pre-retype");
+    __VERIFY(fooTy.fields.d.offset == 14, "unexpected underlying type system offset of 'd' pre-retype");
+    __VERIFY(fooTy.size == 16, "unexpected underlying type system size pre-retype");
+
+    //
+    // To:
+    //
+    // a: __int64 [0, 8)
+    // b: char [8, 9)
+    // c: short [10, 12)
+    // d: char [12, 13)    <-- still aligns to 16 overall size. but c and d moved.
+    //
+
+    fooFldB.Type = "char";
+
+    __VERIFY(fooFldB.Offset == 8, "unexpected offset of 'b' post retype");
+    __VERIFY(fooFldB.Type.Name == "char", "unexpected type of 'b' post retype");
+    __VERIFY(fooFldC.Offset == 10, "unexpected offset of 'c' post retype");
+    __VERIFY(fooFldD.Offset == 12, "unexpected offset of 'd' post retype");
+
+    fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.c.offset == 10, "unexpected underlying type system offset of 'c' post-retype");
+    __VERIFY(fooTy.fields.d.offset == 12, "unexpected underlying type system offset of 'd' post-retype");
+    __VERIFY(fooTy.size == 16, "unexpected underlying type system size post-retype");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_StructMoveField:
+//
+// Verifies that we can move a field of a type in automatic layout mode and that things reflow and the
+// structure looks as expected.
+//
+function Test_StructMoveField()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fooFldA = foo.Fields.Add("a", "__int64");       // [0, 8)
+    var fooFldB = foo.Fields.Add("b", "int");           // [8, 12)
+    var fooFldC = foo.Fields.Add("c", "short");         // [12, 14)
+    var fooFldD = foo.Fields.Add("d", "char");          // [15, 16)
+
+    //
+    // Do some *PRE DELETE* sanity checks against the underlying type system.
+    //
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.size == 16, "unexpected underlying type system size pre-move");
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected underlying type system offset of 'a' pre-move");
+
+    //
+    // Rearrange the type to:
+    //
+    // d:char    [0, 1)
+    // a:__int64 [8, 16)
+    // b: int    [16, 20)
+    // c: short  [20, 22)   <-- size is now 24
+    //
+    fooFldD.MoveBefore(fooFldA);
+
+    __VERIFY(fooFldA.Offset == 8, "unexpected offset of 'a' after move");
+    __VERIFY(foo.Size == 24, "unexpected size of type after move");
+
+    fooTy = host.getModuleType("notepad.exe", name);
+
+    __VERIFY(fooTy.size == 24, "unexpected underlying type system size post-move");
+    __VERIFY(fooTy.fields.a.offset == 8, "unexpected underlying type system offset of 'a' post-move");
+
+    //
+    // Move it back and ensure that things work as expected and we can push something to the back of
+    // the field list.
+    //
+    fooFldD.MoveBefore(99);
+
+    __VERIFY(fooFldA.Offset == 0, "unexpected offset of 'a' after restore");
+    __VERIFY(foo.Size == 16, "unexpected size of type after restore");
+
+    fooTy = host.getModuleType("notepad.exe", name);
+
+    __VERIFY(fooTy.size == 16, "unexpected underlying type system size post-restore");
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected underlying type system offset of 'a' post-restore");
+
+    var barName = __getUniqueName("bar");
+    var bar = __symbolBuilderSymbols.Types.Create(barName);
+
+    var barFldX = bar.Fields.Add("x", "int");
+    var barFldY = bar.Fields.Add("y", "int");
+    var barFldZ = bar.Fields.Add("z", "int");
+
+    //
+    // Verify that trying to do a .MoveBefore() a field of *ANOTHER* type fails.
+    //
+    var caught = false;
+    try
+    {
+        fooFldA.MoveBefore(barFldZ);
+    }
+    catch(exc)
+    {
+        caught = true;
+    }
+
+    __VERIFY(caught, "unexpected success of moving a 'foo' field to before a 'bar' field!");
+
+    foo.Delete();
+    bar.Delete();
+
+    return true;
+}
+
 //**************************************************************************
 // Initialization:
 //
@@ -435,7 +604,10 @@ var __testSuite =
     { Name: "AutoLayoutAlignment", Code: Test_AutoLayoutAlignment },
     { Name: "NestedStructsWithAutoAlignment", Code: Test_NestedStructsWithAutoAlignment },
     { Name: "StructManualLayout", Code: Test_StructManualLayout },
-    { Name: "StructMixedManualAutoLayout", Code: Test_StructMixedManualAutoLayout}
+    { Name: "StructMixedManualAutoLayout", Code: Test_StructMixedManualAutoLayout },
+    { Name: "StructDeleteFields", Code: Test_StructDeleteFields },
+    { Name: "StructChangeFieldType", Code: Test_StructChangeFieldType },
+    { Name: "StructMoveField", Code: Test_StructMoveField }
 ];
 
 // initializeTests:
