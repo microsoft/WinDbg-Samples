@@ -310,15 +310,92 @@ class TestSuiteExecution
 
 public class Program
 {
+    static string AppendPlatformArch(string path)
+    {
+        var arch = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture;
+        switch (arch)
+        {
+            case System.Runtime.InteropServices.Architecture.X86:
+                return Path.Combine(path, "x86");
+            case System.Runtime.InteropServices.Architecture.X64:
+                return Path.Combine(path, "amd64");
+            case System.Runtime.InteropServices.Architecture.Arm:
+                return Path.Combine(path, "woa");
+            case System.Runtime.InteropServices.Architecture.Arm64:
+                return Path.Combine(path, "arm64");
+            default:
+                return path;
+        }
+    }
+
+    /// <summary>
+    /// As JsProvider.dll is not available in a NuGET package, we cannot pull it as we do with other engine
+    /// bits.  The tests here are in JavaScript and require it.  This will attempt to find an appropriate
+    /// debugger install from which to pull JsProvider without being manually pointed at such.
+    ///
+    /// Such can be either a Win10 SDK install (available externally) or a Microsoft internal ring install of
+    /// the debugger (available only internally).  We will not be able to pull from the store installed
+    /// version of WinDbgNext. 
+    /// 
+    /// Note that this can be overriden via the command line pointing at an appropriate install.
+    /// </summary>
+    /// <returns></returns>
+    static string? FindAppropriateDebuggerInstallPath()
+    {
+        string? installPath = null;
+
+        //
+        // Check for an internal ring install.
+        //
+        string internalPath = System.Environment.ExpandEnvironmentVariables("%LOCALAPPDATA%\\dbg\\UI");
+        string versionFile = Path.Combine(internalPath, "currentVersion.txt");
+        if (File.Exists(versionFile))
+        {
+            using (StreamReader reader = File.OpenText(versionFile))
+            {
+                if (reader.Peek() >= 0)
+                {
+                    string? line = reader.ReadLine();
+                    if (line != null)
+                    {
+                        installPath = AppendPlatformArch(Path.Combine(internalPath, line.Trim()));
+                    }
+                }
+            }
+        }
+
+        //
+        // Check for a Windows 10 SDK installation of the debugger.
+        //
+        if (installPath == null)
+        {
+            var installRootsKey = Microsoft.Win32.Registry.LocalMachine.OpenSubKey("Software\\Windows Kits\\Installed Roots");
+            if (installRootsKey != null)
+            {
+                Object val = installRootsKey.GetValue("WindowsDebuggersRoot10");
+                if (val != null)
+                {
+                    installPath = AppendPlatformArch((string)val);
+                }
+            }
+        }
+
+        return installPath;
+    }
     static void Main(string[] args)
     {
-        if (args.Length == 0)
+        string? debuggerInstallPath = FindAppropriateDebuggerInstallPath();
+
+        if (args.Length > 0)
         {
+            debuggerInstallPath = args[0];
+        }
+
+        if (debuggerInstallPath == null)
+        { 
             Console.WriteLine("Usage: SymbolBuilderTests <debugger install path> [<script path>]");
             return;
         }
-
-        string debuggerInstallPath = args[0];
 
         string scriptPath;
         if (args.Length > 1)
