@@ -402,6 +402,11 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
         //
         // Go ask the debugger through the data model for its symbol path.
         //
+        // @TODO: It might be valuable at some point in the future to have the symbol provider service
+        //        listen for changes in the symbol path and make attempts to reconnect to a source if the
+        //        symbol path changes and we don't yet have an import source.  
+        //
+
         std::wstring symPath = (std::wstring)Object::RootNamespace().KeyValue(L"Debugger")
                                                                     .KeyValue(L"Settings")
                                                                     .KeyValue(L"Symbols")
