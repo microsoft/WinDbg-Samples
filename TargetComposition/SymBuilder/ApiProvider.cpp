@@ -961,20 +961,6 @@ Object FieldsObject::Add(_In_ const Object& /*fieldsObject*/,
     SymbolSet *pSymbolSet = spUdtTypeSymbol->InternalGetSymbolSet();
 
     ULONG64 fieldOffsetToUse = fieldOffset.value_or(UdtPositionalSymbol::AutomaticAppendLayout);
-    ULONG64 fieldTypeId = 0;
-
-    UdtTypeObject& udtTypeFactory = ApiProvider::Get().GetUdtTypeFactory();
-    if (udtTypeFactory.IsObjectInstance(fieldType))
-    {
-        ComPtr<UdtTypeSymbol> spFieldType_Udt = udtTypeFactory.GetStoredInstance(fieldType);
-        fieldTypeId = spFieldType_Udt->InternalGetId();
-    }
-    else
-    {
-        std::wstring fieldTypeName = (std::wstring)fieldType;
-        fieldTypeId = pSymbolSet->InternalGetSymbolIdByName(fieldTypeName);
-    }
-
     BaseTypeSymbol *pFieldType = UnboxType(pSymbolSet, fieldType);
 
     ComPtr<FieldSymbol> spField;

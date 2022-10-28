@@ -587,6 +587,271 @@ function Test_StructMoveField()
     return true;
 }
 
+// Test_ArrayCreation:
+//
+// Verify that we can create arrays and get back expected results.
+//
+function Test_ArrayCreation()
+{
+    var arOfInt1 = __symbolBuilderSymbols.Types.CreateArray("int", 32);
+    __VERIFY(arOfInt1.Size == 32 * 4, "unexpected size of array");
+    __VERIFY(arOfInt1.BaseType.Name == "int", "unexpected base type of array");
+    __VERIFY(arOfInt1.ArraySize == 32, "unexpected array dimension");
+
+    var name =  __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    //
+    // Ensure that we can add fields of this type and get back at such via the type system.
+    //
+    var fooFldA = foo.Fields.Add("a", arOfInt1);
+    var fooFldB = foo.Fields.Add("b", "int [8]");
+    var fooFldC = foo.Fields.Add("c", "char[4]");
+
+    __VERIFY(fooFldA.Type.BaseType.Name == "int", "unexpected field type of 'a'");
+    __VERIFY(fooFldA.Type.ArraySize == 32, "unexpected array dimension of 'a'");
+    __VERIFY(fooFldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fooFldB.Type.BaseType.Name == "int", "unexpected field type of 'b'");
+    __VERIFY(fooFldB.Type.ArraySize == 8, "unexpected array dimension of 'b'");
+    __VERIFY(fooFldB.Offset == 32 * 4, "unexpected offset of 'b'");
+    __VERIFY(fooFldC.Type.BaseType.Name == "char", "unexpected field type of 'c'");
+    __VERIFY(fooFldC.Type.ArraySize == 4, "unexpected array dimension of 'c'");
+    __VERIFY(fooFldC.Offset == 32 * 4 + 8 * 4, "unexpected offset of 'c'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.type.typeKind == "array", "unexpected type system type kind of field 'a'");
+    __VERIFY(fooTy.fields.b.type.typeKind == "array", "unexpected type system type kind of field 'b'");
+    __VERIFY(fooTy.fields.c.type.typeKind == "array", "unexpected type system type kind of field 'c'");
+    __VERIFY(fooTy.fields.a.type.baseType.name == "int", "unexpected type system array-of type of field 'a'");
+    __VERIFY(fooTy.fields.b.type.baseType.name == "int", "unexpected type system array-of type of field 'b'");
+    __VERIFY(fooTy.fields.c.type.baseType.name == "char", "unexpected type system array-of type of field 'c'");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_PointerCreation:
+//
+// Verify that we can create poiners and get back expected results.
+//
+function Test_PointerCreation()
+{
+    //
+    // Find the size of a pointer in a module which is *NOT* on symbol builder symbols.  Note that these types
+    // are natively understood by the debugger/EE and they will work even if the module has no symbols whatsoever.
+    //
+    var genPtr = host.getModuleType("ntdll", "int *");
+    var ptrSize = genPtr.size;
+
+    var ptrToInt1 = __symbolBuilderSymbols.Types.CreatePointer("int");
+    __VERIFY(ptrToInt1.Size == ptrSize, "unexpected pointer size");
+    __VERIFY(ptrToInt1.BaseType.Name == "int", "unexpected base type of pointer");
+
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    //
+    // Ensure that we can add fields of this type and get back at such via the type system.
+    //
+    var fooFldA = foo.Fields.Add("a", ptrToInt1);
+    var fooFldB = foo.Fields.Add("b", "int *");
+    var fooFldC = foo.Fields.Add("c", "char *");
+    var fooFldD = foo.Fields.Add("d", name + " *");
+
+    __VERIFY(fooFldA.Type.BaseType.Name == "int", "unexpected field type of 'a'");
+    __VERIFY(fooFldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fooFldB.Type.BaseType.Name == "int", "unexpected field type of 'b'");
+    __VERIFY(fooFldB.Offset == ptrSize * 1, "unexpected offset of 'a'");
+    __VERIFY(fooFldC.Type.BaseType.Name == "char", "unexpected field type of 'c'");
+    __VERIFY(fooFldC.Offset == ptrSize * 2, "unexpected offset of 'a'");
+    __VERIFY(fooFldD.Type.BaseType.Name == name, "unexpected field type of 'd'");
+    __VERIFY(fooFldD.Offset == ptrSize * 3, "unexpected offset of 'a'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.type.typeKind == "pointer", "unexpected type system kind of field 'a'");
+    __VERIFY(fooTy.fields.a.type.pointerKind == "standard", "unexpected type system pointer kind of field 'a'");
+    __VERIFY(fooTy.fields.a.type.baseType.name == "int", "unexpected type system base type name of field 'a'");
+    __VERIFY(fooTy.fields.b.type.typeKind == "pointer", "unexpected type system kind of field 'b'");
+    __VERIFY(fooTy.fields.b.type.pointerKind == "standard", "unexpected type system pointer kind of field 'b'");
+    __VERIFY(fooTy.fields.b.type.baseType.name == "int", "unexpected type system base type name of field 'a'");
+    __VERIFY(fooTy.fields.c.type.typeKind == "pointer", "unexpected type system kind of field 'c'");
+    __VERIFY(fooTy.fields.c.type.pointerKind == "standard", "unexpected type system pointer kind of field 'c'");
+    __VERIFY(fooTy.fields.c.type.baseType.name == "char", "unexpected type system base type name of field 'c'");
+    __VERIFY(fooTy.fields.d.type.typeKind == "pointer", "unexpected type system kind of field 'd'");
+    __VERIFY(fooTy.fields.d.type.pointerKind == "standard", "unexpected type system pointer kind of field 'd'");
+    __VERIFY(fooTy.fields.d.type.baseType.name == name, "unexpected type system base type name of field 'd'");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_EnumWithAutoLayout:
+//
+// Verify that we can create enums with automatic layout of enumerants and get back expected results.
+//
+function Test_EnumWithAutoLayout()
+{
+    var name = __getUniqueName("fruit");
+    var enumType = __symbolBuilderSymbols.Types.CreateEnum(name);
+
+    var enumerantA = enumType.Enumerants.Add("apple");
+    var enumerantB = enumType.Enumerants.Add("orange");
+    var enumerantC = enumType.Enumerants.Add("grapefruit");
+    var enumerantD = enumType.Enumerants.Add("lychee");
+
+    __VERIFY(enumType.BaseType.Name == "int", "unexpected base type of enum");
+    __VERIFY(enumType.Size == 4, "unexpected size of enum");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.apple.value == 0, "unexpected type system value of enumerant 'apple'");
+    __VERIFY(fooTy.fields.orange.value == 1, "unexpected type system value of enumerant 'orange'");
+    __VERIFY(fooTy.fields.grapefruit.value == 2, "unexpected type system value of enumerant 'grapefruit'");
+    __VERIFY(fooTy.fields.lychee.value == 3, "unexpected type system value of enumerant 'lychee'");
+
+    enumType.Delete();
+    return true;
+}
+
+// Test_EnumWithMixedLayout:
+//
+// Verify that we can create enums with mixed layout (some auto, some manual) of enumerants and get
+// back expected results.
+//
+function Test_EnumWithMixedLayout()
+{
+    var name = __getUniqueName("fruit");
+    var enumType = __symbolBuilderSymbols.Types.CreateEnum(name);
+
+    var enumerantA = enumType.Enumerants.Add("apple");
+    var enumerantB = enumType.Enumerants.Add("orange");
+    var enumerantC = enumType.Enumerants.Add("grapefruit", 42);
+    var enumerantD = enumType.Enumerants.Add("lychee");
+
+    __VERIFY(enumType.BaseType.Name == "int", "unexpected base type of enum");
+    __VERIFY(enumType.Size == 4, "unexpected size of enum");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.apple.value == 0, "unexpected type system value of enumerant 'apple'");
+    __VERIFY(fooTy.fields.orange.value == 1, "unexpected type system value of enumerant 'orange'");
+    __VERIFY(fooTy.fields.grapefruit.value == 42, "unexpected type system value of enumerant 'grapefruit'");
+    __VERIFY(fooTy.fields.lychee.value == 43, "unexpected type system value of enumerant 'lychee'");
+
+    enumType.Delete();
+    return true;
+}
+
+// Test_EnumDeleteEnumerants:
+//
+// Verifies that we can delete an enumerant and get automatic layout reflow around the deleted value.
+//
+function Test_EnumDeleteEnumerants()
+{
+    var name = __getUniqueName("foo");
+    var enumType = __symbolBuilderSymbols.Types.CreateEnum(name);
+
+    var enumerantA = enumType.Enumerants.Add("apple");
+    var enumerantB = enumType.Enumerants.Add("orange");
+    var enumerantC = enumType.Enumerants.Add("grapefruit");
+    var enumerantD = enumType.Enumerants.Add("lychee");
+
+    __VERIFY(enumType.BaseType.Name == "int", "unexpected base type of enum");
+    __VERIFY(enumType.Size == 4, "unexpected size of enum");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.apple.value == 0, "unexpected type system value of enumerant 'apple'");
+    __VERIFY(fooTy.fields.orange.value == 1, "unexpected type system value of enumerant 'orange'");
+    __VERIFY(fooTy.fields.grapefruit.value == 2, "unexpected type system value of enumerant 'grapefruit'");
+    __VERIFY(fooTy.fields.lychee.value == 3, "unexpected type system value of enumerant 'lychee'");
+
+    enumerantC.Delete();
+
+    fooTy == host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.apple.value == 0, "unexpected type system value of enumerant 'apple' post delete");
+    __VERIFY(fooTy.fields.orange.value == 1, "unexpected type system value of enumerant 'orange' post delete");
+    __VERIFY(fooTy.fields.lychee.value == 2, "unexpected type system value of enumerant 'lychee' post delete");
+
+    __VERIFY(fooTy.fields.grapefruit === undefined, "unexpected abillity to see deleted enumerant at type system");
+
+    enumType.Delete();
+    return true;
+}
+
+// Test_EnumWithNonDefaultBaseType:
+//
+// Verify that we can create enums with a non default (e.g.: not int) base type and get automatic layout of 
+// enumerants and get back expected results.
+//
+function Test_EnumWithNonDefaultBaseType()
+{
+    var name = __getUniqueName("fruit");
+    var enumType = __symbolBuilderSymbols.Types.CreateEnum(name, "char");
+
+    var enumerantA = enumType.Enumerants.Add("apple");
+    var enumerantB = enumType.Enumerants.Add("orange");
+    var enumerantC = enumType.Enumerants.Add("grapefruit");
+    var enumerantD = enumType.Enumerants.Add("lychee");
+
+    __VERIFY(enumType.BaseType.Name == "char", "unexpected base type of enum");
+    __VERIFY(enumType.Size == 1, "unexpected size of enum");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.apple.value == 0, "unexpected type system value of enumerant 'apple'");
+    __VERIFY(fooTy.fields.orange.value == 1, "unexpected type system value of enumerant 'orange'");
+    __VERIFY(fooTy.fields.grapefruit.value == 2, "unexpected type system value of enumerant 'grapefruit'");
+    __VERIFY(fooTy.fields.lychee.value == 3, "unexpected type system value of enumerant 'lychee'");
+
+    enumType.Delete();
+    return true;
+}
+
+// Test_EnumMoveEnumerant:
+//
+// Verify that we can create enums with mixed layout (some auto, some manual) of enumerants, move enumerants
+// around, and get expected results.
+//
+function Test_EnumMoveEnumerant()
+{
+    var name = __getUniqueName("fruit");
+    var enumType = __symbolBuilderSymbols.Types.CreateEnum(name);
+
+    var enumerantA = enumType.Enumerants.Add("apple");
+    var enumerantB = enumType.Enumerants.Add("orange");
+    var enumerantC = enumType.Enumerants.Add("grapefruit", 42);
+    var enumerantD = enumType.Enumerants.Add("lychee");
+
+    __VERIFY(enumType.BaseType.Name == "int", "unexpected base type of enum");
+    __VERIFY(enumType.Size == 4, "unexpected size of enum");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.apple.value == 0, "unexpected type system value of enumerant 'apple'");
+    __VERIFY(fooTy.fields.orange.value == 1, "unexpected type system value of enumerant 'orange'");
+    __VERIFY(fooTy.fields.grapefruit.value == 42, "unexpected type system value of enumerant 'grapefruit'");
+    __VERIFY(fooTy.fields.lychee.value == 43, "unexpected type system value of enumerant 'lychee'");
+
+    enumerantA.MoveBefore(99);
+    fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.orange.value == 0, "unexpected type system value of enumerant 'orange' post move 1");
+    __VERIFY(fooTy.fields.grapefruit.value == 42, "unexpected type system value of enumerant 'grapefruit' post move 1");
+    __VERIFY(fooTy.fields.lychee.value == 43, "unexpected type system value of enumerant 'lychee' post move 1");
+    __VERIFY(fooTy.fields.apple.value == 44, "unexpected type system value of enumerant 'apple' post move 1");
+
+    enumerantC.MoveBefore(enumerantB);
+    fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.grapefruit.value == 42, "unexpected type system value of enumerant 'grapefruit' post move 2");
+    __VERIFY(fooTy.fields.orange.value == 43, "unexpected type system value of enumerant 'orange' post move 2");
+    __VERIFY(fooTy.fields.lychee.value == 44, "unexpected type system value of enumerant 'lychee' post move 2");
+    __VERIFY(fooTy.fields.apple.value == 45, "unexpected type system value of enumerant 'apple' post move 2");
+
+    enumerantC.MoveBefore(99);
+    __VERIFY(fooTy.fields.orange.value == 0, "unexpected type system value of enumerant 'orange' post move 3");
+    __VERIFY(fooTy.fields.lychee.value == 1, "unexpected type system value of enumerant 'lychee' post move 3");
+    __VERIFY(fooTy.fields.apple.value == 2, "unexpected type system value of enumerant 'apple' post move 3");
+    __VERIFY(fooTy.fields.grapefruit.value == 42, "unexpected type system value of enumerant 'grapefruit' post move 3");
+
+    enumType.Delete();
+    return true;
+}
+
 //**************************************************************************
 // Initialization:
 //
@@ -598,7 +863,14 @@ function Test_StructMoveField()
 //
 var __testSuite =
 [
+    //
+    // General Tests:
+    //
     { Name: "VerifyBuilderSymbols", Code: Test_VerifyBuilderSymbols },
+
+    //
+    // UDT Specific Tests:
+    //
     { Name: "CreateAndDestroyEmptyUdt", Code: Test_CreateAndDestroyEmptyUdt },
     { Name: "UdtWithBasicFields", Code: Test_UdtWithBasicFields },
     { Name: "AutoLayoutAlignment", Code: Test_AutoLayoutAlignment },
@@ -607,7 +879,23 @@ var __testSuite =
     { Name: "StructMixedManualAutoLayout", Code: Test_StructMixedManualAutoLayout },
     { Name: "StructDeleteFields", Code: Test_StructDeleteFields },
     { Name: "StructChangeFieldType", Code: Test_StructChangeFieldType },
-    { Name: "StructMoveField", Code: Test_StructMoveField }
+    { Name: "StructMoveField", Code: Test_StructMoveField },
+
+    //
+    // Pointer/Array Tests:
+    //
+    { Name: "ArrayCreation", Code: Test_ArrayCreation },
+    { Name: "PointerCreation", Code: Test_PointerCreation },
+
+    //
+    // Enum Tests:
+    //
+    {Name: "EnumWithAutoLayout", Code: Test_EnumWithAutoLayout },
+    {Name: "EnumWithMixedLayout", Code: Test_EnumWithMixedLayout },
+    {Name: "EnumDeleteEnumerants", Code: Test_EnumDeleteEnumerants },
+    {Name: "EnumWithNonDefaultBaseType", Code: Test_EnumWithNonDefaultBaseType },
+    {Name: "EnumMoveEnumerant", Code: Test_EnumMoveEnumerant }
+
 ];
 
 // initializeTests:
