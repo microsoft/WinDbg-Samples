@@ -30,6 +30,121 @@ namespace SymbolBuilder
 // General Symbol Set:
 //
 
+bool PublicList::FindNearestSymbols(_In_ ULONG64 address, _Out_ SymbolList const** pSymbolList)
+{
+    if (m_addresses.size() == 0)
+    {
+        return false;
+    }
+
+    auto it = std::lower_bound(m_addresses.begin(), m_addresses.end(), address,
+                               [&](_In_ const Address& symAddr, _In_ ULONG64 address)
+                               {
+                                   return symAddr.Addr < address;
+                               });
+
+    //
+    // Remember that it points to the first element in the list where search_address <= list_address.
+    // If it happens to point to an element which is equal, we want this.  Otherwise, we need to step backwards
+    // one element because, in lacking an exact match, we want address below the search address which is
+    // CLOSEST to it!
+    //
+    if (it == m_addresses.end() || it->Addr != address)
+    {
+        if (it == m_addresses.begin())
+        {
+            return false;
+        }
+
+        --it;
+    }
+
+    *pSymbolList = &(it->Symbols);
+    return true;
+}
+
+HRESULT PublicList::AddSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+{
+    //
+    // We cannot let a C++ exception escape.
+    //
+    auto fn = [&]()
+    {
+        auto it = std::lower_bound(m_addresses.begin(), m_addresses.end(), address,
+                                   [&](_In_ const Address& symAddr, _In_ ULONG64 address)
+                                   {
+                                       return symAddr.Addr < address;
+                                   });
+
+        //
+        // If there are no public symbols which are >= the new public address, the new one can just be put
+        // at the end of the list and we are done.
+        //
+        if (it == m_addresses.end())
+        {
+            m_addresses.push_back( { address, { symbol } } );
+            return S_OK;
+        }
+
+        //
+        // If the found element happens to be at the same address, there are *MULTIPLE* public symbols covering
+        // the same address and they go into a singular list.
+        //
+        if (it->Addr == address)
+        {
+            it->Symbols.push_back(symbol);
+            return S_OK;
+        }
+
+        //
+        // Otherwise, 'it' refers to the first element > address.  We need to insert the new public in the list
+        // immediately before 'it'.
+        //
+        m_addresses.insert(it, { address, { symbol } });
+        return S_OK;
+    };
+    return ConvertException(fn);
+}
+
+HRESULT PublicList::RemoveSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+{
+    //
+    // We cannot let a C++ exception escape.
+    //
+    auto fn = [&]()
+    {
+        auto it = std::lower_bound(m_addresses.begin(), m_addresses.end(), address,
+                                   [&](_In_ const Address& symAddr, _In_ ULONG64 address)
+                                   {
+                                       return symAddr.Addr < address;
+                                   });
+
+        if (it == m_addresses.end() || it->Addr != address)
+        {
+            //
+            // We could not find this address.  It's not a failure per-se.  Just return S_FALSE to the caller
+            // to let them know nothing was actually removed!
+            //
+            return S_FALSE;
+        }
+
+        RemoveSymbolFromList(it->Symbols, symbol);
+
+        //
+        // If there are no public symbols matching this particular list any longer, we need to remove the entire
+        // address entry from the table.  To do otherwise would result in us missing the most appropriate symbol
+        // as we could find an address with an empty list!
+        //
+        if (it->Symbols.size() == 0)
+        {
+            m_addresses.erase(it);
+        }
+
+        return S_OK;
+    };
+    return ConvertException(fn);
+}
+
 bool SymbolRangeList::FindSymbols(_In_ ULONG64 address, _Out_ SymbolList const** pSymbolList)
 {
     auto it = std::lower_bound(m_ranges.begin(), m_ranges.end(), address,
@@ -313,6 +428,11 @@ SymbolBuilderManager* SymbolSet::GetSymbolBuilderManager() const
     return m_pOwningProcess->GetSymbolBuilderManager();
 }
 
+ISvcModule* SymbolSet::GetModule() const
+{
+    return m_spModule.Get();
+}
+
 HRESULT SymbolSet::AddBasicCTypes()
 {
     HRESULT hr = S_OK;
@@ -337,14 +457,14 @@ HRESULT SymbolSet::AddBasicCTypes()
     return hr;
 }
 
-HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId)
+HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId, _In_ ULONG64 reservedId)
 {
     //
     // We cannot let a C++ exception escape.
     //
     auto fn = [&]()
     {
-        ULONG64 uniqueId = GetUniqueId();
+        ULONG64 uniqueId = (reservedId == 0 ? GetUniqueId() : reservedId);
         if (uniqueId > std::numeric_limits<size_t>::max())
         {
             return E_FAIL;
@@ -353,6 +473,11 @@ HRESULT SymbolSet::AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUn
         if (m_symbols.size() <= uniqueId + 1)
         {
             m_symbols.resize(static_cast<size_t>(uniqueId + 1));
+        }
+
+        if (m_symbols[static_cast<size_t>(uniqueId)] != nullptr)
+        {
+            return E_UNEXPECTED;
         }
 
         m_symbols[static_cast<size_t>(uniqueId)] = pBaseSymbol;
@@ -461,6 +586,10 @@ HRESULT SymbolSet::GetSymbolById(_In_ ULONG64 symbolId,
     }
 
     ISvcSymbol *pSymbol = m_symbols[static_cast<size_t>(symbolId)].Get();
+    if (pSymbol == nullptr)
+    {
+        return E_INVALIDARG;
+    }
 
     if (isScopeBoundVariable)
     {
@@ -501,17 +630,24 @@ HRESULT SymbolSet::InvalidateExternalCaches()
 {
     HRESULT hr = S_OK;
 
-    IDebugServiceManager *pServiceManager = GetServiceManager();
-    if (pServiceManager == nullptr)
+    //
+    // There are some circumstances where we *NEVER* want to send notifications upward.  If this is so, just
+    // ignore the invalidation.  It is either not needed or will happen later.
+    //
+    if (!m_cacheInvalidationDisabled)
     {
-        return E_UNEXPECTED;
+        IDebugServiceManager *pServiceManager = GetServiceManager();
+        if (pServiceManager == nullptr)
+        {
+            return E_UNEXPECTED;
+        }
+
+        ComPtr<SymbolCacheInvalidateArguments> spArgs;
+        IfFailedReturn(MakeAndInitialize<SymbolCacheInvalidateArguments>(&spArgs, m_spModule.Get(), this));
+
+        HRESULT hrEvent;
+        IfFailedReturn(pServiceManager->FireEventNotification(DEBUG_SVCEVENT_SYMBOLCACHEINVALIDATE, spArgs.Get(), &hrEvent));
     }
-
-    ComPtr<SymbolCacheInvalidateArguments> spArgs;
-    IfFailedReturn(MakeAndInitialize<SymbolCacheInvalidateArguments>(&spArgs, m_spModule.Get(), this));
-
-    HRESULT hrEvent;
-    IfFailedReturn(pServiceManager->FireEventNotification(DEBUG_SVCEVENT_SYMBOLCACHEINVALIDATE, spArgs.Get(), &hrEvent));
 
     //
     // While we get a sink result if some handler decided to return a failure from their handling of the event, we
@@ -709,6 +845,19 @@ HRESULT SymbolSet::FindSymbolByName(_In_ PCWSTR symbolName, _COM_Outptr_ ISvcSym
     *ppSymbol = nullptr;
 
     //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the name in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (HasImporter())
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spImporter->ImportForNameQuery(SvcSymbol, symbolName);
+    }
+
+    //
     // We cannot let a C++ exception escape.
     //
     auto fn = [&]()
@@ -741,13 +890,40 @@ HRESULT SymbolSet::FindSymbolByOffset(_In_ ULONG64 moduleOffset,
     HRESULT hr = S_OK;
     *ppSymbol = nullptr;
 
+    //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the address in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (HasImporter())
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spImporter->ImportForOffsetQuery(SvcSymbol, moduleOffset);
+    }
+
+    BaseSymbol *pSymbol = nullptr;
+
     SymbolRangeList::SymbolList const* pSymbols;
     if (!m_symbolRanges.FindSymbols(moduleOffset, &pSymbols) || pSymbols->size() == 0)
     {
-        return E_BOUNDS;
+        //
+        // Is there a public symbol which happens to be "closest" to this address...?
+        //
+        PublicList::SymbolList const* pPublics;
+        if (!m_publicAddresses.FindNearestSymbols(moduleOffset, &pPublics) || pPublics->size() == 0)
+        {
+            return E_BOUNDS;
+        }
+
+        pSymbol = InternalGetSymbol((*pPublics)[0]);
+    }
+    else
+    {
+        pSymbol = InternalGetSymbol((*pSymbols)[0]);
     }
 
-    BaseSymbol *pSymbol = InternalGetSymbol((*pSymbols)[0]);
 
     ULONG64 symbolOffset;
     IfFailedReturn(pSymbol->GetOffset(&symbolOffset));
@@ -925,6 +1101,37 @@ HRESULT ScopeEnumerator::GetNext(_COM_Outptr_ ISvcSymbol **ppSymbol)
 // Scopes:
 //
 
+HRESULT GlobalScope::EnumerateChildren(_In_ SvcSymbolKind kind,
+                                       _In_opt_z_ PCWSTR pwszName,
+                                       _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
+                                       _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum)
+{
+    HRESULT hr = S_OK;
+    *ppChildEnum = nullptr;
+
+    //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the name in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (m_spSymbolSet->HasImporter())
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spSymbolSet->GetImporter()->ImportForNameQuery(kind, pwszName);
+    }
+
+    Microsoft::WRL::ComPtr<GlobalEnumerator> spEnum;
+    IfFailedReturn(Microsoft::WRL::MakeAndInitialize<GlobalEnumerator>(&spEnum,
+                                                                       m_spSymbolSet.Get(),
+                                                                       kind,
+                                                                       pwszName,
+                                                                       pSearchInfo));
+
+    *ppChildEnum = spEnum.Detach();
+    return hr;
+}
 
 HRESULT BaseScope::EnumerateArguments(_COM_Outptr_ ISvcSymbolSetEnumerator **ppEnum)
 {

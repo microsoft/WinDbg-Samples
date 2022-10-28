@@ -31,6 +31,72 @@ class SymbolBuilderManager;
 // Overall Symbol Set:
 //
 
+// PublicList:
+//
+// Provides a list of addresses in sorted order which can be binary searched for the "nearest" symbol(s) to
+// a given address.
+//
+class PublicList
+{
+public:
+
+    using SymbolList = std::vector<ULONG64>;
+
+    // PublicList():
+    //
+    // Creates a new public symbol list.  Initially, there are no symbols in the list.
+    //
+    PublicList()
+    {
+    }
+
+    // FindNearestSymbols():
+    //
+    // Find the list of symbols which are closest to a given address.  If such can be found, true is returned and
+    // an output pointer to the list of symbol ids is passed in 'pSymbolList'
+    //
+    bool FindNearestSymbols(_In_ ULONG64 address, _Out_ SymbolList const** pSymbolList);
+
+    // AddSymbol():
+    //
+    // Adds a public symbol to the list.
+    //
+    HRESULT AddSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol);
+
+    // RemoveSymbol():
+    //
+    // Removes a symbol from the list.
+    //
+    HRESULT RemoveSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol);
+
+private:
+    
+    struct Address
+    {
+        ULONG64 Addr;
+        SymbolList Symbols;
+    };
+
+    // RemoveSymbolFromList():
+    //
+    // Removes a symbol from the given list.
+    //
+    void RemoveSymbolFromList(_Inout_ SymbolList& list, _In_ ULONG64 symbol)
+    {
+        for (auto it = list.begin(); it != list.end(); ++it)
+        {
+            if (*it == symbol)
+            {
+                list.erase(it);
+                break;
+            }
+        }
+    }
+
+    std::vector<Address> m_addresses;
+
+};
+
 // SymbolRangeList:
 //
 // Provides a list of address ranges in sorted order which can be binary searched for a given symbol or set
@@ -125,8 +191,17 @@ public:
     SymbolSet() :
         m_nextId(0),
         m_demandCreatePointerTypes(true),
-        m_demandCreateArrayTypes(true)
+        m_demandCreateArrayTypes(true),
+        m_cacheInvalidationDisabled(false)
     {
+    }
+
+    ~SymbolSet()
+    {
+        if (HasImporter())
+        {
+            m_spImporter->DisconnectFromSource();
+        }
     }
 
     //*************************************************
@@ -213,12 +288,28 @@ public:
     //
     IFACEMETHOD(GetDescription)(_Out_ BSTR *pObjectDescription)
     {
-        //
-        // Give the symbol set a description so that commands in the debugger (e.g.: lm) can show something
-        // useful for what kind of symbols are loaded.
-        //
-        *pObjectDescription = SysAllocString(L"Symbol Builder Symbols");
-        return (*pObjectDescription == nullptr ? E_OUTOFMEMORY : S_OK);
+        auto fn = [&]()
+        {
+            HRESULT hr = S_OK;
+            std::wstring desc = L"Symbol Builder Symbols";
+            if (HasImporter())
+            {
+                std::wstring importerInfo;
+                IfFailedReturn(m_spImporter->GetImporterDescription(&importerInfo));
+
+                desc += L" (with demand import from ";
+                desc += importerInfo;
+                desc += L")";
+            }
+
+            //
+            // Give the symbol set a description so that commands in the debugger (e.g.: lm) can show something
+            // useful for what kind of symbols are loaded.
+            //
+            *pObjectDescription = SysAllocString(desc.c_str());
+            return (*pObjectDescription == nullptr ? E_OUTOFMEMORY : S_OK);
+        };
+        return ConvertException(fn);
     }
 
     //*************************************************
@@ -256,7 +347,7 @@ public:
     //
     // Called to add a new symbol to our management lists and assign it a unique id.
     //
-    HRESULT AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId);
+    HRESULT AddNewSymbol(_In_ BaseSymbol *pBaseSymbol, _Out_ ULONG64 *pUniqueId, _In_ ULONG64 reservedId = 0);
 
     // DeleteExistingSymbol():
     //
@@ -298,6 +389,24 @@ public:
             return S_OK;
         };
         return ConvertException(fn);
+    }
+	
+    // SetImporter():
+    //
+    // Sets an "on demand" importer to use for this symbol set.
+    //
+    void SetImporter(_In_ std::unique_ptr<SymbolImporter>&& importer)
+    {
+        m_spImporter = std::move(importer);
+    }	
+
+    // SetCacheInvalidationDisable():
+    //
+    // Turns on / off the ability to send cache invalidation notifications.
+    //
+    void SetCacheInvalidationDisable(_In_ bool disable)
+    {
+        m_cacheInvalidationDisabled = disable;
     }
 
     //*************************************************
@@ -352,11 +461,39 @@ public:
         return m_symbolRanges.RemoveSymbol(start, end, symbol);
     }
 
+    // InternalAddPublicSymbol():
+    //
+    // Adds a mapping of [address] to the existing symbol.
+    //
+    HRESULT InternalAddPublicSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+    {
+        return m_publicAddresses.AddSymbol(address, symbol);
+    }
+
+    // InternalRemovePublicSymbol():
+    //
+    // Removes a mapping of [address] from the existing symbol.
+    //
+    HRESULT InternalRemovePublicSymbol(_In_ ULONG64 address, _In_ ULONG64 symbol)
+    {
+        return m_publicAddresses.RemoveSymbol(address, symbol);
+    }
+
     std::vector<Microsoft::WRL::ComPtr<ISvcSymbol>> const& InternalGetSymbols() { return m_symbols; }
     std::vector<ULONG64> const& InternalGetGlobalSymbols() const { return m_globalSymbols; }
     IDebugServiceManager* GetServiceManager() const;
     ISvcMachineArchitecture* GetArchInfo() const;
     SymbolBuilderManager* GetSymbolBuilderManager() const;
+    ISvcModule* GetModule() const;
+    SymbolBuilderProcess* GetOwningProcess() const { return m_pOwningProcess; }
+
+    // HasImporter/GetImporter():
+    //
+    // Indicates whether or not we have an underlying symbol importer / gets it.
+    //
+    bool HasImporter() const { return m_spImporter.get() != nullptr; }
+    SymbolImporter *GetImporter() const { return m_spImporter.get(); }
+    ULONG64 ReserveUniqueId() { return GetUniqueId(); }
 
 private:
 
@@ -388,6 +525,16 @@ private:
 
     // Tracks the address ranges associated with global symbols.
     SymbolRangeList m_symbolRanges;
+
+    // Tracks the addresses associated with public symbols.
+    PublicList m_publicAddresses;
+
+    // If we have an importer that will automatically pull in underlying symbols, this points
+    // to it. 
+    std::unique_ptr<SymbolImporter> m_spImporter;
+
+    // An indication of whether cache invalidation is disabled or not.
+    bool m_cacheInvalidationDisabled;
 
     // Configuration options:
     bool m_demandCreatePointerTypes;
@@ -658,21 +805,7 @@ public:
     IFACEMETHOD(EnumerateChildren)(_In_ SvcSymbolKind kind,
                                    _In_opt_z_ PCWSTR pwszName,
                                    _In_opt_ SvcSymbolSearchInfo *pSearchInfo,
-                                   _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum)
-    {
-        HRESULT hr = S_OK;
-        *ppChildEnum = nullptr;
-
-        Microsoft::WRL::ComPtr<GlobalEnumerator> spEnum;
-        IfFailedReturn(Microsoft::WRL::MakeAndInitialize<GlobalEnumerator>(&spEnum,
-                                                                           m_spSymbolSet.Get(),
-                                                                           kind,
-                                                                           pwszName,
-                                                                           pSearchInfo));
-
-        *ppChildEnum = spEnum.Detach();
-        return hr;
-    }
+                                   _COM_Outptr_ ISvcSymbolSetEnumerator **ppChildEnum);
 
     //*************************************************
     // Internal APIs:

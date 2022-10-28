@@ -15,10 +15,11 @@
 STRINGTABLE
 BEGIN
     SYMBOLBUILDER_IDS_MODULE_SYMBOLBUILDERSYMBOLS   "The symbol builder symbols for the module"
-    SYMBOLBUILDER_IDS_CREATESYMBOLS                 "CreateSymbols(module) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object"
+    SYMBOLBUILDER_IDS_CREATESYMBOLS                 "CreateSymbols(module, [options]) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object.  'options' is an object with properties which configure the symbols.  'options' currently allows .AutoImportSymbols = true/false (default false).  If 'AutoImportSymbols' is true, symbols from available PDB/exports will be automatically imported to the symbol builder upon use"
     SYMBOLBUILDER_IDS_SYMBOLSET_TYPES               "The list of available types"
     SYMBOLBUILDER_IDS_SYMBOLSET_DATA                "The list of available global data"
     SYMBOLBUILDER_IDS_SYMBOLSET_FUNCTIONS           "The list of available functions"
+    SYMBOLBUILDER_IDS_SYMBOLSET_PUBLICS             "The list of available public symbols"
     SYMBOLBUILDER_IDS_TYPES_ADDBASICCTYPES          "AddBasicCTypes() - For symbol builder symbols created without default C types, this adds the default C types to the type system"
     SYMBOLBUILDER_IDS_TYPES_CREATE                  "Create(typeName, [qualifiedTypeName]) - Creates a new user defined type.  An explicit 'qualifiedTypeName' may be optionally provided if different than the base name"
     SYMBOLBUILDER_IDS_TYPES_CREATEARRAY             "CreateArray(baseType, arraySize) - Creates a new array type.  'baseType' may either be a type object or a type name.  'arraySize' is the size of the array"
@@ -60,6 +61,8 @@ BEGIN
     SYMBOLBUILDER_IDS_FUNCTION_RETURNTYPE           "The return type of the function"
     SYMBOLBUILDER_IDS_FUNCTION_PARAMETERS           "The list of the parameters of the function"
     SYMBOLBUILDER_IDS_FUNCTION_LOCALVARIABLES       "The list of local variables of the function"
+    SYMBOLBUILDER_IDS_FUNCTION_ADDRESSRANGES        "The list of address ranges for code bytes of the function.  The first address range is the primary one and defines the entry point of the function"
+    SYMBOLBUILDER_IDS_FUNCTION_DELETE               "Delete() - Deletes the function"
     SYMBOLBUILDER_IDS_PARAMETERS_ADD                "Add(name, parameterType) - Adds a new parameter of the given name and type"
     SYMBOLBUILDER_IDS_LOCALVARIABLES_ADD            "Add(name, localVariableType) - Adds a new local variable (non parameter) of the given name and type"
     SYMBOLBUILDER_IDS_VARIABLE_NAME                 "The name of the variable (parameter or local)"
@@ -72,4 +75,10 @@ BEGIN
     SYMBOLBUILDER_IDS_LIVERANGE_LOCATION            "A string description of the location of the variable in this live range"
     SYMBOLBUILDER_IDS_LIVERANGE_DELETE              "Delete() - Deletes the live range"
     SYMBOLBUILDER_IDS_PARAMETER_MOVEBEFORE          "MoveBefore(pos) - Moves this parameter to a location in its parent function before the given parameter.  Note that 'pos' may either be a parameter object or it may be a zero based ordinal indicating its position within the list of parameters"
+    SYMBOLBUILDER_IDS_PUBLICS_CREATE                "Create(name, offset) - Adds a new public symbol at 'offset' bytes into the module"
+    SYMBOLBUILDER_IDS_PUBLIC_OFFSET                 "The offset of the public symbol into the module"
+    SYMBOLBUILDER_IDS_PUBLIC_PROMOTETOFUNCTION      "PromoteToFunction([codeSize], [returnType], [parameter]...) - Converts the public symbol to a function symbol as if Functions.Create had been called.  If the 'codeSize' is specified as zero, the disassembler will be used to find the extent of the function"
+    SYMBOLBUILDER_IDS_PUBLIC_DELETE                 "Delete() - Deletes the public symbol"
+    SYMBOLBUILDER_IDS_ADDRESSRANGE_START            "The starting address or offset of the address range"
+    SYMBOLBUILDER_IDS_ADDRESSRANGE_SIZE             "The size of the address range"
 END

@@ -287,6 +287,13 @@ HRESULT BaseDataSymbol::Delete()
         IfFailedReturn(pSymbolType->RemoveDependentNotify(InternalGetId()));
     }
 
+    if (m_rangeCacheOffset != Uninitialized && m_rangeCacheSize != Uninitialized)
+    {
+        InternalGetSymbolSet()->InternalRemoveSymbolRange(m_rangeCacheOffset, 
+                                                          m_rangeCacheSize, 
+                                                          InternalGetId());
+    }
+
     return BaseSymbol::Delete();
 }
 

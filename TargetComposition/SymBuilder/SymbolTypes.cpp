@@ -57,8 +57,9 @@ HRESULT UdtPositionalSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     // the actual offset the same as the offset.  Any triggering of type layout will change this if such
     // is marked as automatic.
     //
+    HRESULT hr = BaseDataSymbol::BaseInitialize(pSymbolSet, SvcSymbolField, owningTypeId, pValue, symTypeId, pwszName, nullptr);
     m_symOffsetActual = m_symOffset;
-    return BaseDataSymbol::BaseInitialize(pSymbolSet, SvcSymbolField, owningTypeId, pValue, symTypeId, pwszName, nullptr);
+    return hr;
 }
 
 HRESULT UdtPositionalSymbol::MoveToBefore(_In_ ULONG64 position)
@@ -186,7 +187,8 @@ HRESULT PointerTypeSymbol::GetBaseType(_Out_ ISvcSymbol **ppBaseType)
 
 HRESULT PointerTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                                   _In_ ULONG64 pointerToId,
-                                                  _In_ SvcSymbolPointerKind pointerKind)
+                                                  _In_ SvcSymbolPointerKind pointerKind,
+                                                  _In_ ULONG64 reservedId)
 {
     //
     // We cannot let a C++ exception escape.
@@ -230,7 +232,8 @@ HRESULT PointerTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                                       SvcSymbolTypePointer,
                                                       0,
                                                       ptrName.empty() ? nullptr : ptrName.c_str(),
-                                                      ptrQualifiedName.empty() ? nullptr : ptrQualifiedName.c_str()));
+                                                      ptrQualifiedName.empty() ? nullptr : ptrQualifiedName.c_str(),
+                                                      reservedId));
 
         m_pointerKind = pointerKind;
         m_pointerToId = pointerToId;

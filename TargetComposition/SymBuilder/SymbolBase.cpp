@@ -30,9 +30,9 @@ namespace SymbolBuilder
 // Base Symbols:
 //
 
-HRESULT BaseSymbol::InitializeNewSymbol()
+HRESULT BaseSymbol::InitializeNewSymbol(_In_ ULONG64 reservedId)
 {
-    return m_pSymbolSet->AddNewSymbol(this, &m_id);
+    return m_pSymbolSet->AddNewSymbol(this, &m_id, reservedId);
 }
 
 HRESULT BaseSymbol::RemoveChild(_In_ ULONG64 uniqueId)
@@ -257,6 +257,30 @@ HRESULT ChildEnumerator::GetNext(_COM_Outptr_ ISvcSymbol **ppSymbol)
     }
 
     return E_BOUNDS;
+}
+
+//*************************************************
+// Publics:
+//
+
+HRESULT PublicSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
+                                             _In_ ULONG64 offset,
+                                             _In_ PCWSTR pwszName,
+                                             _In_opt_ PCWSTR pwszQualifiedName)
+{
+    HRESULT hr = S_OK;
+    IfFailedReturn(BaseInitialize(pSymbolSet, SvcSymbolPublic, 0, pwszName, pwszQualifiedName));
+
+    m_offset = offset;
+    IfFailedReturn(pSymbolSet->InternalAddPublicSymbol(offset, InternalGetId()));
+
+    return hr;
+}
+
+HRESULT PublicSymbol::Delete()
+{
+    InternalGetSymbolSet()->InternalRemovePublicSymbol(InternalGetOffset(), InternalGetId());
+    return BaseSymbol::Delete();
 }
 
 } // SymbolBuilder
