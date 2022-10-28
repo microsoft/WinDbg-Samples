@@ -106,6 +106,14 @@ public:
                                    _In_ PCWSTR pwszName,
                                    _In_opt_ PCWSTR pwszQualifiedName);
 
+    // Delete():
+    //
+    // Deletes the symbol.  This does *NOT* guarantee that this OBJECT disappears...  only that it is no longer
+    // linked to the symbol set.  If there are still other symbols which refer to this symbol, they may become
+    // "zombie" symbols.  They will still be there but will not function correctly.
+    //
+    virtual HRESULT Delete();
+
     //*************************************************
     // Internal Accessors:
     //

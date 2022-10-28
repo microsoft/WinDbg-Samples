@@ -104,6 +104,18 @@ public:
     //
     ISvcMachineArchitecture *GetArchInfo() const;
 
+    // GetVirtualMemory():
+    //
+    // Gets the virtual memory access interface for what we are targeting.
+    //
+    ISvcMemoryAccess *GetVirtualMemory() const;
+
+    // GetProcessKey():
+    //
+    // Gets the process key for this process.
+    //
+    ULONG64 GetProcessKey() const { return m_processKey; }
+
 private:
 
     // The "key" used to identify the process we represent.
@@ -143,6 +155,13 @@ struct RegisterInformation
 #define INTERFACE ISvcSymbolBuilderManager
 DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
 {
+    // ProcessKeyToProcess():
+    //
+    // Converts a process key to the process object for it.
+    //
+    STDMETHOD(ProcessKeyToProcess)(_In_ ULONG64 processKey,
+                                   _COM_Outptr_ ISvcProcess **ppProcess) PURE;
+    
     // PidToProcess():
     //
     // Converts a process id to the process object for it.
@@ -258,14 +277,14 @@ public:
                                         _Out_writes_(sizeHardDependencies) GUID *pHardDependencies,
                                         _Out_ ULONG64 *pNumHardDependencies,
                                         _In_ ULONG64 sizeSoftDependencies,
-                                        _Out_writes_(sizeSoftDependencies) GUID * /*pSoftDependencies*/,
+                                        _Out_writes_(sizeSoftDependencies) GUID *pSoftDependencies,
                                         _Out_ ULONG64 *pNumSoftDependencies)
     {
         HRESULT hr = S_OK;
         if (sizeHardDependencies == 0 && sizeSoftDependencies == 0)
         {
             *pNumHardDependencies = 3;
-            *pNumSoftDependencies = 0;
+            *pNumSoftDependencies = 1;
             return S_OK;
         }
 
@@ -274,12 +293,24 @@ public:
             return E_INVALIDARG;
         }
 
+        if (sizeSoftDependencies < 1)
+        {
+            return E_INVALIDARG;
+        }
+
         pHardDependencies[0] = DEBUG_SERVICE_PROCESS_ENUMERATOR;
         pHardDependencies[1] = DEBUG_SERVICE_MODULE_ENUMERATOR;
         pHardDependencies[2] = DEBUG_SERVICE_ARCHINFO;
 
+        //
+        // We can absolutely function without the VM service.  We only need this for importing symbols from
+        // some sources (e.g.: DbgHelp).  The import may fail without this, but the rest of the builder's symbols
+        // will work properly.  Thus, it is a *soft* dependency and not a *hard* one (e.g.: it's optional)
+        //
+        pSoftDependencies[0] = DEBUG_SERVICE_VIRTUAL_MEMORY;
+
         *pNumHardDependencies = 3;
-        *pNumSoftDependencies = 0;
+        *pNumSoftDependencies = 1;
         return hr;
     }
 
@@ -311,6 +342,7 @@ public:
         (void)pServiceManager->QueryService(DEBUG_SERVICE_PROCESS_ENUMERATOR, IID_PPV_ARGS(&m_spProcEnum));
         (void)pServiceManager->QueryService(DEBUG_SERVICE_MODULE_ENUMERATOR, IID_PPV_ARGS(&m_spModEnum));
         (void)pServiceManager->QueryService(DEBUG_SERVICE_ARCHINFO, IID_PPV_ARGS(&m_spArchInfo));
+        (void)pServiceManager->QueryService(DEBUG_SERVICE_VIRTUAL_MEMORY, IID_PPV_ARGS(&m_spVirtualMemory));
 
         //
         // We want to listen to modules that disappear so that we can "unload" our cached copy of the symbols.
@@ -383,6 +415,21 @@ public:
                 IfFailedReturn(InitArchBased());
             }
         }
+        else if (serviceGuid == DEBUG_SERVICE_VIRTUAL_MEMORY)
+        {
+            //
+            // If the VM service changed, alter our cached copy of it so that we are calling
+            // the correct service.
+            //
+            m_spVirtualMemory = nullptr;
+            if (pNewService != nullptr)
+            {
+                //
+                // *EVERY* VM service is *REQUIRED* to support ISvcMemoryAccess
+                //
+                IfFailedReturn(pNewService->QueryInterface(IID_PPV_ARGS(&m_spVirtualMemory)));
+            }
+        }
 
         return hr;
     }
@@ -402,6 +449,13 @@ public:
     //*************************************************
     // ISvcSymbolBuilderManager:
     //
+
+    // ProcessKeyToProcess():
+    //
+    // Converts a process key to the process object for it.
+    //
+    IFACEMETHOD(ProcessKeyToProcess)(_In_ ULONG64 processKey,
+                                   _COM_Outptr_ ISvcProcess **ppProcess);
 
     // PidToProcess():
     //
@@ -495,6 +549,15 @@ public:
         return m_spArchInfo.Get();
     }
 
+    // GetVirtualMemory():
+    //
+    // Gets the virtual memory access interface for what we are targeting.
+    //
+    ISvcMemoryAccess *GetVirtualMemory() const
+    {
+        return m_spVirtualMemory.Get();
+    }
+
 private:
 
     // InitArchBased():
@@ -525,6 +588,9 @@ private:
 
     // Our container's arch info service.
     Microsoft::WRL::ComPtr<ISvcMachineArchitecture> m_spArchInfo;
+
+    // Our container's VM service.
+    Microsoft::WRL::ComPtr<ISvcMemoryAccess> m_spVirtualMemory;
 
     // The service manager which contains and owns our lifetime.
     IDebugServiceManager *m_pOwningManager;

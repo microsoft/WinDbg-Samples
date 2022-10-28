@@ -249,6 +249,7 @@ ApiProvider::ApiProvider()
     m_spTypesFactory = std::make_unique<TypesObject>();
     m_spDataFactory = std::make_unique<DataObject>();
     m_spFunctionsFactory = std::make_unique<FunctionsObject>();
+    m_spPublicsFactory = std::make_unique<PublicsObject>();
 
     //
     // Types:
@@ -274,6 +275,12 @@ ApiProvider::ApiProvider()
     m_spFunctionFactory = std::make_unique<FunctionObject>();
 
     //
+    // Publics:
+    //
+
+    m_spPublicFactory = std::make_unique<PublicObject>();
+
+    //
     // Other Symbols:
     //
 
@@ -288,6 +295,8 @@ ApiProvider::ApiProvider()
     m_spLocalVariableFactory = std::make_unique<LocalVariableObject>();
     m_spLiveRangesFactory = std::make_unique<LiveRangesObject>();
     m_spLiveRangeFactory = std::make_unique<LiveRangeObject>();
+    m_spAddressRangesFactory = std::make_unique<AddressRangesObject>();
+    m_spAddressRangeFactory = std::make_unique<AddressRangeObject>();
 }
 
 ApiProvider::~ApiProvider()
@@ -300,10 +309,12 @@ ApiProvider::~ApiProvider()
 //
 
 Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*/,
-                                             _In_ Object moduleArg)
+                                             _In_ Object moduleArg,
+                                             _In_ std::optional<Object> options)
 {
     ModelObjectKind moduleArgKind = moduleArg.GetKind();
 
+    bool autoImportSymbols = false;
     ULONG64 moduleBase = 0;
     Object moduleObject;
     switch(moduleArgKind)
@@ -346,6 +357,16 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
         moduleContext = HostContext::Current();
     }
 
+    if (options.has_value())
+    {
+        Object optionsObj = options.value();
+        std::optional<Object> autoImportSymbolsKey = optionsObj.TryGetKeyValue(L"AutoImportSymbols");
+        if (autoImportSymbolsKey.has_value())
+        {
+            autoImportSymbols = (bool)autoImportSymbolsKey.value();
+        }
+    }
+
     ComPtr<ISvcSymbolBuilderManager> spSymbolManager;
     ComPtr<ISvcProcess> spProcess;
     GetSymbolBuilderManager(moduleContext, &spSymbolManager, &spProcess);
@@ -370,6 +391,33 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
     }
 
     CheckHr(spSymbolProcess->CreateSymbolsForModule(spModule.Get(), moduleKey, &spSymbolSet));
+
+    //
+    // If we have been asked to automatically import symbols, set up an appropriate "on demand" importer.
+    // It is *NOT* a failure to create the symbol builder set if we cannot set up the importer!
+    //
+    std::unique_ptr<SymbolImporter> spImporter;
+    if (autoImportSymbols)
+    {
+        //
+        // Go ask the debugger through the data model for its symbol path.
+        //
+        // @TODO: It might be valuable at some point in the future to have the symbol provider service
+        //        listen for changes in the symbol path and make attempts to reconnect to a source if the
+        //        symbol path changes and we don't yet have an import source.  
+        //
+
+        std::wstring symPath = (std::wstring)Object::RootNamespace().KeyValue(L"Debugger")
+                                                                    .KeyValue(L"Settings")
+                                                                    .KeyValue(L"Symbols")
+                                                                    .KeyValue(L"Sympath");
+
+        spImporter.reset(new SymbolImporter_DbgHelp(spSymbolSet.Get(), symPath.c_str()));
+        if (SUCCEEDED(spImporter->ConnectToSource()))
+        {
+            spSymbolSet->SetImporter(std::move(spImporter));
+        }
+    }
 
     SymbolSetObject& symbolSetFactory = ApiProvider::Get().GetSymbolSetFactory();
     return symbolSetFactory.CreateInstance(spSymbolSet);
@@ -436,6 +484,13 @@ Object SymbolSetObject::GetFunctions(_In_ const Object& /*symbolSetObject*/,
 {
     FunctionsObject& functionsFactory = ApiProvider::Get().GetFunctionsFactory();
     return functionsFactory.CreateInstance(spSymbolSet);
+}
+
+Object SymbolSetObject::GetPublics(_In_ const Object& /*symbolSetObject*/,
+                                   _In_ ComPtr<SymbolSet>& spSymbolSet)
+{
+    PublicsObject& publicsFactory = ApiProvider::Get().GetPublicsFactory();
+    return publicsFactory.CreateInstance(spSymbolSet);
 }
 
 //*************************************************
@@ -605,6 +660,15 @@ Object SymbolObjectHelpers::BoxSymbol(_In_ BaseSymbol *pSymbol)
             ComPtr<FunctionSymbol> spFunctionSymbol = pFunctionSymbol;
             FunctionObject& functionFactory = ApiProvider::Get().GetFunctionFactory();
             symbolObject = functionFactory.CreateInstance(spFunctionSymbol); 
+            break;
+        }
+
+        case SvcSymbolPublic:
+        {
+            PublicSymbol *pPublicSymbol = static_cast<PublicSymbol *>(pSymbol);
+            ComPtr<PublicSymbol> spPublicSymbol = pPublicSymbol;
+            PublicObject& publicFactory = ApiProvider::Get().GetPublicFactory();
+            symbolObject = publicFactory.CreateInstance(spPublicSymbol);
             break;
         }
 
@@ -826,14 +890,18 @@ std::wstring BaseTypeObject<TType>::ToString(_In_ const Object& /*typeObject*/,
 {
     std::wstring const& name = spTypeSymbol->InternalGetQualifiedName();
 
-    wchar_t buf[512];
-    swprintf_s(buf, ARRAYSIZE(buf), L"%s: %s ( size = %d, align = %d )",
-               m_pwszConvTag,
-               name.empty() ? L"<Unknown>" : name.c_str(),
+    std::wstring displayString = m_pwszConvTag;
+    displayString += L": ";
+    displayString += (name.empty() ? L"<Unknown>" : name.c_str());
+
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L" ( size = %d, align = %d )",
                (ULONG)spTypeSymbol->InternalGetTypeSize(),
                (ULONG)spTypeSymbol->InternalGetTypeAlignment());
 
-    return (std::wstring)buf;
+    displayString += buf;
+
+    return displayString;
 }
 
 template<typename TType>
@@ -1071,9 +1139,10 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
                                    _In_ ComPtr<FieldSymbol>& spFieldSymbol,
                                    _In_ const Metadata& /*metadata*/)
 {
-    wchar_t buf[512];
-
     std::wstring const& fieldName = spFieldSymbol->InternalGetName();
+
+    std::wstring displayString;
+    wchar_t buf[128];
 
     ULONG64 fieldTypeId = spFieldSymbol->InternalGetSymbolTypeId();
 
@@ -1083,10 +1152,11 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
         // The only way this is legal is if it is a constant valued enumerant!
         //
         std::wstring value = ValueToString(spFieldSymbol->InternalGetSymbolValue());
+        displayString = L"Enumerant : ";
+        displayString += (fieldName.empty() ? L"<Unknown>" : fieldName.c_str());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Enumerant: %s (value = %s)",
-                   fieldName.empty() ? L"<Unknown>" : fieldName.c_str(),
-                   value.c_str());
+        swprintf_s(buf, ARRAYSIZE(buf), L" (value = %s)", value.c_str());
+        displayString += buf;
     }
     else if (spFieldSymbol->InternalIsConstantValue())
     {
@@ -1094,24 +1164,29 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
         std::wstring const& fieldTypeName = pFieldTypeSymbol->InternalGetQualifiedName();
         std::wstring value = ValueToString(spFieldSymbol->InternalGetSymbolValue());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Field: %s (type = '%s', value = %s )",
-                   fieldName.empty() ? L"<Unknown>" : fieldName.c_str(),
-                   fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str(),
-                   value.c_str());
+        displayString = L"Field: ";
+        displayString += (fieldName.empty() ? L"<Unknown>" : fieldName.c_str());
+        displayString += L" (type = '";
+        displayString += (fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str());
 
+        swprintf_s(buf, ARRAYSIZE(buf), L"', value = %s )", value.c_str());
+        displayString += buf;
     }
     else
     {
         BaseSymbol *pFieldTypeSymbol = spFieldSymbol->InternalGetSymbolSet()->InternalGetSymbol(fieldTypeId);
         std::wstring const& fieldTypeName = pFieldTypeSymbol->InternalGetQualifiedName();
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Field: %s ( type = '%s', offset = %d )",
-                   fieldName.empty() ? L"<Unknown>" : fieldName.c_str(),
-                   fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str(),
-                   (ULONG)spFieldSymbol->InternalGetActualSymbolOffset());
+        displayString = L"Field: ";
+        displayString += (fieldName.empty() ? L"<Unknown>" : fieldName.c_str());
+        displayString += L" ( type = '";
+        displayString += (fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str());
+
+        swprintf_s(buf, ARRAYSIZE(buf), L"', offset = %d )", (ULONG)spFieldSymbol->InternalGetActualSymbolOffset());
+        displayString += buf;
     }
 
-    return (std::wstring)buf;
+    return displayString;
 }
 
 void FieldObject::Delete(_In_ const Object& /*fieldObject*/,
@@ -1345,12 +1420,15 @@ std::wstring BaseClassObject::ToString(_In_ const Object& /*baseClassObject*/,
 
     std::wstring const& baseClassTypeName = pBaseClassTypeSymbol->InternalGetQualifiedName();
 
-    wchar_t buf[512];
-    swprintf_s(buf, ARRAYSIZE(buf), L"Base Class: ( type = '%s', offset = %d )",
-               baseClassTypeName.empty() ? L"<Unknown>" : baseClassTypeName.c_str(),
-               (ULONG)spBaseClassSymbol->InternalGetActualSymbolOffset());
+    std::wstring displayString;
+    displayString = L"Base Class: ( type = '";
+    displayString += (baseClassTypeName.empty() ? L"<Unknown>" : baseClassTypeName.c_str());
 
-    return (std::wstring)buf;
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L"', offset = %d )", (ULONG)spBaseClassSymbol->InternalGetActualSymbolOffset());
+    displayString += buf;
+
+    return displayString;
 }
 
 void BaseClassObject::Delete(_In_ const Object& /*baseClassObject*/,
@@ -1553,7 +1631,8 @@ std::wstring GlobalDataObject::ToString(_In_ const Object& /*globalDataObject*/,
                                         _In_ ComPtr<GlobalDataSymbol>& spGlobalDataSymbol,
                                         _In_ const Metadata& /*metadata*/)
 {
-    wchar_t buf[512];
+    std::wstring displayString;
+    wchar_t buf[128];
 
     std::wstring const& dataName = spGlobalDataSymbol->InternalGetQualifiedName();
 
@@ -1565,23 +1644,31 @@ std::wstring GlobalDataObject::ToString(_In_ const Object& /*globalDataObject*/,
         std::wstring const& dataTypeName = pDataTypeSymbol->InternalGetQualifiedName();
         std::wstring value = ValueToString(spGlobalDataSymbol->InternalGetSymbolValue());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Global Data: %s (type = '%s', value = %s )",
-                   dataName.empty() ? L"<Unknown>" : dataName.c_str(),
-                   dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str(),
-                   value.c_str());
+        displayString = L"Global Data: ";
+        displayString += (dataName.empty() ? L"<Unknown>" : dataName.c_str());
+        displayString += L" (type = '";
+        displayString += (dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str());
+
+        swprintf_s(buf, ARRAYSIZE(buf), L"', value = %s )", value.c_str());
+        displayString += buf;
     }
     else
     {
         BaseSymbol *pDataTypeSymbol = spGlobalDataSymbol->InternalGetSymbolSet()->InternalGetSymbol(dataTypeId);
         std::wstring const& dataTypeName = pDataTypeSymbol->InternalGetQualifiedName();
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"Global Data: %s ( type = '%s', module offset = %d )",
-                   dataName.empty() ? L"<Unknown>" : dataName.c_str(),
-                   dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str(),
+        displayString = L"Global Data: ";
+        displayString += (dataName.empty() ? L"<Unknown>" : dataName.c_str());
+        displayString += L" (type = '";
+        displayString += (dataTypeName.empty() ? L"<Unknown>" : dataTypeName.c_str());
+
+        swprintf_s(buf, ARRAYSIZE(buf), L"', module offset = %d )", 
                    (ULONG)spGlobalDataSymbol->InternalGetActualSymbolOffset());
+
+        displayString += buf;
     }
 
-    return (std::wstring)buf;
+    return displayString;
 }
 
 void GlobalDataObject::Delete(_In_ const Object& /*globalDataObject*/,
@@ -1704,14 +1791,18 @@ std::wstring FunctionObject::ToString(_In_ const Object& /*functionObject*/,
                                       _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
                                       _In_ const Metadata& /*metadata*/)
 {
-    wchar_t buf[512];
-
     std::wstring const& functionName = spFunctionSymbol->InternalGetQualifiedName();
 
-    swprintf_s(buf, ARRAYSIZE(buf), L"Function: %s",
-               functionName.empty() ? L"<Unknown>" : functionName.c_str());
+    std::wstring displayString = L"Function: ";
+    displayString += (functionName.empty() ? L"<Unknown>" : functionName.c_str());
 
-    return (std::wstring)buf;
+    return displayString;
+}
+
+void FunctionObject::Delete(_In_ const Object& /*functionObject*/,
+                            _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    CheckHr(spFunctionSymbol->Delete());
 }
 
 Object FunctionObject::GetLocalVariables(_In_ const Object& /*functionObject*/,
@@ -1726,6 +1817,13 @@ Object FunctionObject::GetParameters(_In_ const Object& /*functionObject*/,
 {
     ParametersObject& parametersFactory = ApiProvider::Get().GetParametersFactory();
     return parametersFactory.CreateInstance(spFunctionSymbol);
+}
+
+Object FunctionObject::GetAddressRanges(_In_ const Object& /*functionObject*/, 
+                                        _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    AddressRangesObject& addressRangesFactory = ApiProvider::Get().GetAddressRangesFactory();
+    return addressRangesFactory.CreateInstance(spFunctionSymbol);
 }
 
 Object FunctionObject::GetReturnType(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
@@ -2172,6 +2270,307 @@ void LiveRangeObject::Delete(_In_ const Object& /*liveRangeObject*/,
     liveRangeInfo.Variable->InternalDeleteLiveRange(liveRangeInfo.LiveRangeIdentity);
 }
 
+std::experimental::generator<Object> AddressRangesObject::GetIterator(_In_ const Object& /*addressRangesObject*/,
+                                                                      _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& ranges = spFunctionSymbol->InternalGetAddressRanges();
+        if (cur >= ranges.size())
+        {
+            break;
+        }
+
+        std::pair<ULONG64, ULONG64> range = ranges[cur];
+        ++cur;
+
+        AddressRangeObject& addressRangeFactory = ApiProvider::Get().GetAddressRangeFactory();
+        Object addressRangeObj = addressRangeFactory.CreateInstance(range);
+        co_yield addressRangeObj;
+    }
+}
+
+std::wstring AddressRangesObject::ToString(_In_ const Object& /*functionObject*/,
+                                           _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                                           _In_ const Metadata& /*metadata*/)
+{
+    std::wstring displayString = L"";
+    bool first = true;
+
+    auto&& ranges = spFunctionSymbol->InternalGetAddressRanges();
+    for(auto&& range : ranges)
+    {
+        wchar_t buf[128];
+        swprintf_s(buf, ARRAYSIZE(buf), L"[%I64x, %I64x)", range.first, range.first + range.second);
+        if (!first)
+        {
+            displayString += L", ";
+        }
+        displayString += buf;
+        first = false;
+    }
+
+    if (first)
+    {
+        displayString = L"[)";
+    }
+
+    return displayString;
+}
+
+std::wstring AddressRangeObject::ToString(_In_ const Object& /*addressRangeObject*/,
+                                           _In_ std::pair<ULONG64, ULONG64>& addressRange,
+                                           _In_ const Metadata& /*metadata*/)
+{
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L"[%I64x, %I64x)", addressRange.first, addressRange.first + addressRange.second);
+    return buf;
+}
+
+//*************************************************
+// Publics APIs
+// 
+
+Object PublicsObject::Create(_In_ const Object& typesObject, 
+                             _In_ ComPtr<SymbolSet>& spSymbolSet,
+                             _In_ std::wstring publicName,
+                             _In_ ULONG64 publicOffset)
+{
+    ComPtr<PublicSymbol> spPublic;
+    CheckHr(MakeAndInitialize<PublicSymbol>(&spPublic,
+                                            spSymbolSet.Get(),
+                                            publicOffset,
+                                            publicName.c_str(),
+                                            nullptr));
+
+    PublicObject& publicFactory = ApiProvider::Get().GetPublicFactory();
+    return publicFactory.CreateInstance(spPublic);
+}
+
+std::experimental::generator<Object> PublicsObject::GetIterator(_In_ const Object& /*publicsObject*/,
+                                                                _In_ ComPtr<SymbolSet>& spSymbolSet)
+{
+    //
+    // We must take **GREAT CARE** with what we touch and how we iterate.  After a co_yield, the state
+    // of things may have drastically changed.  We must refetch things and only rely upon positional
+    // counters!
+    //
+    size_t cur = 0;
+    for(;;)
+    {
+        auto&& globalSymbols = spSymbolSet->InternalGetGlobalSymbols();
+        if (cur >= globalSymbols.size())
+        {
+            break;
+        }
+
+        ULONG64 nextGlobal = globalSymbols[cur];
+        ++cur;
+
+        BaseSymbol *pNextSymbol = spSymbolSet->InternalGetSymbol(nextGlobal);
+        if (pNextSymbol->InternalGetKind() != SvcSymbolPublic)
+        {
+            continue;
+        }
+
+        PublicSymbol *pNextPublic = static_cast<PublicSymbol *>(pNextSymbol);
+        Object publicObject = BoxSymbol(pNextPublic);
+        co_yield publicObject;
+    }
+}
+
+std::wstring PublicObject::ToString(_In_ const Object& /*publicObject*/,
+                                    _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                                    _In_ const Metadata& /*metadata*/)
+{
+    std::wstring const& publicName = spPublicSymbol->InternalGetQualifiedName();
+
+    std::wstring displayString = L"Public Symbol: ";
+    displayString += (publicName.empty() ? L"<Unknown>" : publicName.c_str());
+
+    wchar_t buf[128];
+    swprintf_s(buf, ARRAYSIZE(buf), L" (offset = 0x%I64x)", spPublicSymbol->InternalGetOffset());
+
+    displayString += buf;
+
+    return displayString;
+}
+
+ULONG64 PublicObject::GetOffset(_In_ const Object& /*publicObject*/, 
+                                _In_ ComPtr<PublicSymbol>& spPublicSymbol)
+{
+    return spPublicSymbol->InternalGetOffset();
+}
+
+void PublicObject::Delete(_In_ const Object& /*publicObject*/, 
+                          _In_ ComPtr<PublicSymbol>& spPublicSymbol)
+{
+    CheckHr(spPublicSymbol->Delete());
+}
+
+Object PublicObject::PromoteToFunction(_In_ const Object& publicObject, 
+                                       _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                                       _In_ std::optional<ULONG64> codeSize,
+                                       _In_ std::optional<Object> returnType,
+                                       _In_ size_t argCount,                 // [parameter]...
+                                       _In_reads_(argCount) Object *pArgs)
+{
+    SymbolSet *pSymbolSet = spPublicSymbol->InternalGetSymbolSet();
+    if (!returnType.has_value())
+    {
+        returnType = L"void";
+    }
+
+    BaseTypeSymbol *pReturnType = UnboxType(pSymbolSet, returnType);
+
+    //
+    // If the code size was specified as zero (or was left out of the argument list), we will go down
+    // to the disassembler and ask it to do some work for us.  Note that the data model disassembler is provided
+    // by another key extension to the debugger (the API extension).  If that extension isn't available,
+    // accessing these properties will throw (and the promotion will fail).
+    //
+    if (codeSize.value_or(0) == 0)
+    {
+        ULONG64 codeEntryVa = spPublicSymbol->InternalGetOffset();
+        ISvcModule *pModule = pSymbolSet->GetModule();
+
+        ULONG64 moduleBase;
+        CheckHr(pModule->GetBaseAddress(&moduleBase));
+        codeEntryVa += moduleBase;
+
+        //
+        // Many of the debugger's "API" type of extensions are somewhere under Debugger.Utility.  The data model
+        // disassembler places itself under "Debugger.Utility.Code".
+        //
+        Object codeNamespace = Object::RootNamespace().KeyValue(L"Debugger")
+                                                      .KeyValue(L"Utility")
+                                                      .KeyValue(L"Code");
+
+        Object disassembler = codeNamespace.CallMethod(L"CreateDisassembler");
+
+        //
+        // Calling .DisassembleFunction will have the data model disassembler perform a disassembly across the
+        // entire function doing flow analysis to form a basic block graph.  The returned object will have
+        //
+        //     .BasicBlocks - a list of basic blocks
+        //
+        // Where each basic block will have:
+        //
+        //     .StartAddress         - the start address of the block
+        //     .EndAddress           - one byte past the end of the block
+        //     .Instructions         - a list of instructions in the block
+        //     .InboundControlFlows  - a list of inbound edges to this block in the control flow graph
+        //     .OutboundControlFlows - a list of outbound edges from this block in the control flow graph
+        //
+        Object bbs = disassembler.CallMethod(L"DisassembleFunction", codeEntryVa)
+                                 .KeyValue(L"BasicBlocks");
+
+        //
+        // Make sure that the list of basic blocks is ordered by their start address...  then go find how much
+        // of the code is contiguous forwards in VA space from the entry point VA.  Some optimizations or things
+        // like a BBT will cause discontiguous code.
+        //
+        // We cannot *YET* express that in the *SAMPLE* but will be able to eventually.  In either case, the
+        // primary block (with the entry point VA) is the base of the function and we need to know that.
+        //
+        Object bbsOrdered = bbs.CallMethod(L"OrderBy", [&](_In_ const Object& /*ctx*/, _In_ Object bb)
+                                                       { return bb.KeyValue(L"StartAddress"); });
+
+        ULONG64 contigEndVa = codeEntryVa;
+        bool foundPrimaryBlock = false;
+
+        for(Object bb : bbsOrdered)
+        {
+            ULONG64 blockStart = (ULONG64)bb.KeyValue(L"StartAddress");
+            ULONG64 blockEnd = (ULONG64)bb.KeyValue(L"EndAddress");
+
+            //
+            // Bear in mind certain transformations might put some of the function *BEFORE* the "base"
+            // (or entry point) of the function!
+            //
+            if (!foundPrimaryBlock) 
+            {
+                if (codeEntryVa >= blockStart && codeEntryVa < blockEnd)
+                {
+                    foundPrimaryBlock = true;
+                    contigEndVa = blockEnd;
+                }
+            }
+            
+            //
+            // As we *GUARANTEED* the basic blocks are sorted by start address in calling .OrderBy,
+            // it's only contiguous under the simple condition given below.
+            //
+            else if (blockStart == contigEndVa)
+            {
+                contigEndVa = blockEnd;
+            }
+
+            //
+            // We've hit a discontiguous range.  It's not relevant at this point.  We have found the
+            // extents of the primary contiguous piece of code.
+            //
+            else
+            {
+                break;
+            }
+        }
+
+        if (contigEndVa == codeEntryVa)
+        {
+            throw std::runtime_error("disassembler is unable to find code extent from function entry");
+        }
+
+        codeSize = contigEndVa - codeEntryVa;
+    }
+
+    ComPtr<FunctionSymbol> spFunction;
+    CheckHr(MakeAndInitialize<FunctionSymbol>(&spFunction,
+                                              pSymbolSet,
+                                              0,
+                                              pReturnType->InternalGetId(),
+                                              spPublicSymbol->InternalGetOffset(),
+                                              codeSize.value(),
+                                              spPublicSymbol->InternalGetName().c_str(),
+                                              nullptr));
+
+    //
+    // If there are optional parameters in the pArgs... list, apply them one by one.  The method
+    // will currently expect objects that look like:
+    //
+    // { Name: <name>, Type: <type> }
+    //
+    for (size_t i = 0; i < argCount; ++i)
+    {
+        Object paramInfo = pArgs[i];
+        std::wstring paramName = (std::wstring)paramInfo.KeyValue(L"Name");
+        Object paramType = paramInfo.KeyValue(L"Type");
+
+        BaseTypeSymbol *pParamType = UnboxType(pSymbolSet, paramType);
+
+        ComPtr<VariableSymbol> spParameter;
+        CheckHr(MakeAndInitialize<VariableSymbol>(&spParameter, 
+                                                  pSymbolSet,
+                                                  SvcSymbolDataParameter,
+                                                  spFunction->InternalGetId(),
+                                                  pParamType->InternalGetId(),
+                                                  paramName.c_str()));
+    }
+
+    FunctionObject& functionFactory = ApiProvider::Get().GetFunctionFactory();
+    Object functionObject = functionFactory.CreateInstance(spFunction);
+
+    CheckHr(spPublicSymbol->Delete());
+
+    return functionObject;
+}
+
 //*************************************************
 // Data Model Bindings:
 //
@@ -2200,6 +2599,9 @@ SymbolSetObject::SymbolSetObject() :
 
     AddReadOnlyProperty(L"Functions", this, &SymbolSetObject::GetFunctions,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_FUNCTIONS }));
+
+    AddReadOnlyProperty(L"Publics", this, &SymbolSetObject::GetPublics,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_PUBLICS }));
 
     AddReadOnlyProperty(L"Types", this, &SymbolSetObject::GetTypes,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_TYPES }));
@@ -2421,6 +2823,9 @@ FunctionObject::FunctionObject()
 {
     AddStringDisplayableFunction(this, &FunctionObject::ToString);
 
+    AddReadOnlyProperty(L"AddressRanges", this, &FunctionObject::GetAddressRanges,
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_ADDRESSRANGES }));
+
     AddReadOnlyProperty(L"LocalVariables", this, &FunctionObject::GetLocalVariables,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_LOCALVARIABLES }));
 
@@ -2429,6 +2834,9 @@ FunctionObject::FunctionObject()
 
     AddProperty(L"ReturnType", this, &FunctionObject::GetReturnType, &FunctionObject::SetReturnType,
                 Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_RETURNTYPE }));
+
+    AddMethod(L"Delete", this, &FunctionObject::Delete,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTION_DELETE }));
 }
 
 ParametersObject::ParametersObject() :
@@ -2511,6 +2919,27 @@ LiveRangeObject::LiveRangeObject() :
     AddStringDisplayableFunction(this, &LiveRangeObject::ToString);
 }
 
+AddressRangesObject::AddressRangesObject() :
+    TypedInstanceModel()
+{
+    AddStringDisplayableFunction(this, &AddressRangesObject::ToString);
+
+    AddGeneratorFunction(this, &AddressRangesObject::GetIterator);
+}
+
+AddressRangeObject::AddressRangeObject() :
+    TypedInstanceModel()
+{
+    AddStringDisplayableFunction(this, &AddressRangeObject::ToString);
+
+    BindReadOnlyProperty(L"Start", &std::pair<ULONG64, ULONG64>::first, 
+                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_ADDRESSRANGE_START }));
+
+    BindReadOnlyProperty(L"Size", &std::pair<ULONG64, ULONG64>::second, 
+                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_ADDRESSRANGE_SIZE }));
+
+}
+
 SymbolBuilderNamespace::SymbolBuilderNamespace() :
     ExtensionModel(NamespacePropertyParent(L"Debugger.Models.Utility",
                                            L"Debugger.Models.Utility.SymbolBuilder",
@@ -2519,6 +2948,30 @@ SymbolBuilderNamespace::SymbolBuilderNamespace() :
     AddMethod(L"CreateSymbols", this, &SymbolBuilderNamespace::CreateSymbols,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_CREATESYMBOLS },
                        L"PreferShow", true));
+}
+
+PublicsObject::PublicsObject() :
+    TypedInstanceModel()
+{
+    AddMethod(L"Create", this, &PublicsObject::Create,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLICS_CREATE },
+                       L"PreferShow", true));
+
+    AddGeneratorFunction(this, &PublicsObject::GetIterator);
+}
+
+PublicObject::PublicObject()
+{
+    AddStringDisplayableFunction(this, &PublicObject::ToString);
+
+    AddReadOnlyProperty(L"Offset", this, &PublicObject::GetOffset, 
+                        Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_OFFSET }));
+
+    AddMethod(L"Delete", this, &PublicObject::Delete,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_DELETE }));
+
+    AddMethod(L"PromoteToFunction", this, &PublicObject::PromoteToFunction,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PUBLIC_PROMOTETOFUNCTION }));
 }
 
 } // SymbolBuilder

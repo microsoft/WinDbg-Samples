@@ -106,6 +106,12 @@ private:
     //
     Object GetFunctions(_In_ const Object& /*symbolSetObject*/, _In_ ComPtr<SymbolSet>& spSymbolSet);
 
+    // GetPublics():
+    //
+    // Property accessor which gets the public symbols on this symbol set.
+    //
+    Object GetPublics(_In_ const Object& /*symbolSetObject*/, _In_ ComPtr<SymbolSet>& spSymbolSet);
+
 };
 
 //*************************************************
@@ -784,6 +790,17 @@ public:
     //
     Object GetParameters(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 
+    // GetAddressRanges():
+    //
+    // Property accessor which gets the address ranges of the code bytes of this function.
+    //
+    Object GetAddressRanges(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
+    // Delete():
+    //
+    // Bound method which will delete a function.
+    //
+    void Delete(_In_ const Object& /*functionObject*/, _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 };
 
 // ParametersObject:
@@ -1040,6 +1057,149 @@ private:
 
 };
 
+// AddressRangesObject:
+//
+// Represents the list of address ranges for the code bytes of a function
+//
+class AddressRangesObject : public TypedInstanceModel<ComPtr<FunctionSymbol>>,
+                            public SymbolObjectHelpers
+{
+public:
+
+    AddressRangesObject();
+
+private:
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for the address range list.
+    //
+    std::wstring ToString(_In_ const Object& functionObject,
+                          _In_ ComPtr<FunctionSymbol>& spFunctionSymbol,
+                          _In_ const Metadata& metadata);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over address ranges of the code bytes of a function.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& addressRangesObject,
+                                                     _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+};
+
+// AddressRangeObject:
+//
+// Represents a single address range.
+//
+class AddressRangeObject : public TypedInstanceModel<std::pair<ULONG64, ULONG64>>
+{
+public:
+
+    AddressRangeObject();
+
+private:
+
+    // ToString():
+    //
+    // Bound function that is the string conversion for an address range.
+    //
+    std::wstring ToString(_In_ const Object& addressRangeObject,
+                          _In_ std::pair<ULONG64, ULONG64>& addressRange,
+                          _In_ const Metadata& metadata);
+};
+
+//*************************************************
+// Publics:
+//
+
+// PublicsObject:
+//
+// Represents the list of public symbols (and public symbol APIs) available on a symbol set.
+//
+class PublicsObject : public TypedInstanceModel<ComPtr<SymbolSet>>,
+                      public SymbolObjectHelpers
+{
+public:
+
+    PublicsObject();
+
+private:
+
+    // Create():
+    //
+    // Bound API which will create a new public symbol and return an object representing it.
+    //
+    Object Create(_In_ const Object& typesObject, 
+                  _In_ ComPtr<SymbolSet>& spSymbolSet,
+                  _In_ std::wstring publicName,
+                  _In_ ULONG64 publicOffset);
+
+    // GetIterator():
+    //
+    // Bound generator for iterating over public symbols within a symbol set.
+    //
+    std::experimental::generator<Object> GetIterator(_In_ const Object& publicsObject,
+                                                     _In_ ComPtr<SymbolSet>& spSymbolSet);
+
+};
+
+// PublicObject:
+//
+// Represents a public symbol boxed into the data model.
+//
+class PublicObject : public BaseSymbolObject<PublicSymbol>
+{
+public:
+
+    PublicObject();
+	
+    // ToString():
+    //
+    // Bound function that is the string conversion for public symbols.
+    //
+    std::wstring ToString(_In_ const Object& publicbject,
+                          _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                          _In_ const Metadata& metadata);
+
+    // GetOffset():
+    //
+    // Bound property accessor which returns the offset of the public symbol.
+    // 
+    ULONG64 GetOffset(_In_ const Object& publicObject, _In_ ComPtr<PublicSymbol>& spPublicSymbol);
+
+    // Delete():
+    //
+    // Bound method which will delete a public symbol
+    //
+    void Delete(_In_ const Object& publicObject, _In_ ComPtr<PublicSymbol>& spPublicSymbol);
+
+    // PromoteToFunction():
+    //
+    // Bound method which will take the public symbol and convert it into a function symbol instead.
+    // The original public symbol is deleted and a new function symbol is created.  The signature
+    // of this method is:
+    //
+    //     PromoteToFunction([codeSize], [returnType], [parameters]...)
+    //
+    // Where:
+    //
+    //     'codeSize' - The size of the function code.  If this is specified as zero or is unspecified, the 
+    //                  method will disassemble the code in order to discover the address ranges of the function
+    //                  based on the public symbol being the base address of the function.
+    //
+    //     'returnType' - The return type of the function.  If unspecified, this is assumed to be 'void'
+    //
+    //     'parameters' - Identical to the parameters argument within Functions.Create, this takes a
+    //                    set of objects with properties 'Name' and 'Type' which create the set of parameters
+    //                    for the function.
+    //     
+    Object PromoteToFunction(_In_ const Object& publicObject, 
+                             _In_ ComPtr<PublicSymbol>& spPublicSymbol,
+                             _In_ std::optional<ULONG64> codeSize,
+                             _In_ std::optional<Object> returnType,
+                             _In_ size_t argCount,                 // [parameter]...
+                             _In_reads_(argCount) Object *pArgs);
+};
+
 //*************************************************
 // Extension Points:
 //
@@ -1085,11 +1245,13 @@ private:
     //
     // Creates a new symbol builder set for a given module.  We support several forms of CreateSymbols():
     //
-    //     CreateSymbols(moduleObject)     // moduleObject is @$curprocess.Modules[N]
-    //     CreateSymbols(moduleBase)       // moduleBase is the base address of a module in the current process context
-    //     CreateSymbols(moduleName)       // moduleName is the name of a module in the current process context
+    //     CreateSymbols(moduleObject, [options])     // moduleObject is @$curprocess.Modules[N]
+    //     CreateSymbols(moduleBase, [options])       // moduleBase is the base address of a module in the current process context
+    //     CreateSymbols(moduleName, [options])       // moduleName is the name of a module in the current process context
     //
-    Object CreateSymbols(_In_ const Object& contextObject, _In_ Object moduleArg);
+    Object CreateSymbols(_In_ const Object& contextObject, 
+                         _In_ Object moduleArg,
+                         _In_ std::optional<Object> options);
 
 };
 
@@ -1117,6 +1279,7 @@ public:
     TypesObject& GetTypesFactory() const { return *m_spTypesFactory.get(); }
     DataObject& GetDataFactory() const { return *m_spDataFactory.get(); }
     FunctionsObject& GetFunctionsFactory() const { return *m_spFunctionsFactory.get(); }
+    PublicsObject& GetPublicsFactory() const { return *m_spPublicsFactory.get(); }
 
     //
     // Types:
@@ -1140,7 +1303,12 @@ public:
     //
 
     FunctionObject& GetFunctionFactory() const { return *m_spFunctionFactory.get(); }
-    
+
+    //
+    // Publics:
+    //
+
+    PublicObject& GetPublicFactory() const { return *m_spPublicFactory.get(); }
 
     //
     // Other Symbols:
@@ -1157,6 +1325,8 @@ public:
     LocalVariableObject& GetLocalVariableFactory() { return *m_spLocalVariableFactory.get(); }
     LiveRangesObject& GetLiveRangesFactory() const { return *m_spLiveRangesFactory.get(); }
     LiveRangeObject& GetLiveRangeFactory() const { return *m_spLiveRangeFactory.get(); }
+    AddressRangesObject& GetAddressRangesFactory() const { return *m_spAddressRangesFactory.get(); }
+    AddressRangeObject& GetAddressRangeFactory() const { return *m_spAddressRangeFactory.get(); }
 
     // Get():
     //
@@ -1179,6 +1349,7 @@ private:
     std::unique_ptr<TypesObject> m_spTypesFactory;
     std::unique_ptr<DataObject> m_spDataFactory;
     std::unique_ptr<FunctionsObject> m_spFunctionsFactory;
+    std::unique_ptr<PublicsObject> m_spPublicsFactory;
 
     //
     // Types:
@@ -1204,6 +1375,12 @@ private:
     std::unique_ptr<FunctionObject> m_spFunctionFactory;
 
     //
+    // Publics:
+    //
+
+    std::unique_ptr<PublicObject> m_spPublicFactory;
+
+    //
     // Other Symbols:
     //
 
@@ -1218,6 +1395,8 @@ private:
     std::unique_ptr<LocalVariableObject> m_spLocalVariableFactory;
     std::unique_ptr<LiveRangesObject> m_spLiveRangesFactory;
     std::unique_ptr<LiveRangeObject> m_spLiveRangeFactory;
+    std::unique_ptr<AddressRangesObject> m_spAddressRangesFactory;
+    std::unique_ptr<AddressRangeObject> m_spAddressRangeFactory;
 
     //*************************************************
     // Extension Points:
