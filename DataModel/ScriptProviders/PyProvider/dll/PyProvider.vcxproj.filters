@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="x86">
+      <UniqueIdentifier>{34bd5c03-c4f9-4508-bce0-73524d8c1848}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="woa">
+      <UniqueIdentifier>{2781f335-8da4-47b8-9728-c2c5e5759123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="arm64">
+      <UniqueIdentifier>{e06c0da7-2c38-4c3c-a599-dee91f7cd17b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="amd64">
+      <UniqueIdentifier>{bfa9a98a-1072-4504-b0f8-e3a24becd74c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ScriptProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PyProvider.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HostLibrary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Marshal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PyFunctions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PyLibrary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utility.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptTemplates.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="StringResource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Extension.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptProvider.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="PyFunctions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Marshal.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="HostLibrary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Utility.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptTemplates.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="x86\dbgmodel.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="x86\dbghelp.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="x86\dbgeng.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="x86\dbgcore.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="woa\dbgmodel.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="woa\dbghelp.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="woa\dbgeng.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="woa\dbgcore.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="arm64\dbgmodel.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\dbghelp.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\dbgeng.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\dbgcore.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="amd64\dbgmodel.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="amd64\dbghelp.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="amd64\dbgeng.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="amd64\dbgcore.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="PyProvider.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

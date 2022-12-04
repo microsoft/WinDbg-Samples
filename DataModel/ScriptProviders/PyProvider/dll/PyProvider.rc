@@ -1,0 +1,14 @@
+//
+//    Copyright (C) Microsoft.  All rights reserved.
+//
+#include <windows.h>
+#include <ntverp.h>
+
+#define VER_FILETYPE             VFT_DLL
+#define VER_FILESUBTYPE          VFT_UNKNOWN
+#define VER_FILEDESCRIPTION_STR  "Python Script Provider Extension"
+#define VER_INTERNALNAME_STR     "Python Script Provider Extension"
+#define VER_ORIGINALFILENAME_STR "PyProvider.dll"
+
+#include <common.ver>
+#include "StringResource.rc"

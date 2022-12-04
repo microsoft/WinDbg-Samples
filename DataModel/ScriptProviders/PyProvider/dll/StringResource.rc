@@ -1,0 +1,34 @@
+#include <windows.h>
+#include "StringResource.h"
+
+STRINGTABLE
+BEGIN
+    IDS_MUSTBE_METHOD "'%s' must be an invocable function"
+    IDS_FAIL_METHOD "Method call to '%s' failed"
+    IDS_INTERNAL_ERROR "Unexpected internal error"
+    IDS_OUT_OF_RESOURCES "Out of resources"
+    IDS_ERROR "Unknown exception"
+    IDS_NOT_IMPLEMENTED "Function not implemented"
+    IDS_FAIL_EXECUTE "Unable to execute script"
+    IDS_IMPROPER_NUMBER_OF_ARGUMENTS "Improper number of arguments to method '%s'"
+    IDS_OBJECT_NOT_ITERABLE "Object is not iterable"
+    IDS_UNABLE_TO_DEREFERENCE "Unable to dereference object"
+    IDS_INVALID_ARGUMENT "Invalid argument to method '%s'"
+    IDS_ILLEGAL_METHOD_CALL "Illegal call to method '%s'"
+    IDS_NUMERIC_LOSS_OF_PRECISION "64 bit value loses precision on conversion to number"
+    IDS_NON_INDEXED_ITERATOR_RETURN "Iterator supporting getDimensions() did not return an indexedValue instance"
+    IDS_UNABLE_TO_READ_MEMORY "Unable to read target memory at '%s' in method '%s'"
+    IDS_OBJECT_HAS_NO_LOCATION "Object does not have a location"
+    IDS_OBJECT_HAS_NO_SIZE "Object does not have a size"
+    IDS_USER_ABORT "Script execution aborted due to requested interruption"
+    IDS_CANNOT_WRITE "Cannot write to property"
+    IDS_LOCATION_IS_NOT_ADDRESS "Location is not convertible to an address"
+    IDS_ILLEGAL_CUSTOM_MARSHALING "Custom marshaling type specified for object is invalid"
+    IDS_CANNOT_MODIFY_OBJECT_MODEL "Cannot modify debugger object model for '%s (%s)'"
+    IDS_METADATA_KEY_NOT_FOUND "Cannot find key '%s' for metadata definition"
+    IDS_PARTIAL_MEMORY_READ "Unable to read all of target memory at '%s' in method '%s' (partial read success)"
+    IDS_UNABLE_TO_WRITE_MEMORY "Unable to write target memory at '%s' in method '%s'"
+    IDS_PARTIAL_MEMORY_WRITE "Unable to write all of target memory at '%s' in method '%s' (partial write success)"
+    IDS_CANNOT_CREATE_EXTENDO "Unable to create/set property on object"
+END
+
