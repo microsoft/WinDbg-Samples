@@ -664,6 +664,166 @@ HRESULT PythonKeyEnumerator::AdvanceMRO()
 // Marshaling Objects Into Python:
 //
 
+PyTypeObject DataModelSourceObject::s_PyType =
+{
+    PyVarObject_HEAD_INIT(&PyType_Type, 0)
+    "DMSO",
+    sizeof(DataModelSourceObject::PyData),
+    0,
+    (destructor)&DataModelSourceObject::TpDestruct,         // tp_dealloc
+    0,                                                      // tp_vectorcall_offset
+    0,                                                      // tp_getattr
+    0,                                                      // tp_setattr
+    0,                                                      // tp_as_async
+    0,                                                      // tp_repr
+    0,                                                      // tp_as_number
+    0,                                                      // tp_as_sequence
+    0,                                                      // tp_as_mapping
+    0,                                                      // tp_hash
+    0,                                                      // tp_call
+    0,                                                      // tp_str
+    (getattrofunc)&DataModelSourceObject::TpGetAttrO,       // tp_getattro
+    0,                                                      // tp_setattro
+    0,                                                      // tp_as_buffer
+    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,               // tp_flags
+    0,                                                      // tp_doc
+    0,                                                      // tp_traverse
+    0,                                                      // tp_clear
+    0,                                                      // tp_richcompare
+    0,                                                      // tp_weaklistoffset
+    0,                                                      // tp_iter
+    0,                                                      // tp_iternext
+    0,                                                      // tp_methods
+    0,                                                      // tp_members
+    0,                                                      // tp_getset
+    0,                                                      // tp_base
+    0,                                                      // tp_dict
+    0,                                                      // tp_descr_get
+    0,                                                      // tp_descr_set
+    0,                                                      // tp_dictoffset
+    0,                                                      // tp_init
+    0,                                                      // tp_alloc
+    0,                                                      // tp_new
+    0,                                                      // tp_free
+    0,                                                      // tp_is_gc
+    0,                                                      // tp_bases
+    0,                                                      // tp_mro
+    0,                                                      // tp_cache
+    0,                                                      // tp_subclasses
+    0,                                                      // tp_weaklist
+    0,                                                      // tp_del
+    0,                                                      // tp_version_tag
+    0,                                                      // tp_finalize
+    0,                                                      // tp_vectorcall
+};
+
+PyObject *DataModelSourceObject::CreateInstance(_In_ IModelObject *pModelObject,
+                                                _Outptr_opt_ DataModelSourceObject **ppSourceObject)
+{
+    if (ppSourceObject != nullptr)
+    {
+        *ppSourceObject = nullptr;
+    }
+
+    std::unique_ptr<DataModelSourceObject> dmso(new(std::nothrow) DataModelSourceObject);
+    if (dmso == nullptr)
+    {
+        PyErr_Format(PyExc_MemoryError, "unable to allocate DMSO to marshal an object into Python");
+        return nullptr;
+    }
+
+    PyObject *pArgs = PyTuple_New(0);
+    if (pArgs == nullptr)
+    {
+        assert(PyErr_Occurred());
+        return nullptr;
+    }
+
+    PyObject *pDmsoObject = PyType_GenericNew(GetType(), pArgs, nullptr);
+    if (pDmsoObject == nullptr)
+    {
+        assert(PyErr_Occurred());
+        return nullptr;
+    }
+
+    if (FAILED(dmso->Initialize(pModelObject)))
+    {
+        PyErr_Format(PyExc_TypeError, "unable to initialize DMSO for marshalling");
+        return nullptr;
+    }
+
+    PyData *pData = reinterpret_cast<PyData *>(pDmsoObject);
+    pData->Object = dmso.release();
+
+    if (ppSourceObject != nullptr)
+    {
+        *ppSourceObject = pData->Object;
+    }
+
+    return pDmsoObject;
+}
+
+PythonMarshaler *DataModelSourceObject::GetMarshaler() const
+{
+    return PythonProvider::Get()->GetMarshaler();
+}
+
+HRESULT DataModelSourceObject::FromPythonObject(_In_ PyObject *pObject, _Out_ DataModelSourceObject **ppSourceObject)
+{
+    *ppSourceObject = nullptr;
+
+    if (!PyObject_TypeCheck(pObject, &DataModelSourceObject::s_PyType))
+    {
+        return E_FAIL;
+    }
+
+    *ppSourceObject = AsDMSO(pObject);
+    return S_OK;
+}
+
+HRESULT DataModelSourceObject::Initialize(_In_ IModelObject *pModelObject)
+{
+    HRESULT hr = S_OK;
+    m_modelObject = pModelObject;
+    return hr;
+}
+
+PyObject *DataModelSourceObject::GetAttrO(_In_ PyObject *pAttr)
+{
+    PythonMarshaler *pMarshaler = GetMarshaler();
+
+    if (!PyUnicode_Check(pAttr))
+    {
+        PyErr_Format(PyExc_TypeError, "attribute name must be string");
+        return nullptr;
+    }
+
+    char const *pszAttrName = PyUnicode_AsUTF8AndSize(pAttr, nullptr);
+
+    std::wstring utf16Attr;
+    if (FAILED(GetUTF16(pszAttrName, &utf16Attr)))
+    {
+        PyErr_Format(PyExc_MemoryError, "unable to convert to UTF-16");
+    }
+
+    Object attrVal;
+
+    if (FAILED(pMarshaler->BindNameToValue(m_modelObject, utf16Attr.c_str(), &attrVal, nullptr)))
+    {
+        PyErr_Format(PyExc_AttributeError, "unable to get attribute named %s", pszAttrName);
+        return nullptr;
+    }
+
+    PyObject *pMshValue;
+    if (FAILED(pMarshaler->MarshalToPython(nullptr, attrVal, &pMshValue)))
+    {
+        PyErr_Format(PyExc_TypeError, "unable to marshal attribute value into Python");
+        return nullptr;
+    }
+
+    return pMshValue;
+}
+
 HRESULT PythonMarshaler::MarshalToPython(_In_opt_ IModelObject *pSrcObject,
                                          _In_ IModelObject *pModelObject,
                                          _Out_ PyObject **ppPyObject)
@@ -723,12 +883,20 @@ HRESULT PythonMarshaler::MarshalToPython(_In_opt_ IModelObject *pSrcObject,
         //        ObjectNoValue
         //        ObjectError
         //        ObjectMethod
-        //        ObjectContext
-        //        ObjectSynthetic
-        //        ObjectTargetObject
         //        ObjectTargetObjectReference
         //        ObjectKeyReference
         //
+
+        case ObjectContext:
+        case ObjectSynthetic:
+        case ObjectTargetObject:
+        {
+            IfFailedReturn(CreatePythonObjectForModelObject(pSrcObject,
+                                                            pModelObject,
+                                                            &pPyObject));
+
+            break;
+        }
 
         default:
             //
@@ -808,6 +976,27 @@ PyObject *PythonMarshaler::ModelValueToPython(_In_ IModelObject * pModelObject)
     }
 
     return pPyObject;
+}
+
+HRESULT PythonMarshaler::CreatePythonObjectForModelObject(_In_opt_ IModelObject * /*pSourceObject*/,
+                                                          _In_ IModelObject *pModelObject,
+                                                          _Out_ PyObject **ppPyObject)
+{
+    HRESULT hr = S_OK;
+    *ppPyObject = nullptr;
+
+    DataModelSourceObject *pSourceObject;
+
+    PyObject *pPyObject = DataModelSourceObject::CreateInstance(pModelObject, &pSourceObject);
+    if (pPyObject == nullptr)
+    {
+        // @TODO: Convert...?
+        assert(PyErr_Occurred());
+        return E_FAIL;
+    }
+
+    *ppPyObject = pPyObject;
+    return hr;
 }
 
 //*************************************************
@@ -929,6 +1118,84 @@ HRESULT PythonMarshaler::MarshalFromPython(_In_ PyObject *pPyObject,
     }
 
     return hr;
+}
+
+HRESULT PythonMarshaler::BindNameToValue(_In_ IModelObject *pModelObject,
+                                         _In_ PCWSTR pwszName, 
+                                         _Out_ Object *pValue, 
+                                         _Out_opt_ Metadata *pMetadata)
+{
+    HRESULT hr = S_OK;
+
+    *pValue = Object();
+    if (pMetadata != nullptr)
+    {
+        *pMetadata = Metadata();
+    }
+
+    ComPtr<IModelObject> spValue;
+    ComPtr<IKeyStore> spMetadata;
+
+    IKeyStore **ppDestMetadata = nullptr;
+    if (pMetadata != nullptr)
+    {
+        ppDestMetadata = &spMetadata;
+    }
+
+    IfFailedReturn(m_spNameBinder->BindValue(pModelObject, 
+                                             pwszName, 
+                                             &spValue,
+                                             ppDestMetadata));
+
+    *pValue = std::move(spValue);
+    if (pMetadata != nullptr)
+    {
+        *pMetadata = std::move(spMetadata);
+    }
+
+    return hr;
+}
+
+HRESULT PythonMarshaler::BindNameToReference(_In_ IModelObject *pModelObject,
+                                             _In_ PCWSTR pwszName, 
+                                             _Out_ Object *pReference, 
+                                             _Out_opt_ Metadata *pMetadata)
+{
+    HRESULT hr = S_OK;
+
+    *pReference = Object();
+    if (pMetadata != nullptr)
+    {
+        *pMetadata = Metadata();
+    }
+
+    ComPtr<IModelObject> spReference;
+    ComPtr<IKeyStore> spMetadata;
+
+    IKeyStore **ppDestMetadata = nullptr;
+    if (pMetadata != nullptr)
+    {
+        ppDestMetadata = &spMetadata;
+    }
+
+    IfFailedReturn(m_spNameBinder->BindReference(pModelObject, 
+                                                 pwszName, 
+                                                 &spReference,
+                                                 ppDestMetadata));
+
+    *pReference = std::move(spReference);
+    if (pMetadata != nullptr)
+    {
+        *pMetadata = std::move(spMetadata);
+    }
+
+    return hr;
+}
+
+HRESULT PythonMarshaler::EnumerateValues(_In_ IModelObject *pModelObject,
+                                         _COM_Outptr_ IKeyEnumerator **ppEnum)
+{
+    return m_spNameBinder->EnumerateValues(pModelObject, ppEnum);
 }
 
 HRESULT PythonMarshaler::ConvertPythonException(_In_ HRESULT hrConverted,

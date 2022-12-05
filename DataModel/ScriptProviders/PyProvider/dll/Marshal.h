@@ -310,6 +310,167 @@ private:
 };
 
 //*************************************************
+// Marshaling Objects Into Python:
+//
+
+// DataModelSourceObject:
+//
+// Represents a data model object which was marshaled into Python.
+//
+class DataModelSourceObject
+{
+public:
+
+    DataModelSourceObject()
+    {
+    }
+
+    // ~DataModelSourceObject():
+    //
+    // Data model source object destructor.
+    //
+    ~DataModelSourceObject() { }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    // Initialize():
+    // 
+    // Initializes the data model source object.
+    //
+    HRESULT Initialize(_In_ IModelObject *pModelObject);
+
+    // GetObject():
+    //
+    // Returns the original object.
+    //
+    IModelObject *GetObject() const
+    {
+        return (IModelObject *)m_modelObject;
+    }
+
+    // FromPythonObject():
+    //
+    // Attempts to return the data model source object from a Python object which may or may not
+    // be a data model source object.
+    //
+    static HRESULT FromPythonObject(_In_ PyObject *pObject, _Out_ DataModelSourceObject **ppSourceObject);
+
+    // CreateInstance():
+    //
+    // Creates a new PyObject attached to a new DMSO.
+    //
+    static PyObject *CreateInstance(_In_ IModelObject *pModelObject, 
+                                    _Outptr_opt_ DataModelSourceObject **ppSourceObject);
+
+    // GetMarshaler():
+    //
+    // Gets the marshaler associated with this DMSO.
+    //
+    PythonMarshaler *GetMarshaler() const;
+
+    // GetType():
+    //
+    // Gets the type object for a DMSO.
+    //
+    static PyTypeObject *GetType()
+    {
+        return &s_PyType;
+    }
+
+    // GetTypeAsObject():
+    //
+    // Gets the type object for a DMSO as a PyObject.
+    //
+    static PyObject *GetTypeAsObject()
+    {
+        return reinterpret_cast<PyObject *>(&s_PyType);
+    }
+
+    // StaticInitialize():
+    //
+    // Performs necessary type initialization for the DMSO type.
+    //
+    static int StaticInitialize()
+    {
+        return PyType_Ready(&s_PyType);
+    }
+
+private:
+
+    // PyData:
+    //
+    // The POD data which is associated with the actual Python object representing
+    // a DMSO.
+    //
+    struct PyData
+    {
+        PyObject_HEAD;
+        DataModelSourceObject *Object;
+    };
+
+    //*************************************************
+    // Instance Python Callbacks:
+    //
+
+    // GetAttrO():
+    //
+    // The instance implementation of the tp_getattro callback from Python.  Gets a named attribute.
+    //
+    PyObject *GetAttrO(_In_ PyObject *pAttr);
+
+    //*************************************************
+    // Static Python Callbacks:
+    //
+
+    // AsDMSO():
+    //
+    // Given a Python object **KNOWN** to be a DMSO, get the DMSO pointer.
+    //
+    static DataModelSourceObject *AsDMSO(_In_ PyObject *pPyObject)
+    {
+        return reinterpret_cast<PyData *>(pPyObject)->Object;
+    }
+
+    // TpDestruct():
+    //
+    // The tp_destruct callback from Python.  Destroys the DMSO.
+    //
+    static void TpDestruct(_In_ PyObject *pSelf)
+    {
+        PyData *pData = reinterpret_cast<PyData *>(pSelf);
+        delete (pData->Object);
+        pData->Object = nullptr;
+    }
+
+    // TpGetAttrO():
+    //
+    // The tp_getattro callback from Python.  Gets a named attribute.
+    //
+    static PyObject *TpGetAttrO(_In_ PyObject *pSelf, _In_ PyObject *pAttr)
+    {
+        return AsDMSO(pSelf)->GetAttrO(pAttr);
+    }
+
+    //*************************************************
+    // Static Data
+    //
+
+    // PyType:
+    //
+    // The PyTypeObject which defines a DMSO type object.
+    //
+    static PyTypeObject s_PyType;
+
+    //*************************************************
+    // Instance Data
+    //
+
+    Object m_modelObject;
+};
+
+//*************************************************
 // General Marshaler:
 //
 
@@ -356,6 +517,31 @@ public:
                             _In_ IModelObject *pModelObject,
                             _Out_ PyObject **ppPyObject);
 
+    // BindNameToValue():
+    //
+    // Uses the default name binder to bind a name 'pwszName' in the context of a given object.
+    //
+    HRESULT BindNameToValue(_In_ IModelObject *pModelObject,
+                            _In_ PCWSTR pwszName, 
+                            _Out_ Object *pValue, 
+                            _Out_opt_ Metadata *pMetadata);
+
+    // BindNameToReference():
+    //
+    // Uses the default name binder to bind a name 'pwszName' to a reference in the context of a given object.
+    //
+    HRESULT BindNameToReference(_In_ IModelObject *pModelObject,
+                                _In_ PCWSTR pwszName,
+                                _Out_ Object *pReference,
+                                _Out_opt_ Metadata *pMetadata);
+
+    // EnumerateValues():
+    //
+    // Returns an enumerator for all name/values on the object as indicated by the default name binder.
+    //
+    HRESULT EnumerateValues(_In_ IModelObject *pModelObject,
+                            _COM_Outptr_ IKeyEnumerator **ppEnum);
+
     // ConvertPythonException():
     //
     // Converts the current exception on the Python runtime to a model error object.  If there is not a
@@ -364,6 +550,16 @@ public:
     HRESULT ConvertPythonException(_In_ HRESULT hrConverted,
                                    _Out_ Object *pErrorObject,
                                    _Out_ HRESULT *pResult);
+
+    // CreatePythonObjectForModelObject():
+    //
+    // Creates a new Python object for the given model object.  The resulting Python object is an
+    // instance of the DataModelSourceObject "Python type" and implements the necessary protocols to bridge
+    // from Python back to the data model.
+    //
+    HRESULT CreatePythonObjectForModelObject(_In_opt_ IModelObject *pSourceObject,
+                                             _In_ IModelObject *pModelObject,
+                                             _Out_ PyObject **ppPyObject);
 
     // SetDataModelError():
     //

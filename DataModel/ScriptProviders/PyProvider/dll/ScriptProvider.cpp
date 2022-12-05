@@ -122,6 +122,10 @@ HRESULT PythonProvider::RuntimeClassInitialize(_In_ IDataModelManager *pManager,
     config.isolated = 1;
 
     IfStatusErrorConvertAndReturn(Py_InitializeFromConfig(&config));
+    if (Marshal::DataModelSourceObject::StaticInitialize() < 0)
+    {
+        return E_FAIL;
+    }
 
     //
     // @TODO: The Python documentation around this is *ABSOLUTELY ABYSMAL*.  It talks about merely calling
