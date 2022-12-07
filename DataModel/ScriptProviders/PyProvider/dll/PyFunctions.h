@@ -89,6 +89,15 @@ protected:
         return m_pMarshaler;
     }
 
+    // Destruct():
+    //
+    // The destructor callback from Python for this function.
+    //
+    void Destruct()
+    {
+        Release();
+    }
+
 private:
 
     // InternalInitialize():
@@ -111,16 +120,34 @@ private:
         m_methodDef.ml_doc = nullptr;
     }
 
+    // call_va():
+    //
+    // The varargs form of the invocation.
+    //
     static PyObject *call_va(PyObject *pData, PyObject *pArgs)
     {
         PythonFunction *pFunction = reinterpret_cast<PythonFunction *>(PyCapsule_GetPointer(pData, nullptr));
         return (pFunction->InvokeVa(pArgs));
     }
 
+    // call_vakw():
+    //
+    // The varargs/kwargs form of the invocation.
+    //
     static PyObject *call_vakw(PyObject *pData, PyObject *pArgs, PyObject *pKwArgs)
     {
         PythonFunction *pFunction = reinterpret_cast<PythonFunction *>(PyCapsule_GetPointer(pData, nullptr));
         return (pFunction->InvokeVaKw(pArgs, pKwArgs));
+    }
+
+    // destruct():
+    //
+    // The capsule destructor.
+    //
+    static void destruct(_In_ PyObject *pData)
+    {
+        PythonFunction *pFunction = reinterpret_cast<PythonFunction *>(PyCapsule_GetPointer(pData, nullptr));
+        return (pFunction->Destruct());
     }
 
     // The method definition for this function
@@ -163,6 +190,106 @@ public:
     }
 
 };
+
+// PythonFunctionTable:
+//
+// A set of functions.
+//
+class PythonFunctionTable :
+    public Microsoft::WRL::RuntimeClass<
+        Microsoft::WRL::RuntimeClassFlags<Microsoft::WRL::RuntimeClassType::ClassicCom>,
+        IUnknown
+        >
+{
+public:
+
+    // ~PythonFunctionTable:
+    //
+    // Destroys a Python function table.
+    //
+    ~PythonFunctionTable()
+    {
+    }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    // Lookup():
+    //
+    // Looks up a function by name in the function table hash.
+    //
+    PythonFunction *Lookup(_In_ PCSTR pszName)
+    {
+        PythonFunction *pFunc = nullptr;
+        ConvertException([&](){
+            auto it = m_functionMap.find(pszName);
+            if (it != m_functionMap.end())
+            {
+                pFunc = it->second;
+            }
+            return S_OK;
+        });
+        return pFunc;
+    }
+
+    // AddToObject():
+    //
+    // Adds every function in the table to the given Python object.
+    //
+    HRESULT AddToObject(_In_ PyObject *pPyObject)
+    {
+        HRESULT hr = S_OK;
+
+        for (auto&& func : m_functions)
+        {
+            IfFailedReturn(func->AddToObject(pPyObject));
+        }
+
+        return hr;
+    }
+
+    // RuntimeClassInitialize():
+    //
+    // Initializes the function table.
+    //
+    HRESULT RuntimeClassInitialize()
+    {
+        return S_OK;
+    }
+
+    template<typename TFN, typename... TArgs>
+    HRESULT NewFunction(_In_ Marshal::PythonMarshaler *pMarshaler, _In_ TArgs&&... args)
+    {
+        HRESULT hr = S_OK;
+        Microsoft::WRL::ComPtr<TFN> spFn;
+        IfFailedReturn(Microsoft::WRL::MakeAndInitialize<TFN>(&spFn, pMarshaler, std::forward<TArgs>(args)...));
+        IfFailedReturn(AddFunction(spFn.Get()));
+        return hr;
+    }
+
+private:
+
+    typedef std::unordered_map<std::string, PythonFunction *> FunctionMap;
+
+    HRESULT AddFunction(_In_ PythonFunction *pPythonFunction)
+    {
+        HRESULT hr = S_OK;
+        Microsoft::WRL::ComPtr<PythonFunction> spFn(pPythonFunction);
+        IfFailedReturn(ConvertException([&](){
+            m_functions.push_back(spFn);
+            m_functionMap.insert(FunctionMap::value_type(spFn->GetName(), spFn.Get()));
+            return hr;
+        }));
+
+        return hr;
+    }
+
+    FunctionMap m_functionMap;
+    std::vector<Microsoft::WRL::ComPtr<PythonFunction>> m_functions;
+    bool m_temporaryTable;
+};
+
 
 
 };

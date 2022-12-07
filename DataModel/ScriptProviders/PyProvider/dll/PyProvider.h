@@ -71,7 +71,13 @@ namespace Debugger::DataModel::ScriptProvider::Python
     namespace Marshal
     {
         class PythonMarshaler;
-    };
+    }
+
+    namespace Library
+    {
+        class PythonLibrary;
+        class HostLibrary;
+    }
 
 } // Debugger::DataModel::ScriptProvider::Python
 
@@ -83,6 +89,8 @@ namespace Debugger::DataModel::ScriptProvider::Python
 #include "Utility.h"
 #include "Marshal.h"
 #include "PyFunctions.h"
+#include "PyClasses.h"
+#include "PyLibrary.h"
 #include "HostLibrary.h"
 #include "ScriptProvider.h"
 #include "ScriptTemplates.h"

@@ -25,6 +25,10 @@ namespace Debugger::DataModel::ScriptProvider::Python::Functions
 
 PythonFunction::~PythonFunction()
 {
+    if (m_pFunction != nullptr)
+    {
+        Py_DECREF(m_pFunction);
+    }
 }
 
 HRESULT PythonFunction::InternalInitialize(_In_ const char *pName, 
@@ -54,26 +58,48 @@ HRESULT PythonFunction::InternalInitialize(_In_ const char *pName,
     }
 
     DefineMethod(pName, pFunction, flags);
-    PyObject *pCapsule = PyCapsule_New(reinterpret_cast<void *>(this),
-                                       nullptr,
-                                       nullptr);
-    if (pCapsule == nullptr)
-    {
-        return E_FAIL;
-    }
 
-    m_pFunction = PyCFunction_NewEx(&m_methodDef, pCapsule, nullptr /*module*/);
-    if (m_pFunction == nullptr)
-    {
-        return E_FAIL;
-    }
+    PinnedReference capsule = PinnedReference::Take(PyCapsule_New(reinterpret_cast<void *>(this),
+                                                                  nullptr,
+                                                                  &(PythonFunction::destruct)));
+    IfObjectErrorConvertAndReturn(capsule);
+
+    //
+    // *** DANGER *** : After this line of code executes, we rely on the Python GC to collect this object.
+    //                  The destruction of the capsule will invoke PythonFunction::destruct which will
+    //                  release the corresponding reference.
+    //
+    //                  If the construction of the function fails, the capsule will destruct at the end of
+    //                  this scope and it is expected that the capsule holds a single COM ref on the function!
+    //
+    AddRef();
+
+    m_pFunction = PyCFunction_NewEx(&m_methodDef, capsule, nullptr /*module*/);
+    IfObjectErrorConvertAndReturn(capsule);
+
+    //
+    // The capsule is the function entity and was created.  Let our hold on it go.  The Python GC owns this.
+    //
+    capsule.Detach();
 
     return hr;
 }
 
 HRESULT PythonFunction::AddToObject(_In_ PyObject *pObject)
 {
-    int result = PyObject_SetAttrString(pObject, GetName(), GetFunctionObject());
+    //
+    // If we are explicitly being asked to add this to a dictionary, it's not an attribute...
+    //
+    int result = 0;
+    if (PyDict_Check(pObject))
+    {
+        result = PyDict_SetItemString(pObject, GetName(), GetFunctionObject());
+    }
+    else
+    {
+        result = PyObject_SetAttrString(pObject, GetName(), GetFunctionObject());
+    }
+      
     if (result == -1)
     {
         PyObject *pType, *pValue, *pTraceback;

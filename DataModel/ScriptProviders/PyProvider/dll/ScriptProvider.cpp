@@ -780,9 +780,20 @@ HRESULT PythonScriptState::RuntimeClassInitialize(_In_ PythonScript *pScript,
         return E_FAIL;
     }
 
+    m_spPythonLibrary.reset(new(std::nothrow) Library::PythonLibrary());
+    if (m_spPythonLibrary == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
     //
-    // @TODO: Bring up the python library and perform phase one initialization of the script.
+    // Initialization of the library will perform phase one initialization of the host library which
+    // will bridge minimal support APIs into the script context.
     //
+    // After all the root code has run and everything else is bridged, the full support API set can
+    // be bridged with a PhaseTwoInitialize() call on the host library.
+    //
+    IfFailedReturn(m_spPythonLibrary->Initialize(m_pModule, scriptFullPathName));
 
     return hr;
 }
@@ -808,12 +819,14 @@ HRESULT PythonScriptState::Execute()
     auto lock = GlobalInterpreterLock::Lock();
     PyObject *pDict = PyModule_GetDict(m_pModule);
 
+#if 0
 // @TODO: REMOVE THIS!
     ComPtr<Functions::PythonHostLibrary_DebugLog> spDebugLog;
     IfFailedReturn(MakeAndInitialize<Functions::PythonHostLibrary_DebugLog>(&spDebugLog, nullptr));
     IfFailedReturn(spDebugLog->AddToObject(m_pModule));
     spDebugLog.Detach();
 // @TODO: REMOVE THIS!
+#endif // 0
 
     PyObject *pValue = PyRun_String(reinterpret_cast<const char *>(&m_scriptContent[0]), 
                                     Py_file_input, 

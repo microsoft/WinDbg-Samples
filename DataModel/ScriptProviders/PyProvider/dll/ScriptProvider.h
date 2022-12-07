@@ -99,6 +99,15 @@ public:
         return m_spScript.Get();
     }
 
+    // GetPythonLibrary():
+    //
+    // Returns the Python "support library".
+    //
+    Library::PythonLibrary *GetPythonLibrary() const
+    {
+        return m_spPythonLibrary.get();
+    }
+
     // GetModule():
     //
     // Gets the Python module (script context) which presently represents this script.
@@ -171,6 +180,10 @@ private:
 
     // The content of this script (converted to UTF-8 per Python)
     std::vector<BYTE> m_scriptContent;
+
+    // The library of Python routines which we must call to support the script.  All of these are specific
+    // to the script context.
+    std::unique_ptr<Library::PythonLibrary> m_spPythonLibrary;
 
     // The script's main function.
     PinnedReference m_pythonMainFunction;
@@ -358,6 +371,21 @@ public:
     PythonScriptState *GetActiveState() const
     {
         return m_spActiveState.Get();
+    }
+
+    // GetPythonLibrary():
+    //
+    // Returns the Python "support library".
+    //
+    Library::PythonLibrary *GetPythonLibrary() const
+    {
+        Library::PythonLibrary *pPythonLibrary = nullptr;
+        auto pActiveState = GetActiveState();
+        if (pActiveState != nullptr)
+        {
+            pPythonLibrary = pActiveState->GetPythonLibrary();
+        }
+        return pPythonLibrary;
     }
 
     // GetModule():

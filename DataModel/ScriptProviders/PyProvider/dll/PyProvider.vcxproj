@@ -151,6 +151,7 @@
   <ItemGroup>
     <ClInclude Include="HostLibrary.h" />
     <ClInclude Include="Marshal.h" />
+    <ClInclude Include="PyClasses.h" />
     <ClInclude Include="PyFunctions.h" />
     <ClInclude Include="PyLibrary.h" />
     <ClInclude Include="PyProvider.h" />
@@ -163,7 +164,9 @@
     <ClCompile Include="Extension.cpp" />
     <ClCompile Include="HostLibrary.cpp" />
     <ClCompile Include="Marshal.cpp" />
+    <ClCompile Include="PyClasses.cpp" />
     <ClCompile Include="PyFunctions.cpp" />
+    <ClCompile Include="PyLibrary.cpp" />
     <ClCompile Include="ScriptProvider.cpp" />
     <ClCompile Include="ScriptTemplates.cpp" />
     <ClCompile Include="Utility.cpp" />

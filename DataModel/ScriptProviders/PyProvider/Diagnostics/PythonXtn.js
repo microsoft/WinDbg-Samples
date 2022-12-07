@@ -393,6 +393,60 @@ class __ObjectVisualizer
     }
 }
 
+// __PythonException:
+//
+// A wrapper around a Python exception given by type, value, and traceback.
+//
+class __PythonException
+{
+    constructor(excType, excValue, excTraceback)
+    {
+        this.Type = excType;
+        this.Value = excValue;
+        this.Traceback = excTraceback;
+    }
+
+    toString()
+    {
+        var str = this.Type.dereference().runtimeTypedObject.toString();
+        if (!this.Value.isNull)
+        {
+            str += " ";
+            str += this.Value.dereference().runtimeTypedObject.toString();
+        }
+        return str;
+    }
+}
+
+
+// __PythonProcessExtension:
+//
+// An extension of the process object (the <process>.Python namespace)
+//
+class __PythonProcessExtension
+{
+    get Runtime()
+    {
+        return host.getModuleSymbol(__getCache().pythonModule, "_PyRuntime", this);
+    }
+
+    get CurrentThreadState()
+    {
+        return host.createTypedObject(this.Python.Runtime.gilstate.tstate_current._value, __getCache().pythonModule, "PyThreadState", this);
+    }
+
+    get CurrentException()
+    {
+        var threadState = this.Python.CurrentThreadState;
+        if (threadState.address.compareTo(0) == 0 || threadState.curexc_type.isNull)
+        {
+            return null;
+        }
+
+        return new __PythonException(threadState.curexc_type, threadState.curexc_value, threadState.curexc_traceback);
+    }
+}
+
 function initializeScript()
 {
     return [new host.apiVersionSupport(1, 7),
@@ -404,5 +458,6 @@ function initializeScript()
             new host.typeSignatureExtension(__genStringViz, "propertyobject"),
             new host.typeSignatureExtension(__genStringViz, "PyFunctionObject"),
             new host.typeSignatureExtension(__PyGetSetDescrObjectVisualizer, "PyGetSetDescrObject"),
-            new host.typeSignatureExtension(__PyTypeObjectVisualizer, "PyTypeObject")];
+            new host.typeSignatureExtension(__PyTypeObjectVisualizer, "PyTypeObject"),
+            new host.namespacePropertyParent(__PythonProcessExtension, "Debugger.Models.Process", "Debugger.Models.Process.Python", "Python")];
 }
