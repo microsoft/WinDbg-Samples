@@ -130,6 +130,11 @@ HRESULT HostLibrary::PhaseOneInitialize()
     IfFailedReturn(InitializeClass<Classes::PythonTypeSignatureRegistration>(m_hostObject, 
                                                                              &m_spClass_TypeSignatureRegistration, 
                                                                              pMarshaler));
+    IfFailedReturn(ConvertException([&]() {
+        m_classRegistrations.insert({ reinterpret_cast<ULONG_PTR>(m_spClass_TypeSignatureRegistration->GetClassObject()),
+                                     HostRegistrationKind::TypeSignatureRegistration });
+        return S_OK;
+    }));
 
     //
     // Place the host in the global namespace of this script.  This only has a limited set of functionality until
@@ -138,6 +143,86 @@ HRESULT HostLibrary::PhaseOneInitialize()
 
     if (PyObject_SetAttrString(m_pPythonLibrary->GetModule(), "host", m_hostObject) < 0) { return E_FAIL; }
     return hr;
+}
+
+HRESULT HostLibrary::GetSignatureInformation(_In_ PyObject *pPyBridgeElement,
+                                             _Out_ std::wstring *pTypeSignature,
+                                             _Out_ std::wstring *pModuleName,
+                                             _Out_ std::wstring *pMinVersion,
+                                             _Out_ std::wstring *pMaxVersion,
+                                             _Out_ PinnedReference *pClassRegistration)
+{
+    auto fn = [&]()
+    {
+        HRESULT hr = S_OK;
+        *pTypeSignature = { };
+        *pModuleName = { };
+        *pMinVersion = { };
+        *pMaxVersion = { };
+        *pClassRegistration = { };
+
+        auto classObject = PinnedReference::Take(PyObject_GetAttrString(pPyBridgeElement, "class_object"));
+        IfObjectErrorConvertAndReturn(classObject);
+
+        auto typeSignature = PinnedReference::Take(PyObject_GetAttrString(pPyBridgeElement, "type_signature"));
+        IfObjectErrorConvertAndReturn(pTypeSignature);
+
+        PinnedReference moduleInfo;
+        if (PyObject_HasAttrString(pPyBridgeElement, "module_info"))
+        {
+            moduleInfo = PinnedReference::Take(PyObject_GetAttrString(pPyBridgeElement, "module_info"));
+            IfObjectErrorConvertAndReturn(moduleInfo);
+        }
+
+        PinnedReference minVersion;
+        if (PyObject_HasAttrString(pPyBridgeElement, "min_version"))
+        {
+            minVersion = PinnedReference::Take(PyObject_GetAttrString(pPyBridgeElement, "min_version"));
+            IfObjectErrorConvertAndReturn(minVersion);
+        }
+
+        PinnedReference maxVersion;
+        if (PyObject_HasAttrString(pPyBridgeElement, "max_version"))
+        {
+            maxVersion = PinnedReference::Take(PyObject_GetAttrString(pPyBridgeElement, "max_version"));
+            IfObjectErrorConvertAndReturn(maxVersion);
+        }
+
+        const char *pTypeSignatureStr = PyUnicode_AsUTF8AndSize(typeSignature, nullptr);
+        IfFailedReturn(GetUTF16(pTypeSignatureStr, pTypeSignature));
+
+        //
+        // @TODO: module objects...
+        //
+        if (moduleInfo)
+        {
+            if (PyUnicode_Check(moduleInfo))
+            {
+                const char *pModuleInfoStr = PyUnicode_AsUTF8AndSize(moduleInfo, nullptr);
+                IfFailedReturn(GetUTF16(pModuleInfoStr, pTypeSignature));
+            }
+            else
+            {
+                return E_INVALIDARG;
+            }
+        }
+
+        if (minVersion)
+        {
+            const char *pMinVersionStr = PyUnicode_AsUTF8AndSize(minVersion, nullptr);
+            IfFailedReturn(GetUTF16(pMinVersionStr, pMinVersion));
+        }
+
+        if (maxVersion)
+        {
+            const char *pMaxVersionStr = PyUnicode_AsUTF8AndSize(maxVersion, nullptr);
+            IfFailedReturn(GetUTF16(pMaxVersionStr, pMaxVersion));
+        }
+
+        *pClassRegistration = std::move(classObject);
+        return hr;
+    };
+    return ConvertException(fn);
 }
     
 } // Debugger::DataModel::ScriptProvider::Python::Library

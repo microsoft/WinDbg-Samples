@@ -63,7 +63,8 @@ HRESULT PythonSourceObject::GetKey(_In_ IModelObject *pContextObject,
 
     // PUBLIC BOUNDARY CALL: Enter the appropriate script context
     auto switcher = m_spOwningScriptState->EnterScript();
-
+    Library::PythonLibrary *pLibrary = m_spOwningScriptState->GetPythonLibrary();
+    
     *pHasKey = false;
     if (ppKeyValue != nullptr)
     {
@@ -101,10 +102,8 @@ HRESULT PythonSourceObject::GetKey(_In_ IModelObject *pContextObject,
     }
 
     bool hasKey = !!PyObject_HasAttrString(m_pythonObject, keyNameUtf8.c_str());
-    PyObject *pKeyValue = nullptr;
+    PinnedReference keyValue;
 
-// @TODO
-#if 0
     if (m_isDataModel)
     {
         //
@@ -115,10 +114,66 @@ HRESULT PythonSourceObject::GetKey(_In_ IModelObject *pContextObject,
         // @TODO: This seems horribly expensive.  There should be a better way to get the outside "this" pointer
         //        injected into any accessors.
         //
-        return E_NOTIMPL;
+        if (hasKey)
+        {
+            PyObject *pAttrRaw;
+            IfFailedReturn(pLibrary->FindAttribute(m_pythonObject, keyNameUtf8.c_str(), &pAttrRaw));
+
+            //
+            // @TODO: There are keys for which HasAttrString will return it's there and FindAttribute won't
+            //        find it.  Just bail for now.  This needs more investigation.
+            //
+            if (hr == S_FALSE)
+            {
+                hasKey = false;
+            }
+            else
+            {
+                auto attrRaw = PinnedReference::Take(pAttrRaw);
+
+                if (PyObject_IsInstance(pAttrRaw, reinterpret_cast<PyObject *>(&PyProperty_Type)))
+                {
+                    //
+                    // Invoke the property __get__ **MANUALLY** and pass the 'this' / 'self' pointer which came from
+                    // outside of Python by marshaling it back into Python.  This is 'instance'
+                    //
+                    auto get = PinnedReference::Take(PyObject_GetAttrString(pAttrRaw, "__get__"));
+                    IfObjectErrorConvertAndReturn(get);
+
+                    auto argsTuple = PyTuple_New(2);
+                    IfObjectErrorConvertAndReturn(argsTuple);
+
+                    PyObject *pPyThis = nullptr;
+                    IfFailedReturn(GetMarshaler()->MarshalToPython(nullptr, pContextObject, &pPyThis));
+
+                    //
+                    // NOTE: PyTuple_SetItem steals the reference count passed to it!
+                    //
+                    // [implicit] - self (the property object) <-- via the method wrapper
+                    // [0] - instance (the 'self' / instance that the property was accessed to)
+                    // [1] - owner (the owning class)
+                    //
+                    auto pyThis = PinnedReference::Take(pPyThis);
+                    if (PyTuple_SetItem(argsTuple, 0, pyThis) < 0) { return E_FAIL; }
+                    pyThis.Detach();
+
+                    PinnedReference classObject = m_pythonObject;
+                    if (PyTuple_SetItem(argsTuple, 1, classObject) < 0) { return E_FAIL; }
+                    classObject.Detach();
+
+                    auto value = PinnedReference::Take(PyObject_Call(get, argsTuple, nullptr));
+                    IfObjectErrorConvertAndReturn(value);
+
+                    keyValue = std::move(value);
+                }
+                else
+                {
+                    keyValue = std::move(attrRaw);
+                }
+            }
+        }
     }
     else
-#endif // 0
     {
         if (hasKey && excludeFromMarshaling)
         {
@@ -130,16 +185,16 @@ HRESULT PythonSourceObject::GetKey(_In_ IModelObject *pContextObject,
 
         if (hasKey)
         {
-            pKeyValue = PyObject_GetAttrString(m_pythonObject, keyNameUtf8.c_str());
-            IfObjectErrorConvertAndReturn(pKeyValue);
+            keyValue = PinnedReference::Take(PyObject_GetAttrString(m_pythonObject, keyNameUtf8.c_str()));
+            IfObjectErrorConvertAndReturn(keyValue);
         }
     }
 
     Object mshKeyValue;
     Metadata mshMetadata;
-    if (hasKey && pKeyValue != nullptr)
+    if (hasKey && keyValue != nullptr)
     {
-        IfFailedReturn(GetMarshaler()->MarshalFromPython(pKeyValue, &mshKeyValue, &mshMetadata));
+        IfFailedReturn(GetMarshaler()->MarshalFromPython(keyValue, &mshKeyValue, &mshMetadata));
     }
 
     *pHasKey = hasKey;
@@ -1071,7 +1126,12 @@ HRESULT PythonMarshaler::MarshalFromPython(_In_ PyObject *pPyObject,
                 mshResult = ll;
             }
         }
-        else if (PyCallable_Check(pPyObject))
+
+        // NOTE: A class is callable (it's the constructor).  If we are marshaling something which is callable
+        //       and we are using it in a context where we expect a data model, expect it to be a class and fall
+        //       through to general marshaling.
+        // 
+        else if (PyCallable_Check(pPyObject) && !isDataModel)
         {
             ComPtr<PythonSourceObject> spSrcObj;
             IModelMethod *pMethod;
@@ -1196,6 +1256,19 @@ HRESULT PythonMarshaler::EnumerateValues(_In_ IModelObject *pModelObject,
                                          _COM_Outptr_ IKeyEnumerator **ppEnum)
 {
     return m_spNameBinder->EnumerateValues(pModelObject, ppEnum);
+}
+
+HRESULT PythonMarshaler::ThrowException(_In_ PyObject *pType, _In_ ULONG rscId, ...)
+{
+    HRESULT hr = S_OK;
+    va_list va;
+    va_start(va, rscId);
+
+    std::unique_ptr<char []> spMessage;
+    IfFailedReturn(m_pProvider->GetStringResource(rscId, &spMessage));
+
+    (void)PyErr_FormatV(pType, spMessage.get(), va);
+    return S_OK;
 }
 
 HRESULT PythonMarshaler::ConvertPythonException(_In_ HRESULT hrConverted,

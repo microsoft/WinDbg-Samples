@@ -58,6 +58,25 @@ namespace Debugger::DataModel::ScriptProvider::Python::Library
 using namespace Debugger::DataModel::ScriptProvider::Python::Functions;
 using namespace Debugger::DataModel::ScriptProvider::Python::Classes;
 
+// HostRegistrationKind:
+//
+// Indicates what kind of registration we are performing.
+//
+enum class HostRegistrationKind
+{
+    None,
+    TypeSignatureRegistration = 1,
+    TypeSignatureExtension = 2,
+    NamedModelRegistration = 3,
+    NamedModelParent = 4,
+    FunctionAlias = 5,
+    OptionalRecord = 6,
+    NamespacePropertyParent = 7,
+    ApiVersionSupport = 8,
+    ResourceFile = 9,
+    AllowOutsidePropertyWrites = 10
+};
+
 // HostLibrary:
 //
 // The host support library for the Python provider.
@@ -92,6 +111,30 @@ public:
     // code, methods, and property fetches.
     //
     HRESULT PhaseTwoInitialize();
+
+    // GetRegistrationKind()
+    //
+    // Gets what kind of registration information was returned in an object returned from InitializeScript.
+    //
+    HRESULT GetRegistrationKind(_In_ PyObject *pPyBridgeElement,
+                                _Out_ HostRegistrationKind *pRegistrationKind)
+    {
+        auto it = m_classRegistrations.find(reinterpret_cast<ULONG_PTR>(PyObject_Type(pPyBridgeElement)));
+        if (it == m_classRegistrations.end()) { return E_INVALIDARG; }
+        *pRegistrationKind = it->second;
+        return S_OK;
+    }
+
+    // GetSignatureInformation():
+    //
+    // Returns the registration information from an object returned from InitializeScript.
+    //
+    HRESULT GetSignatureInformation(_In_ PyObject *pPyBridgeElement,
+                                    _Out_ std::wstring *pTypeSignature,
+                                    _Out_ std::wstring *pModuleName,
+                                    _Out_ std::wstring *pMinVersion,
+                                    _Out_ std::wstring *pMaxVersion,
+                                    _Out_ PinnedReference *pClassRegistration);
 
 private:
 
@@ -139,6 +182,9 @@ private:
 
     std::unique_ptr<PythonNamespace> m_spClass_Namespace;
     std::unique_ptr<PythonTypeSignatureRegistration> m_spClass_TypeSignatureRegistration;
+
+    // Maps type objects for registration records to their registration kind
+    std::unordered_map<ULONG_PTR, HostRegistrationKind> m_classRegistrations;
 
     //*************************************************
     // Other Objects:

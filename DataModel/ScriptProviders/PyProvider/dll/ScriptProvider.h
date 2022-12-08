@@ -13,6 +13,143 @@
 namespace Debugger::DataModel::ScriptProvider::Python
 {
 
+using namespace Debugger::DataModel::ClientEx;
+
+//*************************************************
+// Script Provider Core Constructs:
+//
+
+// PythonHostRegistration:
+//
+// Tracks a single type signature or named model registration against a script.
+//
+struct PythonHostRegistration
+{
+    // PythonHostRegistration():
+    //
+    // Constructs an empty registration record.
+    //
+    PythonHostRegistration() :
+        m_registrationKind(Library::HostRegistrationKind::None)
+    {
+    }
+
+    PythonHostRegistration(PythonHostRegistration &&rhs)
+    {
+        MoveFrom(std::forward<PythonHostRegistration&&>(rhs));
+    }
+
+    PythonHostRegistration& operator=(PythonHostRegistration &&rhs)
+    {
+        MoveFrom(std::forward<PythonHostRegistration&&>(rhs));
+        return *this;
+    }
+
+    // Initialize():
+    //
+    // Initializes a new host registration record from a bridge element returned from InitializeScript.
+    //
+    HRESULT Initialize(_In_ PythonScriptState *pScriptState, _In_ PyObject *pPyBridgeElement);
+
+    // Initialize():
+    //
+    // Initializes a new host registration record for either a type signature registration,
+    // a data model registration, a function alias, or an optional record registration
+    //
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ PCWSTR pwszSignature,
+                       _In_ IDebugHostTypeSignature *pTypeSignature,
+                       _In_ const Object& marshaledDataModel);
+
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ PCWSTR pwszName,
+                       _In_ const Object& marshaledObject,
+                       _In_ const Metadata & marshaledMetadata = Metadata());
+
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ PythonScriptState *pScriptState,
+                       _In_ PyObject *pPyUnderlyingRecord);
+
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ PCWSTR pwszModelName,
+                       _In_ PCWSTR pwszSubNamespaceModelName,
+                       _In_ PCWSTR pwszSubNamespaceAccessName,
+                       _In_ const Object& marshaledObject);
+
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ ULONG majorVersion,
+                       _In_ ULONG minorVersion);
+
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ PCWSTR pwszResourceFileName);
+
+    HRESULT Initialize(_In_ IDataModelManager *pDataModelManager,
+                       _In_ Library::HostRegistrationKind regKind,
+                       _In_ bool allowOutsidePropertyWrites);
+
+    // Apply():
+    //
+    // Applies the registration to the data model manager.
+    //
+    HRESULT Apply(_Out_ bool *pActiveRecord, _In_ bool isOptional = false);
+
+    // Undo():
+    //
+    // Undoes the registration from the data model manager.
+    //
+    HRESULT Undo();
+
+private:
+   
+    PythonHostRegistration(PythonHostRegistration const&) =delete;
+    PythonHostRegistration &operator=(PythonHostRegistration const&) =delete;
+
+    // MoveFrom():
+    //
+    // Moves from src into this.
+    //
+    void MoveFrom(_In_ PythonHostRegistration &&src)
+    {
+        m_registrationKind = src.m_registrationKind;
+        m_pScriptState = src.m_pScriptState;
+        m_spDataModelManager = std::move(src.m_spDataModelManager);
+        m_spTypeSignature = std::move(src.m_spTypeSignature);
+        m_name = std::move(src.m_name);
+        m_subNamespaceModelName = std::move(src.m_subNamespaceModelName);
+        m_subNamespaceAccessName = std::move(src.m_subNamespaceAccessName);
+        m_signature = std::move(src.m_signature);
+        m_originalNamedModel = std::move(src.m_originalNamedModel);
+        m_marshaledObject = std::move(src.m_marshaledObject);
+        m_spUnderlyingRecord = std::move(src.m_spUnderlyingRecord);
+        m_majorVersion = src.m_majorVersion;
+        m_minorVersion = src.m_minorVersion;
+        m_allowOutsidePropertyWrites = src.m_allowOutsidePropertyWrites;
+    }
+	
+    Library::HostRegistrationKind m_registrationKind;
+    PythonScriptState *m_pScriptState; // weak (script state owns us)
+    Microsoft::WRL::ComPtr<IDataModelManager> m_spDataModelManager;
+    Microsoft::WRL::ComPtr<IDebugHostTypeSignature> m_spTypeSignature;
+    std::wstring m_name;
+    std::wstring m_subNamespaceModelName;
+    std::wstring m_subNamespaceAccessName;
+    std::wstring m_signature;
+    Object m_originalNamedModel;
+    Object m_marshaledObject;
+    Metadata m_marshaledMetadata;
+    std::unique_ptr<PythonHostRegistration> m_spUnderlyingRecord;
+    ULONG m_majorVersion = 0;
+    ULONG m_minorVersion = 0;
+    std::wstring m_resourceFileName;
+    bool m_allowOutsidePropertyWrites;
+};
+
 // PythonScriptState:
 //
 // Maintains the state of a single "execution" of a script.  If script content changes
@@ -176,6 +313,20 @@ private:
         Inactive
     };
 
+    // InitializationBridge():
+    //
+    // Handles processing the return value from InitializeScript.  Processes every element and performs
+    // an auto-bridge between the Python script and the data model.
+    //
+    HRESULT InitializationBridge(_In_ PyObject *pInitList);
+
+    // ProcessBridgeElement():
+    //
+    // Handles processing an individual element in the return iterable from InitializeScript.  Registers a type
+    // signature or extension as necessary.
+    //
+    HRESULT ProcessBridgeElement(_In_ PyObject *pBridgeElement);
+
     ScriptStateState m_state;
 
     // The content of this script (converted to UTF-8 per Python)
@@ -193,6 +344,10 @@ private:
     // from the script host.  The two are linked together to provide rollback capability
     // for subsequent Populate/Execute cycles.
     Debugger::DataModel::ClientEx::Object m_namespaceObject;
+
+    // The list of active type signature, extension, named model, or model parent registrations.  This is a version of what is built
+    // from the return value of the script's InitializeScript method in Python.
+    std::vector<PythonHostRegistration> m_activeRegistrations;
 
     // Pointer to the owning script.
     Microsoft::WRL::ComPtr<PythonScript> m_spScript;

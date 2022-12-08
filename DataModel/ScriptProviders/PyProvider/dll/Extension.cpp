@@ -112,15 +112,13 @@ HRESULT InitializeProvider()
         ComPtr<IHostDataModelAccess> spAccess;
         IfFailedReturn(spClient.As(&spAccess));
 
-        ComPtr<IDataModelManager> spDataModelManager;
-        ComPtr<IDebugHost> spDebugHost;
         IfFailedReturn(spAccess->GetDataModel(&g_pManager, &g_pHost));
 
         IfFailedReturn(g_pManager->QueryInterface(IID_PPV_ARGS(&spScriptManager)));
         IfFailedReturn(g_pHost->QueryInterface(IID_PPV_ARGS(&spScriptHost)));
 
         IfFailedReturn(MakeAndInitialize<PythonProvider>(&spScriptProvider, 
-                                                         spDataModelManager.Get(), 
+                                                         g_pManager, 
                                                          spScriptManager.Get(),
                                                          spScriptHost.Get()));
     }

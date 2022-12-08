@@ -261,6 +261,15 @@ protected:
         return false;
     }
 
+    // GetMarshaler():
+    //
+    // Gets the marshaler associated with this class.
+    //
+    Marshal::PythonMarshaler *GetMarshaler() const
+    {
+        return m_pMarshaler;
+    }
+
     //*************************************************
     // Internal Data:
     //

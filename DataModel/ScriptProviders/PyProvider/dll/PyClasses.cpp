@@ -271,15 +271,54 @@ HRESULT PythonTypeSignatureRegistration::Initialize(_In_ Marshal::PythonMarshale
 
 int PythonTypeSignatureRegistration::TpInit(_In_ PyObject *pSelf, _In_ PyObject *pArgs, _In_ PyObject *pKwArgs)
 {
-    Py_ssize_t argCount = PyTuple_Size(pArgs);
-    if (argCount != 2)
+    Marshal::PythonMarshaler *pMarshaler = GetMarshaler();
+
+    //
+    // This is a varargs function:
+    //
+    // TypeSignatureRegistration(class_object, type_signature, <module_info>)
+    //
+    //     <module_info> can be expressed as:
+    //
+    //     [module_name], [min_version], [max_version]
+    //     or
+    //     [module_object]
+    //
+    // Note that the declaration appears to Python as:
+    //
+    //     TypeSignatureRegistation(class_object, type_signature, 
+    //                              module_info = None, min_version = None, max_version = None)
+    //
+    // Where:
+    //
+    //     'module_info' is accepted as any object (in reality, it must either be a Unicode object or a module
+    //     object which was marshaled in from the data model or the underlying usage of the TypeSignatureRegistration
+    //     will fail.
+    //
+    PyObject *pClassObject = nullptr;
+    PyObject *pTypeSignature = nullptr;
+    PyObject *pModuleInfo = nullptr;
+    PyObject *pMinVersion = nullptr;
+    PyObject *pMaxVersion = nullptr;
+    static char const *kwList[] = { "class_object", "type_signature", "module_info", "min_version", "max_version", nullptr };
+    if (!PyArg_ParseTupleAndKeywords(pArgs, pKwArgs, /* "O!U|OUU" */ "OU|OUU", const_cast<char **>(kwList),
+                                     /* PyType_Type, */ &pClassObject,
+                                     &pTypeSignature,
+                                     &pModuleInfo,
+                                     &pMinVersion,
+                                     &pMaxVersion))
     {
-        PyErr_Format(PyExc_Exception, "invalid argument");
         return -1;
     }
 
-    int i = PyObject_SetAttrString(pSelf, "class_object", PyTuple_GetItem(pArgs, 0));
-    int j = PyObject_SetAttrString(pSelf, "signature_string", PyTuple_GetItem(pArgs, 1));
+    if (PyObject_SetAttrString(pSelf, "class_object", pClassObject) < 0 ||
+        PyObject_SetAttrString(pSelf, "type_signature", pTypeSignature) < 0 ||
+        (pModuleInfo && PyObject_SetAttrString(pSelf, "module_info", pModuleInfo) < 0) ||
+        (pMinVersion && PyObject_SetAttrString(pSelf, "min_version", pMinVersion) < 0) ||
+        (pMaxVersion && PyObject_SetAttrString(pSelf, "max_version", pMaxVersion) < 0))
+    {
+        return -1;
+    }
 
     return 0;
 }

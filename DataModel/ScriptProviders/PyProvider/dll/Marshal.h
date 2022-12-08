@@ -551,6 +551,12 @@ public:
                                    _Out_ Object *pErrorObject,
                                    _Out_ HRESULT *pResult);
 
+    // ThrowException():
+    //
+    // Throws an exception in Python.
+    //
+    HRESULT ThrowException(_In_ PyObject *pType, _In_ ULONG rscId, ...);
+
     // CreatePythonObjectForModelObject():
     //
     // Creates a new Python object for the given model object.  The resulting Python object is an

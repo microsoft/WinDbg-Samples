@@ -191,6 +191,626 @@ void PythonProvider::FinishInitialization()
     AddRef();
 }
 
+HRESULT PythonHostRegistration::Initialize(_In_ PythonScriptState *pScriptState, _In_ PyObject *pPyBridgeElement)
+{
+    HRESULT hr = S_OK;
+
+    PythonProvider *pProvider = pScriptState->GetScript()->GetProvider();
+    Marshal::PythonMarshaler *pMarshaler = pProvider->GetMarshaler();
+    Library::PythonLibrary *pPythonLibrary = pScriptState->GetPythonLibrary();
+    Library::HostLibrary *pHostLibrary = pPythonLibrary->GetHostLibrary();
+    IDataModelManager *pDataModelManager = pProvider->GetDataModelManager();
+    m_pScriptState = pScriptState;
+
+    Library::HostRegistrationKind regKind;
+    IfFailedReturn(pHostLibrary->GetRegistrationKind(pPyBridgeElement, &regKind));
+
+    Object marshaledObject;
+    Metadata marshaledMetadata;
+
+    std::wstring nameOrSignature;
+    std::wstring moduleName;
+    std::wstring minVersion;
+    std::wstring maxVersion;
+    PinnedReference registeredClass;
+    PyObject *pPyObject;
+    ComPtr<IDebugHostTypeSignature> spSig;
+
+    switch(regKind)
+    {
+#ifdef OTHERREC
+        case Library::HostRegistrationKind::OptionalRecord:
+        {
+            IfFailedReturn(pHostLibrary->GetUnderlyingRecord(pPyBridgeElement, &pPyObject));
+            auto underlyingRecord = PinnedReference::Take(pPyObject);
+            IfFailedReturn(Initialize(pDataModelManager, regKind, pScriptState, underlyingRecord));
+            break;
+        }
+
+        case Library::HostRegistrationKind::FunctionAlias:
+        {
+#if 0
+            JsValueRef jsMetadata;
+#endif // 0
+
+            IfFailedReturn(pHostLibrary->GetFunctionAliasInformation(pPyBridgeElement,
+                                                                     &pwszNameOrSignature,
+                                                                     &pPyObject));
+#if 0
+                                                                     &jsMetadata));
+#endif // 0
+            auto function = PinnedReference::Take(pPyObject);
+
+            Client::Metadata metadata;
+#if 0
+            if (jsMetadata != nullptr)
+            {
+                IfFailedReturn(pMarshaler->CreateMetadataFromDescriptor(jsMetadata, nullptr, &metadata));
+            }
+#endif // 0
+
+            IfFailedReturn(pMarshaler->MarshalFromPython(function, &marshaledObject, nullptr, false));
+
+            IfFailedReturn(Initialize(pDataModelManager, regKind, pwszNameOrSignature, marshaledObject, metadata));
+            break;
+        }
+#endif // OTHERREC
+
+        case Library::HostRegistrationKind::TypeSignatureRegistration:
+        case Library::HostRegistrationKind::TypeSignatureExtension:
+        {
+            PCWSTR pwszReportName = (regKind == Library::HostRegistrationKind::TypeSignatureRegistration) ?
+                L"TypeSignatureRegistration" : L"TypeSignatureExtension";
+
+            IfFailedReturn(pHostLibrary->GetSignatureInformation(pPyBridgeElement, 
+                                                                 &nameOrSignature,
+                                                                 &moduleName,
+                                                                 &minVersion,
+                                                                 &maxVersion,
+                                                                 &registeredClass));
+
+            if (!moduleName.empty())
+            {
+                hr = pProvider->GetHostSymbols()->CreateTypeSignatureForModuleRange(nameOrSignature.c_str(),
+                                                                                    moduleName.c_str(),
+                                                                                    minVersion.empty() ? nullptr : minVersion.c_str(),
+                                                                                    maxVersion.empty() ? nullptr : maxVersion.c_str(),
+                                                                                    &spSig);
+            }
+            else
+            {
+                if (!minVersion.empty() || !maxVersion.empty())
+                {
+                    pScriptState->GetScript()->ReportError(ErrorClassError, E_INVALIDARG, IDS_INVALID_ARGUMENT, pwszReportName);
+                    return E_INVALIDARG;
+                }
+
+                hr = pProvider->GetHostSymbols()->CreateTypeSignature(nameOrSignature.c_str(), nullptr, &spSig);
+            }
+
+            if (FAILED(hr))
+            {
+#if 0
+                pScriptState->GetScript()->ReportError(ErrorClassError, 
+                                                       hr, 
+                                                       IDS_CANNOT_MODIFY_OBJECT_MODEL,
+                                                       pwszReportName,
+                                                       pwszNameOrSignature);
+#endif // 0
+                return hr;
+            }
+
+            IfFailedReturn(pMarshaler->MarshalFromPython(registeredClass, &marshaledObject, &marshaledMetadata, true));
+
+            //
+            // Verify that it marshaled out with a valid data model.  If not, fail immediately.
+            //
+            ComPtr<IDataModelConcept> spDataModel;
+            IfFailedReturn(marshaledObject->GetConcept(__uuidof(IDataModelConcept), &spDataModel, nullptr));
+
+            IfFailedReturn(Initialize(pDataModelManager, regKind, nameOrSignature.c_str(), spSig.Get(), marshaledObject));
+            break;
+        }
+
+#ifdef OTHERREC
+
+        case Library::HostRegistrationKind::NamedModelRegistration:
+        case Library::HostRegistrationKind::NamedModelParent:
+        {
+            IfFailedReturn(pHostLibrary->GetModelInformation(pPyBridgeElement,
+                                                             &pwszNameOrSignature,
+                                                             &pPyRegisteredClass));
+            auto registeredClass = PinnedReference::Take(pPyRegisteredClass);
+
+            //
+            // This implies that we track the model name for the first registration.  This is never undone --
+            // it is simply tracked.  Perform the action here.
+            //
+            if (regKind == Library::HostRegistrationKind::NamedModelRegistration)
+            {
+                return E_NOTIMPL;
+#if 0
+                JsRef jsModelName;
+                IfErrorConvertAndReturn(JsGetIndexedProperty(jsRegisteredPrototype, 
+                                                             pJsLibrary->GetModelNameSymbol(),
+                                                             &jsModelName));
+
+                JsValueType jsType;
+                IfErrorConvertAndReturn(JsGetValueType(jsModelName, &jsType));
+                if (jsType == JsUndefined)
+                {
+                    IfErrorConvertAndReturn(JsPointerToString(pwszNameOrSignature, 
+                                                              wcslen(pwszNameOrSignature), 
+                                                              &jsModelName));
+
+                    IfErrorConvertAndReturn(JsSetIndexedProperty(jsRegisteredPrototype, 
+                                                                 pJsLibrary->GetModelNameSymbol(),
+                                                                 jsModelName));
+                }
+#endif // 0
+            }
+
+            IfFailedReturn(pMarshaler->MarshalFromPython(registeredClass, &marshaledObject, &marshaledMetadata, true));
+
+            //
+            // Verify that it marshaled out with a valid data model.  If not, fail immediately.
+            //
+            ComPtr<IDataModelConcept> spDataModel;
+            IfFailedReturn(marshaledObject->GetConcept(__uuidof(IDataModelConcept), &spDataModel, nullptr));
+
+            IfFailedReturn(Initialize(pDataModelManager, regKind, pwszNameOrSignature, marshaledObject));
+            break;
+        }
+
+        case Library::HostRegistrationKind::NamespacePropertyParent:
+        {
+            PCWSTR ppwszSubNamespaceModelName;
+            PCWSTR ppwszSubNamespaceAccessName;
+
+            IfFailedReturn(pHostLibrary->GetSubNamespaceInformation(pPyBridgeElement,
+                                                                    &pwszNameOrSignature,
+                                                                    &ppwszSubNamespaceModelName,
+                                                                    &ppwszSubNamespaceAccessName,
+                                                                    &pPyRegisteredClass));
+            auto registeredClass = PinnedReference::Take(pPyRegisteredClass);
+
+            IfFailedReturn(pMarshaler->MarshalFromPython(registeredClass, &marshaledObject, &marshaledMetadata, true));
+
+            //
+            // Verify that it marshaled out with a valid data model.  If not, fail immediately.
+            //
+            ComPtr<IDataModelConcept> spDataModel;
+            IfFailedReturn(marshaledObject->GetConcept(__uuidof(IDataModelConcept), &spDataModel, nullptr));
+
+            IfFailedReturn(Initialize(pDataModelManager, 
+                                      regKind, 
+                                      pwszNameOrSignature, 
+                                      ppwszSubNamespaceModelName, 
+                                      ppwszSubNamespaceAccessName,
+                                      marshaledObject));
+            break;
+        }
+
+        case Library::HostRegistrationKind::ApiVersionSupport:
+        {
+            ULONG majorVersion;
+            ULONG minorVersion;
+
+            IfFailedReturn(pHostLibrary->GetApiVersionSupportInformation(pPyBridgeElement, &majorVersion, &minorVersion));
+
+            IfFailedReturn(Initialize(pDataModelManager, regKind, majorVersion, minorVersion));
+            break;
+        }
+
+        case Library::HostRegistrationKind::ResourceFile:
+        {
+            PCWSTR ppwszResourceFileName;
+
+            IfFailedReturn(pHostLibrary->GetResourceFileName(pPyBridgeElement, &ppwszResourceFileName));
+
+            IfFailedReturn(Initialize(pDataModelManager, regKind, ppwszResourceFileName));
+            break;
+        }
+
+        case Library::HostRegistrationKind::AllowOutsidePropertyWrites:
+        {
+            bool allowOutsidePropertyWrites;
+
+            IfFailedReturn(pHostLibrary->GetAllowOutsidePropertyWritesInformation(pPyBridgeElement, &allowOutsidePropertyWrites));
+
+            IfFailedReturn(Initialize(pDataModelManager, regKind, allowOutsidePropertyWrites));
+            break;
+        }
+#endif // OTHERREC
+
+        default:
+        {
+            return E_UNEXPECTED;
+        }
+    }
+
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                           _In_ Library::HostRegistrationKind regKind,
+                                           _In_ PythonScriptState *pScriptState,
+                                           _In_ PyObject *pPyUnderlyingRecord)
+{
+    HRESULT hr = S_OK;
+    m_spDataModelManager = pDataModelManager;
+    m_registrationKind = regKind;
+    m_spUnderlyingRecord.reset(new(std::nothrow) PythonHostRegistration);
+    if (m_spUnderlyingRecord.get() == nullptr)
+    {
+        return E_OUTOFMEMORY;
+    }
+
+    IfFailedReturn(m_spUnderlyingRecord->Initialize(pScriptState, pPyUnderlyingRecord));
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                               _In_ Library::HostRegistrationKind regKind,
+                                               _In_ PCWSTR pwszSignature,
+                                               _In_ IDebugHostTypeSignature *pTypeSignature,
+                                               _In_ const Object& marshaledDataModel)
+{
+    HRESULT hr = S_OK;
+    auto fn = [&](){
+        m_signature = pwszSignature;
+        m_spDataModelManager = pDataModelManager;
+        m_registrationKind = regKind;
+        m_spTypeSignature = pTypeSignature;
+        m_marshaledObject = marshaledDataModel;
+        return hr;
+    };
+    IfFailedReturn(ConvertException(fn));
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                           _In_ Library::HostRegistrationKind regKind,
+                                           _In_ PCWSTR pwszName,
+                                           _In_ const Object& marshaledObject,
+                                           _In_ const Metadata & marshaledMetadata /* = Metadata() */)
+{
+    HRESULT hr = S_OK;
+
+    auto fn = [&](){
+        m_spDataModelManager = pDataModelManager;
+        m_registrationKind = regKind;
+        m_name = pwszName;
+        m_marshaledObject = marshaledObject;
+        m_marshaledMetadata = marshaledMetadata;
+        return hr;
+    };
+    IfFailedReturn(ConvertException(fn));
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                           _In_ Library::HostRegistrationKind regKind,
+                                           _In_ PCWSTR pwszModelName,
+                                           _In_ PCWSTR pwszSubNamespaceModelName,
+                                           _In_ PCWSTR pwszSubNamespaceAccessName,
+                                           _In_ const Object& marshaledObject)
+{
+    HRESULT hr = S_OK;
+
+    auto fn = [&](){
+
+        if (regKind != Library::HostRegistrationKind::NamespacePropertyParent)
+        {
+            return E_FAIL;
+        }
+
+        m_spDataModelManager = pDataModelManager;
+        m_registrationKind = regKind;
+        m_name = pwszModelName;
+        m_subNamespaceModelName = pwszSubNamespaceModelName;
+        m_subNamespaceAccessName = pwszSubNamespaceAccessName;
+        m_marshaledObject = marshaledObject;
+        return hr;
+    };
+    IfFailedReturn(ConvertException(fn));
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                           _In_ Library::HostRegistrationKind regKind,
+                                           _In_ ULONG majorVersion,
+                                           _In_ ULONG minorVersion)
+{
+    HRESULT hr = S_OK;
+    m_spDataModelManager = pDataModelManager;
+    m_registrationKind = regKind;
+    m_majorVersion = majorVersion;
+    m_minorVersion = minorVersion;
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                           _In_ Library::HostRegistrationKind regKind,
+                                           _In_ PCWSTR pwszResourceFileName)
+{
+    auto fn = [&]() {
+        m_spDataModelManager = pDataModelManager;
+        m_registrationKind = regKind;
+        m_resourceFileName = pwszResourceFileName;
+
+        return S_OK;
+    };
+
+    return ConvertException(fn);
+}
+
+HRESULT PythonHostRegistration::Initialize(_In_ IDataModelManager *pDataModelManager,
+                                           _In_ Library::HostRegistrationKind regKind,
+                                           _In_ bool allowOutsidePropertyWrites)
+{
+    auto fn = [&]() {
+        m_spDataModelManager = pDataModelManager;
+        m_registrationKind = regKind;
+        m_allowOutsidePropertyWrites = allowOutsidePropertyWrites;
+
+        return S_OK;
+    };
+
+    return ConvertException(fn);
+}
+
+HRESULT PythonHostRegistration::Apply(_Out_ bool *pActiveRecord, _In_ bool isOptional)
+{
+    HRESULT hr = S_OK;
+    *pActiveRecord = true;
+
+    switch(m_registrationKind)
+    {
+        case Library::HostRegistrationKind::OptionalRecord:
+        {
+            //
+            // If the underlying record type is optional, a failure will not cause the application to fail.  It will
+            // just pass back an indication that the record is not active.
+            //
+            bool childActive;
+            assert(m_spUnderlyingRecord.get() != nullptr);
+            if (FAILED(m_spUnderlyingRecord->Apply(&childActive, true)))
+            {
+                *pActiveRecord = false;
+            }
+            else
+            {
+                *pActiveRecord = childActive;
+            }
+            
+            break;
+        }
+
+        case Library::HostRegistrationKind::FunctionAlias:
+        {
+            PythonProvider *pProvider = m_pScriptState->GetScript()->GetProvider();
+            ComPtr<IDebugHostExtensibility> spExtensibility = pProvider->GetHostExtensibility();
+            if (spExtensibility == nullptr)
+            {
+                return E_NOTIMPL;
+            }
+
+            ComPtr<IDebugHostExtensibility2> spExtensibility2;
+            if (SUCCEEDED(spExtensibility.As<IDebugHostExtensibility2>(&spExtensibility2)))
+            {
+                hr = spExtensibility2->CreateFunctionAliasWithMetadata(m_name.c_str(), m_marshaledObject, m_marshaledMetadata);
+            }
+            else
+            {
+                hr = spExtensibility->CreateFunctionAlias(m_name.c_str(), m_marshaledObject);
+            }
+
+            if (FAILED(hr))
+            {
+                if (!isOptional)
+                {
+                    m_pScriptState->GetScript()->ReportError(ErrorClassError, 
+                                                             hr, 
+                                                             IDS_CANNOT_MODIFY_OBJECT_MODEL, 
+                                                             L"functionAlias",
+                                                             m_name.c_str());
+                }
+                return hr;
+            }
+            break;
+        }
+
+        case Library::HostRegistrationKind::TypeSignatureRegistration:
+            hr = m_spDataModelManager->RegisterModelForTypeSignature(m_spTypeSignature.Get(), m_marshaledObject);
+            if (FAILED(hr))
+            {
+                if (!isOptional)
+                {
+                    m_pScriptState->GetScript()->ReportError(ErrorClassError,
+                                                             hr,
+                                                             IDS_CANNOT_MODIFY_OBJECT_MODEL,
+                                                             L"typeSignatureRegistration",
+                                                             m_signature.c_str());
+                }
+                                
+                return hr;
+            }
+            break;
+
+        case Library::HostRegistrationKind::TypeSignatureExtension:
+            hr = m_spDataModelManager->RegisterExtensionForTypeSignature(m_spTypeSignature.Get(), m_marshaledObject);
+            if (FAILED(hr))
+            {
+                if (!isOptional)
+                {
+                    m_pScriptState->GetScript()->ReportError(ErrorClassError,
+                                                             hr,
+                                                             IDS_CANNOT_MODIFY_OBJECT_MODEL,
+                                                             L"typeSignatureExtension",
+                                                             m_signature.c_str());
+                }
+                return hr;
+            }
+            break;
+
+        case Library::HostRegistrationKind::NamedModelRegistration:
+            hr = m_spDataModelManager->RegisterNamedModel(m_name.c_str(), m_marshaledObject);
+            if (FAILED(hr))
+            {
+                if (!isOptional)
+                {
+                    m_pScriptState->GetScript()->ReportError(ErrorClassError,
+                                                             hr,
+                                                             IDS_CANNOT_MODIFY_OBJECT_MODEL,
+                                                             L"namedModelRegistration",
+                                                             m_name.c_str());
+                }
+                return hr;
+            }
+            break;
+
+        case Library::HostRegistrationKind::NamedModelParent:
+        {
+            Microsoft::WRL::ComPtr<IModelObject> spOriginalNamedModel;
+            hr = m_spDataModelManager->AcquireNamedModel(m_name.c_str(), &spOriginalNamedModel);
+            m_originalNamedModel = std::move(spOriginalNamedModel);
+            if (SUCCEEDED(hr))
+            {
+                hr = m_originalNamedModel->AddParentModel(m_marshaledObject, nullptr, false);
+            }
+
+            if (FAILED(hr))
+            {
+                if (!isOptional)
+                {
+                    m_pScriptState->GetScript()->ReportError(ErrorClassError,
+                                                             hr,
+                                                             IDS_CANNOT_MODIFY_OBJECT_MODEL,
+                                                             L"namedModelParent",
+                                                             m_name.c_str());
+                }
+                return hr;
+            }
+
+            break;
+        }
+
+        case Library::HostRegistrationKind::NamespacePropertyParent:
+        {
+            ComPtr<IDataModelManager2> spManager2;
+
+            hr = m_spDataModelManager->QueryInterface(IID_PPV_ARGS(&spManager2));
+            if (SUCCEEDED(hr))
+            {
+                ComPtr<IModelObject> spOriginalNamedModel;
+                hr = spManager2->AcquireSubNamespace(m_name.c_str(),
+                                                     m_subNamespaceModelName.c_str(),
+                                                     m_subNamespaceAccessName.c_str(),
+                                                     nullptr,
+                                                     &spOriginalNamedModel);
+                m_originalNamedModel = std::move(spOriginalNamedModel);
+
+                if (SUCCEEDED(hr))
+                {
+                    hr = m_originalNamedModel->AddParentModel(m_marshaledObject, nullptr, false);
+                }
+            }
+
+            if (FAILED(hr))
+            {
+                if (!isOptional)
+                {
+                    m_pScriptState->GetScript()->ReportError(ErrorClassError,
+                                                             hr,
+                                                             IDS_CANNOT_MODIFY_OBJECT_MODEL,
+                                                             L"namespacePropertyParent",
+                                                             m_name.c_str());
+                }
+            }
+
+            break;
+        }
+
+#if 0
+        case Library::HostRegistrationKind::ApiVersionSupport:
+            IfFailedReturn(m_pScriptState->GetPythonLibrary()->InitializeApiVersionSupport(m_majorVersion, m_minorVersion));
+            break;
+
+        case Library::HostRegistrationKind::ResourceFile:
+            IfFailedReturn(m_pScriptState->GetPythonLibrary()->InitializeResourceFileName(m_resourceFileName.c_str()));
+            break;
+
+        case Library::HostRegistrationKind::AllowOutsidePropertyWrites:
+            IfFailedReturn(m_pScriptState->GetPythonLibrary()->InitializeAllowOutsidePropertyWrites(m_allowOutsidePropertyWrites));
+            break;
+#endif // 0
+
+        default:
+            return E_UNEXPECTED;
+    }
+
+    return hr;
+}
+
+HRESULT PythonHostRegistration::Undo()
+{
+    HRESULT hr = S_OK;
+
+    switch(m_registrationKind)
+    {
+        case Library::HostRegistrationKind::OptionalRecord:
+        {
+            assert(m_spUnderlyingRecord.get() != nullptr);
+            IfFailedReturn(m_spUnderlyingRecord->Undo());
+            break;
+        }
+
+        case Library::HostRegistrationKind::FunctionAlias:
+        {
+            PythonProvider *pProvider = m_pScriptState->GetScript()->GetProvider();
+            IDebugHostExtensibility *pExtensibility = pProvider->GetHostExtensibility();
+            if (pExtensibility == nullptr)
+            {
+                return E_NOTIMPL;
+            }
+
+            IfFailedReturn(pExtensibility->DestroyFunctionAlias(m_name.c_str()));
+            break;
+        }
+
+        case Library::HostRegistrationKind::TypeSignatureRegistration:
+            IfFailedReturn(m_spDataModelManager->UnregisterModelForTypeSignature(m_marshaledObject, m_spTypeSignature.Get()));
+            break;
+
+        case Library::HostRegistrationKind::TypeSignatureExtension:
+            IfFailedReturn(m_spDataModelManager->UnregisterExtensionForTypeSignature(m_marshaledObject, m_spTypeSignature.Get()));
+            break;
+
+        case Library::HostRegistrationKind::NamedModelRegistration:
+            IfFailedReturn(m_spDataModelManager->UnregisterNamedModel(m_name.c_str()));
+            break;
+
+        case Library::HostRegistrationKind::NamedModelParent:
+            IfFailedReturn(m_originalNamedModel->RemoveParentModel(m_marshaledObject));
+            break;
+
+        case Library::HostRegistrationKind::NamespacePropertyParent:
+            IfFailedReturn(m_originalNamedModel->RemoveParentModel(m_marshaledObject));
+            break;
+
+        case Library::HostRegistrationKind::ApiVersionSupport:
+        case Library::HostRegistrationKind::AllowOutsidePropertyWrites:
+            //
+            // This is meaningless...  There is nothing to "undo".  This had effect only on the JS side of the fence.
+            //
+            break;
+
+    }
+
+    return hr;
+}
+
 HRESULT PythonScript::RuntimeClassInitialize(_In_ PythonProvider *pScriptProvider)
 {
     HRESULT hr = S_OK;
@@ -612,6 +1232,80 @@ HRESULT PythonScript::IsInvocable(_Out_ bool *pIsInvocable)
     return S_OK;
 }
 
+HRESULT PythonScriptState::ProcessBridgeElement(_In_ PyObject *pPyBridgeElement)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // Create a registration record and apply such record.  If we cannot record the registration, undo
+    // every change which was made to the object model on the basis of this record.
+    //
+    bool recordActive;
+    PythonHostRegistration hostRegistration;
+    IfFailedReturn(hostRegistration.Initialize(this, pPyBridgeElement));
+    IfFailedReturn(hostRegistration.Apply(&recordActive));
+
+    if (recordActive)
+    {
+        hr = ConvertException([&](){
+            m_activeRegistrations.push_back(std::move(hostRegistration));
+            return S_OK;
+        });
+    }
+
+    if (FAILED(hr))
+    {
+        (void)hostRegistration.Undo();
+    }
+
+    return hr;
+}
+
+HRESULT PythonScriptState::InitializationBridge(_In_ PyObject *pPyInitList)
+{
+    HRESULT hr = S_OK;
+
+    //
+    // Iterate through the returned initialization list and set up the bridge for it.
+    //
+    auto pyIter = PinnedReference::Take(PyObject_GetIter(pPyInitList));
+    IfObjectErrorConvertAndReturn(pyIter);
+
+    while (SUCCEEDED(hr))
+    {
+        PinnedReference pyBridgeElement = PinnedReference::Take(PyIter_Next(pyIter));
+        if (pyBridgeElement == nullptr)
+        {
+            //
+            // PyIter_Next will return null with no exception set at EOL.  Failure will be null with
+            // an exception set.
+            //
+            if (PyErr_Occurred())
+            {
+                hr = E_FAIL;            // @TODO: Convert...?
+            }
+            break;
+        }
+
+        hr = ProcessBridgeElement(pyBridgeElement);
+    }
+
+    //
+    // If we failed part way through creating all the links to the script, we **MUST** unroll any changes
+    // which were made from earlier registration records that are active!
+    //
+    if (FAILED(hr))
+    {
+        for(auto&& registration : m_activeRegistrations)
+        {
+            (void)registration.Undo();
+        }
+        m_activeRegistrations.clear();
+    }
+
+    return hr;
+}
+
 HRESULT PythonScriptState::InitializeScript()
 {
     HRESULT hr = S_OK;
@@ -661,11 +1355,10 @@ HRESULT PythonScriptState::InitializeScript()
         // The return value from initializeScript indicates what bridging we need to perform to the object
         // model.  Run through this return.
         //
-#if 0
-        //
-        // @TODO: If pResult is not none, perform the initialization bridge
-        //
-#endif // 0
+        if (!Py_IsNone(pResult))
+        {
+            IfFailedReturn(InitializationBridge(pResult));
+        }
     }
 
     //

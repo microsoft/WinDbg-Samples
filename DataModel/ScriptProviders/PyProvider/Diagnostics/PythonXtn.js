@@ -99,6 +99,8 @@ class __PythonCache
             this.__CacheType("PyTuple_Type", "PyTupleObject");
             this.__CacheType("PyType_Type", "PyTypeObject");
             this.__CacheType("PyGetSetDescr_Type", "PyGetSetDescrObject");
+            this.__CacheType("PyMethodDescr_Type", "PyMethodDescrObject");
+            this.__CacheType("PyWrapperDescr_Type", "PyWrapperDescrObject");
         }
     }
 
@@ -370,6 +372,27 @@ class __PyGetSetDescrObjectVisualizer
     }
 }
 
+// __PyMethodDescrObjectVisualizer:
+//
+// A visualizer for a python method descriptor object
+//
+class __PyMethodDescrObjectVisualizer
+{
+    toString()
+    {
+        var descrTypeName = host.memory.readString(this.d_common.d_type.tp_name);
+        var methName = "UNKNOWN";
+        var d_name = this.d_common.d_name;
+        if (!d_name.isNull)
+        {
+            methName = d_name.dereference().runtimeTypedObject.toString();
+        }
+        
+        return "< PyMethodDescrObject for '" + methName + "' in '" + descrTypeName + "' >";
+    }
+
+}
+
 class __genStringViz
 {
     toString()
@@ -457,6 +480,7 @@ function initializeScript()
             new host.typeSignatureRegistration(__PyTupleObjectVisualizer, "PyTupleObject"),
             new host.typeSignatureExtension(__genStringViz, "propertyobject"),
             new host.typeSignatureExtension(__genStringViz, "PyFunctionObject"),
+            new host.typeSignatureExtension(__PyMethodDescrObjectVisualizer, "PyMethodDescrObject"),
             new host.typeSignatureExtension(__PyGetSetDescrObjectVisualizer, "PyGetSetDescrObject"),
             new host.typeSignatureExtension(__PyTypeObjectVisualizer, "PyTypeObject"),
             new host.namespacePropertyParent(__PythonProcessExtension, "Debugger.Models.Process", "Debugger.Models.Process.Python", "Python")];
