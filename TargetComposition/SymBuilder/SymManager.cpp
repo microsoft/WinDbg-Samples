@@ -73,7 +73,8 @@ HRESULT SymbolBuilderProcess::CreateSymbolsForModule(_In_ ISvcModule *pModule,
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
+HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ bool isKernel,
+                                                 _In_ ULONG64 processKey,
                                                  _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
@@ -84,7 +85,7 @@ HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
     auto it = m_trackedProcesses.find(processKey);
     if (it == m_trackedProcesses.end())
     {
-        IfFailedReturn(MakeAndInitialize<SymbolBuilderProcess>(&spProcess, processKey, this));
+        IfFailedReturn(MakeAndInitialize<SymbolBuilderProcess>(&spProcess, isKernel, processKey, this));
 
         //
         // We cannot let an exception escape the COM boundary.
@@ -105,7 +106,8 @@ HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ ISvcModule *pModule, 
+HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ bool isKernel,
+                                                    _In_ ISvcModule *pModule, 
                                                     _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
@@ -115,23 +117,32 @@ HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ ISvcModule *pModule,
     IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
 
     ComPtr<SymbolBuilderProcess> spProcess;
-    IfFailedReturn(TrackProcessForKey(processKey, &spProcess));
+    IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcess(_In_ ISvcProcess *pProcess, 
+HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
+                                           _In_ ISvcProcess *pProcess, 
                                            _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
     *ppProcess = nullptr;
 
-    ULONG64 processKey;
-    IfFailedReturn(pProcess->GetKey(&processKey));
+    if (pProcess == nullptr && !isKernel)
+    {
+        return E_INVALIDARG;
+    }
+
+    ULONG64 processKey = 0;
+    if (pProcess != nullptr)
+    {
+        IfFailedReturn(pProcess->GetKey(&processKey));
+    }
 
     ComPtr<SymbolBuilderProcess> spProcess;
-    IfFailedReturn(TrackProcessForKey(processKey, &spProcess));
+    IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
     return hr;

@@ -76,8 +76,11 @@ public:
     //
     // Initializes a new SymbolBuilderProcess.
     //
-    HRESULT RuntimeClassInitialize(_In_ ULONG64 processKey, _In_ SymbolBuilderManager *pOwningManager)
+    HRESULT RuntimeClassInitialize(_In_ bool isKernel,
+                                   _In_ ULONG64 processKey, 
+                                   _In_ SymbolBuilderManager *pOwningManager)
     {
+        m_isKernel = isKernel;
         m_processKey = processKey;
         m_pOwningManager = pOwningManager;
         return S_OK;
@@ -112,13 +115,23 @@ public:
 
     // GetProcessKey():
     //
-    // Gets the process key for this process.
+    // Gets the process key for this process.  This will be zero if this represents the kernel and its
+    // set of modules.
     //
     ULONG64 GetProcessKey() const { return m_processKey; }
 
+    // IsKernel():
+    //
+    // Indicates whether or not this represents the kernel.
+    //
+    bool IsKernel() const { return m_isKernel; }
+
 private:
 
-    // The "key" used to identify the process we represent.
+    // Indicates if this represents the kernel and its set of modules
+    bool m_isKernel;
+
+    // The "key" used to identify the process we represent.  This will be zero if we represent the kernel.
     ULONG64 m_processKey;
 
     // A map tracking the "symbol sets" we have created for modules in this process.  This a map
@@ -182,21 +195,24 @@ DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
     // For a given module, find its associated process, and create tracking structures associated with
     // that process.
     //
-    STDMETHOD(TrackProcessForModule)(_In_ ISvcModule *pModule, 
+    STDMETHOD(TrackProcessForModule)(_In_ bool isKernel,
+                                     _In_ ISvcModule *pModule, 
                                      _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // TrackProcessForKey():
     //
     // Create tracking structures associated with a process by its unique key.
     //
-    STDMETHOD(TrackProcessForKey)(_In_ ULONG64 processKey,
+    STDMETHOD(TrackProcessForKey)(_In_ bool isKernel,
+                                  _In_ ULONG64 processKey,
                                   _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // TrackProcess():
     //
     // Create tracking structures associated with a process by its interface.
     //
-    STDMETHOD(TrackProcess)(_In_ ISvcProcess *pProcess,
+    STDMETHOD(TrackProcess)(_In_ bool isKernel,
+                            _In_ ISvcProcess *pProcess,
                             _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // FindInformationForRegisterByName():
@@ -486,21 +502,24 @@ public:
     // For a given module, find its associated process, and create tracking structures associated with
     // that process.
     //
-    IFACEMETHOD(TrackProcessForModule)(_In_ ISvcModule *pModule, 
+    IFACEMETHOD(TrackProcessForModule)(_In_ bool isKernel, 
+                                       _In_ ISvcModule *pModule, 
                                        _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
     // TrackProcessForKey():
     //
     // Create tracking structures associated with a process by its unique key.
     //
-    IFACEMETHOD(TrackProcessForKey)(_In_ ULONG64 processKey,
+    IFACEMETHOD(TrackProcessForKey)(_In_ bool isKernel,
+                                    _In_ ULONG64 processKey,
                                     _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
     // TrackProcess():
     //
     // Create tracking structures associated with a process by its interface.
     //
-    IFACEMETHOD(TrackProcess)(_In_ ISvcProcess *pProcess,
+    IFACEMETHOD(TrackProcess)(_In_ bool isKernel,
+                              _In_ ISvcProcess *pProcess,
                               _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
     // FindInformationForRegisterByName():
