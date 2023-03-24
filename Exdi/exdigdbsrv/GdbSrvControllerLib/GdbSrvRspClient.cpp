@@ -842,7 +842,12 @@ bool GdbSrvRspClient<TcpConnectorStream>::ConfigRspSession(_In_ const RSP_CONFIG
         if (isAllCores || core == coreNumber)
         {
             TcpIpStream * pStream = m_pConnector->GetLinkLayerStreamEntry(coreNumber);
-            assert(pStream != nullptr);
+            if (pStream == nullptr)
+            {
+                // There is no any available connection
+                configDone = false;
+                break;
+            }
 
             //  Set the call back function
             if (pConfigData->pDisplayCommDataFunc != nullptr && pConfigData->pTextHandler != nullptr)

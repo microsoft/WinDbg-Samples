@@ -1259,8 +1259,7 @@ bool XmlDataGdbServerRegisterFile::HandleTargetFileTags(_In_ TAG_ATTR_LIST* cons
             }
             else
             {
-                assert(false);
-                isDone = false;
+                isDone = true;
             }
         }
     }
