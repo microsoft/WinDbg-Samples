@@ -1205,21 +1205,30 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         pContext->RegGroupSelection.fSegmentRegs = TRUE;
 
         //   Control registers (System registers)
-        pContext->RegCr0 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr0"]));
-        pContext->RegCr2 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr2"]));
-        pContext->RegCr3 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr3"]));
-        pContext->RegCr4 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr4"]));
-        pContext->RegCr8 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr8"]));
-        pContext->RegGroupSelection.fSystemRegisters = TRUE;
+        //   Control registers (System registers)
+        std::map<std::string, std::string> ::const_iterator it = registers.find("cr0");
+        if (it != registers.end())
+        {
+            pContext->RegCr0 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr0"]));
+            pContext->RegCr2 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr2"]));
+            pContext->RegCr3 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr3"]));
+            pContext->RegCr4 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr4"]));
+            pContext->RegCr8 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr8"]));
+            pContext->RegGroupSelection.fSystemRegisters = TRUE;
+        }
 
         //  get all floating point registers (FPU)
-        pContext->ControlWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fctrl"]));
-        pContext->StatusWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fstat"]));
-        pContext->TagWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["ftag"]));
-        pContext->ErrorOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fioff"]));
-        pContext->ErrorSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fiseg"]));
-        pContext->DataOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fooff"]));
-        pContext->DataSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["foseg"]));
+        it = registers.find("fctrl");
+        if (it != registers.end())
+        {
+            pContext->ControlWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fctrl"]));
+            pContext->StatusWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fstat"]));
+            pContext->TagWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["ftag"]));
+            pContext->ErrorOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fioff"]));
+            pContext->ErrorSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fiseg"]));
+            pContext->DataOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fooff"]));
+            pContext->DataSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["foseg"]));
+        }
 
         //  x87 registers (FPU)
         for (int index = 0; index < s_numberFPRegList; ++index)

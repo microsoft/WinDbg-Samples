@@ -447,12 +447,85 @@
   <!-- VMWare GDB server configuration -->
   <ExdiTarget Name = "VMWare">
     <ExdiGdbServerConfigData agentNamePacket = "" uuid = "72d4aeda-9723-4972-b89a-679ac79810ef" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "no" >
-      <ExdiGdbServerTargetData targetArchitecture = "X86" targetFamily = "ProcessorFamilyX86" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xffe" targetDescriptionFile = "" />
+      <ExdiGdbServerTargetData targetArchitecture = "X64" targetFamily = "ProcessorFamilyX64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xffe" targetDescriptionFile = "" />
       <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000" >
-        <Value HostNameAndPort="localhost:15360" />
+        <Value HostNameAndPort="localhost:1234" />
       </GdbServerConnectionParameters>
       <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "no" SystemRegisterDecoding = "no">
       </ExdiGdbServerMemoryCommands>
+
+      <!-- x64 GDB server core resgisters -->
+
+      <ExdiGdbServerRegisters Architecture = "X64" FeatureNameSupported = "sys" SystemRegistersStart = "18" SystemRegistersEnd = "20" >
+        <Entry Name ="rax" Order = "0" Size ="8" />
+        <Entry Name ="rbx" Order = "1" Size ="8" />
+        <Entry Name ="rcx" Order = "2" Size ="8" />
+        <Entry Name ="rdx" Order = "3" Size ="8" />
+        <Entry Name ="rsi" Order = "4" Size ="8" />
+        <Entry Name ="rdi" Order = "5" Size ="8" />
+        <Entry Name ="rbp" Order = "6" Size ="8" />
+        <Entry Name ="rsp" Order = "7" Size ="8" />
+        <Entry Name ="r8"  Order = "8" Size ="8" />
+        <Entry Name ="r9"  Order = "9" Size ="8" />
+        <Entry Name ="r10" Order = "a" Size ="8" />
+        <Entry Name ="r11" Order = "b" Size ="8" />
+        <Entry Name ="r12" Order = "c" Size ="8" />
+        <Entry Name ="r13" Order = "d" Size ="8" />
+        <Entry Name ="r14" Order = "e" Size ="8" />
+        <Entry Name ="r15" Order = "f" Size ="8" />
+        <Entry Name ="rip" Order = "10" Size ="8" />
+        <!-- <flags id="i386_eflags" size="4">
+         <flags id="i386_eflags" size="4">
+         <field name="CF" start="0" end="0"/>
+         <field name="" start="1" end="1"/>
+         <field name="PF" start="2" end="2"/>
+         <field name="AF" start="4" end="4"/>
+         <field name="ZF" start="6" end="6"/>
+         <field name="SF" start="7" end="7"/>
+         <field name="TF" start="8" end="8"/>
+         <field name="IF" start="9" end="9"/>
+         <field name="DF" start="10" end="10"/>
+         <field name="OF" start="11" end="11"/>
+         <field name="NT" start="14" end="14"/>
+         <field name="RF" start="16" end="16"/>
+         <field name="VM" start="17" end="17"/>
+         <field name="AC" start="18" end="18"/>
+         <field name="VIF" start="19" end="19"/>
+         <field name="VIP" start="20" end="20"/>
+         <field name="ID" start="21" end="21"/>
+         </flags>
+        </flags> -->
+  
+      <Entry Name ="eflags" Order = "11" Size ="4" />
+        <!-- Segment registers -->
+        <Entry Name ="cs" Order = "12" Size ="4" />
+        <Entry Name ="ss" Order = "13" Size ="4" />
+        <Entry Name ="ds" Order = "14" Size ="4" />
+        <Entry Name ="es" Order = "15" Size ="4" />
+        <Entry Name ="fs" Order = "16" Size ="4" />
+        <Entry Name ="gs" Order = "17" Size ="4" />
+
+        <Entry Name ="st0" Order = "18" Size = "10" />
+        <Entry Name ="st1" Order = "19" Size = "10" />
+        <Entry Name ="st2" Order = "1a" Size = "10" />
+        <Entry Name ="st3" Order = "1b" Size = "10" />
+        <Entry Name ="st4" Order = "1c" Size = "10" />
+        <Entry Name ="st5" Order = "1d" Size = "10" />
+        <Entry Name ="st6" Order = "1e" Size = "10" />
+        <Entry Name ="st7" Order = "1f" Size = "10" />
+
+        <Entry Name ="fctrl" Order = "20" Size ="4" />
+        <Entry Name ="fstat" Order = "21" Size ="4" />
+        <Entry Name ="ftag"  Order = "22" Size ="4" />
+        <Entry Name ="fiseg" Order = "23" Size ="4" />
+        <Entry Name ="fioff" Order = "24" Size ="4" />
+        <Entry Name ="foseg" Order = "25" Size ="4" />
+        <Entry Name ="fooff" Order = "26" Size ="4" />
+        <Entry Name ="fop" Order = "27" Size ="4" />
+      </ExdiGdbServerRegisters>
+
+      <!-- x86 GDB server core resgisters -->
+
       <ExdiGdbServerRegisters Architecture = "x86">
         <Entry Name ="Eax" Order = "0" Size =  "4" />
         <Entry Name ="Ecx" Order = "1" Size =  "4" />
