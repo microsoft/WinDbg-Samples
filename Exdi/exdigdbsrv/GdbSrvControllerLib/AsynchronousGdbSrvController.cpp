@@ -24,11 +24,16 @@
 
 using namespace GdbSrvControllerLib;
 
-//  GDb protocol asynchronous commands
+//  GDB protocol asynchronous commands
 LPCSTR const g_GdbStep = "s";
 LPCSTR const g_GdbStepEx = "vCont;s";
 LPCSTR const g_GdbResume = "c";
 LPCSTR const g_GdbResumeEx = "vCont;c";
+
+// GDB command variable.
+// Used to set the current step/resume mode
+LPCSTR g_GdbStepCmd = g_GdbStepEx;
+LPCSTR g_GdbResumeCmd = g_GdbResumeEx;
 
 
 //
@@ -100,7 +105,6 @@ const char * GetDataAccessBreakPointCommand(_In_ DATA_ACCESS_TYPE dataAccessType
     return pCommandType;
 }
 
-//AsynchronousGdbSrvController * AsynchronousGdbSrvController::Create(_In_ LPCTSTR pConnectParameters) 
 AsynchronousGdbSrvController * AsynchronousGdbSrvController::Create(_In_ const std::vector<std::wstring> &coreConnectionParameters) 
 {
     if (coreConnectionParameters.empty())
@@ -111,6 +115,17 @@ AsynchronousGdbSrvController * AsynchronousGdbSrvController::Create(_In_ const s
     if (pResult == nullptr)
     {
         throw _com_error(ERROR_NOT_ENOUGH_MEMORY);
+    }
+    ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+    if (cfgData.IsForcedLegacyResumeStepMode())
+    {
+        g_GdbStepCmd = g_GdbStep;
+        g_GdbResumeCmd = g_GdbResume;
+    }
+    else
+    {
+        g_GdbStepCmd = g_GdbStepEx;
+        g_GdbResumeCmd = g_GdbResumeEx;
     }
     return pResult;
 }
@@ -581,13 +596,13 @@ void AsynchronousGdbSrvController::StartStepCommand(unsigned processorNumber)
     //  An action ('s') with no thread - id matches all threads.
     //  Specifying no actions is an error.
     char stepCommand[256] = { 0 };
-    _snprintf_s(stepCommand, _TRUNCATE, "%s:%s", g_GdbStepEx, GetTargetThreadId(processorNumber).c_str());
+    _snprintf_s(stepCommand, _TRUNCATE, "%s:%s", g_GdbStepCmd, GetTargetThreadId(processorNumber).c_str());
     StartAsynchronousCommand(stepCommand, false, true);
 }
 
 void AsynchronousGdbSrvController::StartRunCommand()
 {
-    StartAsynchronousCommand(g_GdbResumeEx, false, true);
+    StartAsynchronousCommand(g_GdbResumeCmd, false, true);
 }
 
 bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * pPcAddress, _Out_ DWORD * pProcessorNumber,
@@ -746,10 +761,8 @@ void AsynchronousGdbSrvController::ContinueWaitingOnStopReplyPacket()
 
 bool AsynchronousGdbSrvController::IsLastCommandTargetRun()
 {
-    bool isGdbStepTargetCommand = strstr(m_currentAsynchronousCommand.c_str(), g_GdbStepEx) != nullptr ||
-        strstr(m_currentAsynchronousCommand.c_str(), g_GdbStep) != nullptr;
-    bool isGdbResumeTargetCmd = g_GdbResume == m_currentAsynchronousCommand || 
-        g_GdbResumeEx == m_currentAsynchronousCommand;;
+    bool isGdbStepTargetCommand = strstr(m_currentAsynchronousCommand.c_str(), g_GdbStepCmd) != nullptr;
+    bool isGdbResumeTargetCmd = g_GdbResumeCmd == m_currentAsynchronousCommand;
     return isGdbResumeTargetCmd || isGdbStepTargetCommand;
 }
 
