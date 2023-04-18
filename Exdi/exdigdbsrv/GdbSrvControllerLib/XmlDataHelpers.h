@@ -49,13 +49,14 @@ namespace GdbSrvControllerLib
         std::wstring agentNamePacket;   //  Agent name
         std::wstring uuid;              //  Class identifier.
         bool fDisplayCommPackets;       //  Flag if set then we display the communication packets characters.
-        bool fDebuggerSessionByCore;	//	Flag if set then we do debug only by core processor, so step and continue
-                                        //	commands happen only on one core at the time. If not set then we 
-                                        //	let all cores run when we do step/continue commands.
+        bool fDebuggerSessionByCore;    //  Flag if set then we do debug only by core processor, so step and continue
+                                        //  commands happen only on one core at the time. If not set then we 
+                                        //  let all cores run when we do step/continue commands.
         bool fExceptionThrowEnabled;    //  Allow throwing exception by the Exdi COM server.
                                         //  Used to disallow throwing exceptions when memory failures occur.
         std::wstring qSupportedPacket;  //  GDB server supported, if this empty then will send the default "qsupported" packet
         bool fTreatSwBpAsHwBp;          //  GDB server client will convert SW bp as HW bp.
+        bool fForcedLegacyResumeStepCommands; //  Flag if set the GDB server will use the legacy resume/step command mode
     } ConfigExdiData;
 
     //  This type indicates the Target data.
