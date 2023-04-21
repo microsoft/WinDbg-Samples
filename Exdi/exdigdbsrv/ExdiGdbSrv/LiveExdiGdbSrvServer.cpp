@@ -1224,8 +1224,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         }
 
         //  Get all floating point registers (FPU)
-        it = registers.find("fctrl");
-        if (it != registers.end())
+        if (registers.find("fctrl") != registers.end())
         {
             pContext->ControlWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fctrl"]));
             pContext->StatusWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fstat"]));
@@ -1236,16 +1235,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
             pContext->DataSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["foseg"]));
         }
 
-        // Check if the GDT & IDT system registers
-        it = registers.find("gdtrbase");
-        if (it != registers.end())
+        //  Are the GDT & IDT system register present?
+        if (registers.find("gdtrbase") != registers.end())
         {
             pContext->GDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrbase"]));
             pContext->GDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrlimit"]));
         }
 
-        it = registers.find("idtrbase");
-        if (it != registers.end())
+        if (registers.find("idtrbase") != registers.end())
         {
             pContext->IDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrbase"]));
             pContext->IDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrlimit"]));
