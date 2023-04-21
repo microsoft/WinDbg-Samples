@@ -1189,7 +1189,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         pContext->R13 = GdbSrvController::ParseRegisterValue(registers["r13"]);
         pContext->R14 = GdbSrvController::ParseRegisterValue(registers["r14"]);
         pContext->R15 = GdbSrvController::ParseRegisterValue(registers["r15"]);
-        pContext->EFlags = GdbSrvController::ParseRegisterValue32(registers["eflags"]);
+        if (registers.find("eflags") != registers.end())
+        {
+            pContext->EFlags = GdbSrvController::ParseRegisterValue32(registers["eflags"]);
+        }
+        else if (registers.find("rflags") != registers.end())
+        {
+            pContext->EFlags = GdbSrvController::ParseRegisterValue(registers["rflags"]);
+        }
         pContext->RegGroupSelection.fIntegerRegs = TRUE;
 
         pContext->ModeFlags = AMD64_CONTEXT_AMD64 | AMD64_CONTEXT_CONTROL | 
@@ -1204,8 +1211,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         pContext->SegGs = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gs"]));
         pContext->RegGroupSelection.fSegmentRegs = TRUE;
 
-        //   Control registers (System registers)
-        //   Control registers (System registers)
+        //  Control registers (System registers)
         std::map<std::string, std::string> ::const_iterator it = registers.find("cr0");
         if (it != registers.end())
         {
@@ -1217,9 +1223,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
             pContext->RegGroupSelection.fSystemRegisters = TRUE;
         }
 
-        //  get all floating point registers (FPU)
-        it = registers.find("fctrl");
-        if (it != registers.end())
+        //  Get all floating point registers (FPU)
+        if (registers.find("fctrl") != registers.end())
         {
             pContext->ControlWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fctrl"]));
             pContext->StatusWord = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fstat"]));
@@ -1228,6 +1233,19 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
             pContext->ErrorSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fiseg"]));
             pContext->DataOffset = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["fooff"]));
             pContext->DataSelector = static_cast<DWORD>(GdbSrvController::ParseRegisterValue32(registers["foseg"]));
+        }
+
+        //  Are the GDT & IDT system register present?
+        if (registers.find("gdtrbase") != registers.end())
+        {
+            pContext->GDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrbase"]));
+            pContext->GDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrlimit"]));
+        }
+
+        if (registers.find("idtrbase") != registers.end())
+        {
+            pContext->IDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrbase"]));
+            pContext->IDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrlimit"]));
         }
 
         //  x87 registers (FPU)

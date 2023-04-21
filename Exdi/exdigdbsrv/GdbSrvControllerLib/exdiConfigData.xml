@@ -571,4 +571,62 @@
     </ExdiGdbServerConfigData>
   </ExdiTarget>
 
+    <!-- BMC SMM Host Debug Agent GDB server configuration -->
+  <ExdiTarget Name = "BMC-SMM">
+    <ExdiGdbServerConfigData agentNamePacket = "" uuid = "72d4aeda-9723-4972-b89a-679ac79810ef" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386">
+      <ExdiGdbServerTargetData targetArchitecture = "X64" targetFamily = "ProcessorFamilyX64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0" targetDescriptionFile = "target.xml" />
+      <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
+        <Value HostNameAndPort="LocalHost:1234" />
+      </GdbServerConnectionParameters>
+      <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "no" SystemRegisterDecoding = "no">
+      </ExdiGdbServerMemoryCommands>
+
+      <!-- x64 server core resgisters -->
+      <ExdiGdbServerRegisters Architecture = "X64" FeatureNameSupported = "" >
+        <Entry Name ="rax" Order = "0" Size ="8" />
+        <Entry Name ="rbx" Order = "1" Size ="8" />
+        <Entry Name ="rcx" Order = "2" Size ="8" />
+        <Entry Name ="rdx" Order = "3" Size ="8" />
+        <Entry Name ="rsi" Order = "4" Size ="8" />
+        <Entry Name ="rdi" Order = "5" Size ="8" />
+        <Entry Name ="rbp" Order = "6" Size ="8" />
+        <Entry Name ="rsp" Order = "7" Size ="8" />
+        <Entry Name ="r8"  Order = "8" Size ="8" />
+        <Entry Name ="r9"  Order = "9" Size ="8" />
+        <Entry Name ="r10" Order = "a" Size ="8" />
+        <Entry Name ="r11" Order = "b" Size ="8" />
+        <Entry Name ="r12" Order = "c" Size ="8" />
+        <Entry Name ="r13" Order = "d" Size ="8" />
+        <Entry Name ="r14" Order = "e" Size ="8" />
+        <Entry Name ="r15" Order = "f" Size ="8" />
+        <Entry Name ="rip" Order = "10" Size ="8" />
+
+        <!-- rflag -->
+        <Entry Name ="rflags" Order = "11" Size ="8" />
+
+        <!-- Segment registers -->
+        <Entry Name ="cs" Order = "12" Size ="4" />
+        <Entry Name ="ss" Order = "13" Size ="4" />
+        <Entry Name ="ds" Order = "14" Size ="4" />
+        <Entry Name ="es" Order = "15" Size ="4" />
+        <Entry Name ="fs" Order = "16" Size ="4" />
+        <Entry Name ="gs" Order = "17" Size ="4" />
+
+        <!-- Control registers -->
+        <!-- the CrX register format fields: -->
+        <Entry Name ="cr0" Order = "18" Size ="8" />
+        <Entry Name ="cr2" Order = "19" Size ="8" />
+        <Entry Name ="cr3" Order = "1a" Size ="8" />
+        <Entry Name ="cr4" Order = "1b" Size ="4" />
+        <Entry Name ="cr8" Order = "1c" Size ="8" />
+
+        <Entry Name ="gdtrbase" Order = "1d" Size ="8" />
+        <Entry Name ="gdtrlimit" Order = "1e" Size ="4" />
+        <Entry Name ="idtrbase" Order = "1f" Size ="8" />
+        <Entry Name ="idtrlimit" Order = "20" Size ="4" />
+
+      </ExdiGdbServerRegisters>
+    </ExdiGdbServerConfigData>
+  </ExdiTarget>
+
 </ExdiTargets>
