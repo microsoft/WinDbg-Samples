@@ -144,7 +144,8 @@ HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
     //
     // For now, we won't track individual processes for a kernel mode target.  This does prevent us from completely
     // dealing with user mode modules in a kernel target, but there are other issues which make that somewhat
-    // problematic at the moment.
+    // problematic at the moment (e.g.: at the moment, the module enumeration service for kernel targets only
+    // produces kernel mode modules)
     //
     ULONG64 processKey = 0;
     if (!isKernel)
