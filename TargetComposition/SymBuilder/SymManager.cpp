@@ -113,8 +113,14 @@ HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ bool isKernel,
     HRESULT hr = S_OK;
     *ppProcess = nullptr;
 
-    ULONG64 processKey;
-    IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
+    //
+    // See comments in ::TrackProcess.  For now, we won't track individual processes for a kernel mode target.
+    //
+    ULONG64 processKey = 0;
+    if (!isKernel)
+    {
+        IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
+    }
 
     ComPtr<SymbolBuilderProcess> spProcess;
     IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
@@ -124,7 +130,7 @@ HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ bool isKernel,
 }
 
 HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
-                                           _In_ ISvcProcess *pProcess, 
+                                           _In_opt_ ISvcProcess *pProcess, 
                                            _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
@@ -135,8 +141,13 @@ HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
         return E_INVALIDARG;
     }
 
+    //
+    // For now, we won't track individual processes for a kernel mode target.  This does prevent us from completely
+    // dealing with user mode modules in a kernel target, but there are other issues which make that somewhat
+    // problematic at the moment.
+    //
     ULONG64 processKey = 0;
-    if (pProcess != nullptr)
+    if (!isKernel)
     {
         IfFailedReturn(pProcess->GetKey(&processKey));
     }
@@ -145,6 +156,21 @@ HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
     IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
+    return hr;
+}
+
+HRESULT SymbolBuilderManager::GetKernelAddressContext(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext)
+{
+    HRESULT hr = S_OK;
+    *ppKernelAddressContext = nullptr;
+
+    if (m_spKernelAddressContext == nullptr)
+    {
+        return E_NOT_SET;
+    }
+
+    ComPtr<ISvcAddressContext> spKernelAddressContext = m_spKernelAddressContext;
+    *ppKernelAddressContext = spKernelAddressContext.Detach();
     return hr;
 }
 

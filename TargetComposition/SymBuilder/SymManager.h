@@ -168,6 +168,13 @@ struct RegisterInformation
 #define INTERFACE ISvcSymbolBuilderManager
 DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
 {
+    // GetKernelAddressContext():
+    //
+    // If the target in question is a kernel mode target, this returns the address context for kernel mode
+    // (non process specific) reads.  If not, this will fail.
+    //
+    STDMETHOD(GetKernelAddressContext)(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext) PURE;
+
     // ProcessKeyToProcess():
     //
     // Converts a process key to the process object for it.
@@ -212,7 +219,7 @@ DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
     // Create tracking structures associated with a process by its interface.
     //
     STDMETHOD(TrackProcess)(_In_ bool isKernel,
-                            _In_ ISvcProcess *pProcess,
+                            _In_opt_ ISvcProcess *pProcess,
                             _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // FindInformationForRegisterByName():
@@ -466,6 +473,13 @@ public:
     // ISvcSymbolBuilderManager:
     //
 
+    // GetKernelAddressContext():
+    //
+    // If the target in question is a kernel mode target, this returns the address context for kernel mode
+    // (non process specific) reads.  If not, this will fail.
+    //
+    IFACEMETHOD(GetKernelAddressContext)(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext);
+
     // ProcessKeyToProcess():
     //
     // Converts a process key to the process object for it.
@@ -577,6 +591,23 @@ public:
         return m_spVirtualMemory.Get();
     }
 
+    //*************************************************
+    // Internal APIs:
+    //
+
+    // RuntimeClassInitialzie():
+    //
+    // Initializes the symbol builder manager for a given service container (e.g.: target).  If the 
+    // target in question is a kernel mode (or similar hardware centric) target, a "default" address context
+    // can be passed as 'pKernelAddressContext' such that memory reads to the kernel can take place outside
+    // of the context of any particular process.
+    //
+    HRESULT RuntimeClassInitialize(_In_opt_ ISvcAddressContext *pKernelAddressContext = nullptr)
+    {
+        m_spKernelAddressContext = pKernelAddressContext;
+        return S_OK;
+    }
+
 private:
 
     // InitArchBased():
@@ -610,6 +641,10 @@ private:
 
     // Our container's VM service.
     Microsoft::WRL::ComPtr<ISvcMemoryAccess> m_spVirtualMemory;
+
+    // If we are included for a kernel mode / hardware centric target, this is the default address
+    // context of the kernel.
+    Microsoft::WRL::ComPtr<ISvcAddressContext> m_spKernelAddressContext;
 
     // The service manager which contains and owns our lifetime.
     IDebugServiceManager *m_pOwningManager;

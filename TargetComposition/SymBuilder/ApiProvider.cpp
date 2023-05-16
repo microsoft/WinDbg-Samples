@@ -165,11 +165,17 @@ void GetSymbolBuilderManager(_In_ const HostContext& ctx,
     // a kernel debug connection, EXDI target, or other similar view) will have a DEBUG_SERVICE_MACHINE
     // which supports ISvcMachineDebug.
     //
+    // We also want a generalized address context for the kernel so that we can perform kernel memory reads
+    // that aren't associated with any particular process context.
+    //
     bool isKernel = false;
     ComPtr<ISvcMachineDebug> spMachineDebug;
+    ComPtr<ISvcAddressContext> spKernelAddressContext;
+
     if (SUCCEEDED(spServiceManager->QueryService(DEBUG_SERVICE_MACHINE, IID_PPV_ARGS(&spMachineDebug))))
     {
         isKernel = true;
+        CheckHr(spMachineDebug->GetDefaultAddressContext(&spKernelAddressContext));
     }
 
     if (ppProcess != nullptr)
@@ -198,7 +204,7 @@ void GetSymbolBuilderManager(_In_ const HostContext& ctx,
                                               IID_PPV_ARGS(&spSymManager))))
     {
         ComPtr<SymbolBuilderManager> spManager;
-        CheckHr(MakeAndInitialize<SymbolBuilderManager>(&spManager));
+        CheckHr(MakeAndInitialize<SymbolBuilderManager>(&spManager, spKernelAddressContext.Get()));
         CheckHr(spManager->RegisterServices(spServiceManager.Get()));
         spSymManager = std::move(spManager);
 
