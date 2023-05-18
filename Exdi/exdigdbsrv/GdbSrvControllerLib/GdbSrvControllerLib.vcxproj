@@ -30,6 +30,7 @@
     <ProjectGuid>{56E91845-8A60-4B27-BBD2-C292C103DC80}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>GdbSrvControllerLib</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -41,7 +42,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="Configuration">
@@ -260,6 +261,7 @@ midl /env x64 /out".\GeneratedSources" /h "ExdiGdbSrv.h" /W1 /I"..\ExdiGdbSrv"  
     <ClInclude Include="BufferWrapper.h" />
     <ClInclude Include="cfgExdiGdbSrvHelper.h" />
     <ClInclude Include="ExceptionHelpers.h" />
+    <ClInclude Include="X86_64_SpecialRegister.h" />
     <ClInclude Include="GdbSrvControllerLib.h" />
     <ClInclude Include="GdbSrvRspClient.h" />
     <ClInclude Include="HandleHelpers.h" />

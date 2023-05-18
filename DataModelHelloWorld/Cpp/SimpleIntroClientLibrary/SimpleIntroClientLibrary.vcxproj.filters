@@ -13,6 +13,18 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="x86">
+      <UniqueIdentifier>{8f748245-ad05-4762-ae93-9ef6439c21d6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="woa">
+      <UniqueIdentifier>{c5a1558b-2a5c-482f-90f5-1e4401b4884e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="arm64">
+      <UniqueIdentifier>{4cf77c3e-ffde-46b3-b38f-0aceaedfcac5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="amd64">
+      <UniqueIdentifier>{defc6e6c-d701-4825-a259-5c1102ea8267}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HelloProvider.h">
@@ -38,6 +50,54 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="x86\dbgmodel.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="x86\dbghelp.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="x86\dbgeng.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="x86\dbgcore.dll">
+      <Filter>x86</Filter>
+    </None>
+    <None Include="woa\dbgmodel.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="woa\dbghelp.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="woa\dbgeng.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="woa\dbgcore.dll">
+      <Filter>woa</Filter>
+    </None>
+    <None Include="arm64\dbgmodel.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\dbghelp.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\dbgeng.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="arm64\dbgcore.dll">
+      <Filter>arm64</Filter>
+    </None>
+    <None Include="amd64\dbgmodel.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="amd64\dbghelp.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="amd64\dbgeng.dll">
+      <Filter>amd64</Filter>
+    </None>
+    <None Include="amd64\dbgcore.dll">
+      <Filter>amd64</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SimpleIntro.rc">

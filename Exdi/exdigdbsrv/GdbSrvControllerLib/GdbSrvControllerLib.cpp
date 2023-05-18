@@ -584,7 +584,7 @@ public:
     //  RequestTIB  Request the Windows OS specific thread information block.
     //
     //  Request:
-    //     qGetTIBAddr:thread-id’   where the 'thread-id' specifies the procesor number/thread ID.
+    //     qGetTIBAddr:thread-id?  where the 'thread-id' specifies the procesor number/thread ID.
     //
     //  Response:
     //      'OK'    for success.
@@ -1005,7 +1005,7 @@ public:
     //      'XXXXXXX...XXXXX'   This is a hex string where each byte will be represented by two hex digits.
     //                          The bytes are transmitted in target byte order. The size and the order are determined
     //                          by the target architecture.
-    //      ‘E NN’              Error reading the registers.
+    //      ‘E NN?             Error reading the registers.
     //
     //  Example:
     //  Get all registers (r command)
@@ -1065,7 +1065,7 @@ public:
     //      'XXXXXXX...XXXXX'   This is a hex string where each byte will be represented by two hex digits.
     //                          The bytes are transmitted in target byte order. The size and the order are determined
     //                          by the target architecture.
-    //      ‘E NN’              Error reading the registers.
+    //      ‘E NN?             Error reading the registers.
     //
     //  Example:
     //  Get all registers (r command)
@@ -1099,8 +1099,8 @@ public:
     //   https://sourceware.org/gdb/onlinedocs/gdb/Packets.html#Packets
     //
     //  Response:
-    //  ‘OK’                Success.
-    //  ‘E NN’              Error.
+    //  ‘OK?               Success.
+    //  ‘E NN?             Error.
     //
     //  Example:
     //  Set the 'es' register ($es=0x24)
@@ -1168,11 +1168,11 @@ public:
     //  A map containing the register name and its hex-decimal ascii value.
     //
     //  Request:
-    //  ‘p n’               Reads the register n (where the register number n is in hexadecimal ascii number).
+    //  ‘p n?              Reads the register n (where the register number n is in hexadecimal ascii number).
     //               
     //  Response:
     //  ‘XX…’               Success.
-    //  ‘E NN’              Error.
+    //  ‘E NN?             Error.
     //  ''                  Ignore
     //
     //  Example:
@@ -1240,11 +1240,11 @@ public:
     //  A map containing the register name and its hex-decimal ascii value.
     //
     //  Request:
-    //  ‘p n’               Reads the register n (where the register number n is in hexadecimal ascii number).
+    //  ‘p n?              Reads the register n (where the register number n is in hexadecimal ascii number).
     //               
     //  Response:
     //  ‘XX…’               Success.
-    //  ‘E NN’              Error.
+    //  ‘E NN?             Error.
     //  ''                  Ignore
     //
     //  Example:
@@ -1501,14 +1501,14 @@ public:
     //  A simple buffer object containing the memory content.
     //
     //  Request:
-    //      ‘m address,length’
+    //      ‘m address,length?
     //
     //  Response:
-    //      ‘XX...’     Memory contents.
+    //      ‘XX...?    Memory contents.
     //                  Each byte is transmitted as a two-digit ascii hexadecimal number. 
     //                  The response may contain fewer bytes than requested if the server 
     //                  was able to read only part of the region of memory. 
-    //      ‘E NN’      NN is the error number
+    //      ‘E NN?     NN is the error number
     //
     //  Example:
     //  Request:
@@ -1654,8 +1654,8 @@ public:
     //   XX..           The data to write.
     //
     //  Response: 
-    //  ‘OK’            Success.
-    //  ‘E NN’          Error (includes the case where only part of the data was written). 
+    //  ‘OK?           Success.
+    //  ‘E NN?         Error (includes the case where only part of the data was written). 
     //
     //  Example:
     //  Request:
@@ -1748,7 +1748,7 @@ public:
     //
     //  Request:
     //  The packet sequence contains two requests the first request packet is 'qfThreadInfo'
-    //  for subsequent requests is used ‘qsThreadInfo’. 
+    //  for subsequent requests is used ‘qsThreadInfo? 
     //  'qfThreadInfo'
     //  'qsThreadInfo'
     //  
@@ -3150,10 +3150,16 @@ void GdbSrvController::ParseRegisterVariableSize(_In_ const std::string &registe
     GdbSrvControllerImpl::ParseRegisterVariableSize(registerValue, pRegisterArea, registerAreaLength);
 }
 
+#include "X86_64_SpecialRegister.h"
 std::map<std::string, std::string> GdbSrvController::QueryAllRegisters(_In_ unsigned processorNumber)
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
-    return m_pGdbSrvControllerImpl->QueryAllRegisters(processorNumber);
+
+    std::map<std::string, std::string> result = m_pGdbSrvControllerImpl->QueryAllRegisters(processorNumber);
+
+    QuerySpecialRegistor(this, result);
+
+    return result;
 }
 
 void GdbSrvController::SetRegisters(_In_ unsigned processorNumber, 

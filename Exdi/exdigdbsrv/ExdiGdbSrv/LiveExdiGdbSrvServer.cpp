@@ -1215,11 +1215,11 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         std::map<std::string, std::string> ::const_iterator it = registers.find("cr0");
         if (it != registers.end())
         {
-            pContext->RegCr0 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr0"]));
-            pContext->RegCr2 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr2"]));
-            pContext->RegCr3 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr3"]));
-            pContext->RegCr4 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr4"]));
-            pContext->RegCr8 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr8"]));
+            pContext->RegCr0 = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["cr0"]));
+            pContext->RegCr2 = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["cr2"]));
+            pContext->RegCr3 = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["cr3"]));
+            pContext->RegCr4 = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["cr4"]));
+            pContext->RegCr8 = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["cr8"]));
             pContext->RegGroupSelection.fSystemRegisters = TRUE;
         }
 
@@ -1238,14 +1238,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         //  Are the GDT & IDT system register present?
         if (registers.find("gdtrbase") != registers.end())
         {
-            pContext->GDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrbase"]));
-            pContext->GDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrlimit"]));
+            pContext->GDTBase = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["gdtrbase"]));
+            pContext->GDTLimit = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["gdtrlimit"]));
         }
 
         if (registers.find("idtrbase") != registers.end())
         {
-            pContext->IDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrbase"]));
-            pContext->IDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrlimit"]));
+            pContext->IDTBase = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["idtrbase"]));
+            pContext->IDTLimit = static_cast<DWORD64>(GdbSrvController::ParseRegisterValue(registers["idtrlimit"]));
         }
 
         //  x87 registers (FPU)

@@ -57,6 +57,9 @@
     <ClInclude Include="TargetGdbServerHelpers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="X86_64_SpecialRegister.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
