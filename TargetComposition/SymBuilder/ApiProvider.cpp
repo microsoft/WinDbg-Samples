@@ -1862,6 +1862,11 @@ Object ParametersObject::Add(_In_ const Object& /*parametersObject*/,
     return parameterFactory.CreateInstance(spParameter);
 }
 
+void ParametersObject::PropagateLiveRangesFromCallingConvention(_In_ const Object& /*parametersObject*/,
+                                                                _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+}
+
 std::experimental::generator<Object> ParametersObject::GetIterator(_In_ const Object& /*parametersObject*/,
                                                                _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
@@ -2844,6 +2849,10 @@ ParametersObject::ParametersObject() :
 {
     AddMethod(L"Add", this, &ParametersObject::Add,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PARAMETERS_ADD },
+                       L"PreferShow", true));
+
+    AddMethod(L"PropagateLiveRangesFromCallingConvention", this, &ParametersObject::PropagateLiveRangesFromCallingConvention,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PARAMETERS_PROPAGATELIVERANGESFROMCALLINGCONVENTION },
                        L"PreferShow", true));
 
     AddGeneratorFunction(this, &ParametersObject::GetIterator);

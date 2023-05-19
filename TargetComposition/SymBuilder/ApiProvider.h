@@ -827,6 +827,15 @@ private:
                _In_ std::wstring parameterName,
                _In_ Object parameterType);
 
+    // PropagateLiveRangesFromCallingConvention():
+    //
+    // Takes the list of parameters which have been defined and uses knowledge of the calling convention
+    // and the disassembler to walk the code of the function and determine where the parameters are at 
+    // at each given instruciton and add appropriate live ranges.
+    //
+    void PropagateLiveRangesFromCallingConvention(_In_ const Object& parametersObject,
+                                                  _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
+
     // GetIterator():
     //
     // Bound generator for iterating over parameters within a function.
