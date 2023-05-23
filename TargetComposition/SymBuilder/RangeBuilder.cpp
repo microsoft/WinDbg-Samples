@@ -13,6 +13,7 @@
 //**************************************************************************
 
 #include "SymBuilder.h"
+#include "ObjectModel.h"
 
 using namespace Microsoft::WRL;
 
@@ -25,143 +26,17 @@ namespace Services
 namespace SymbolBuilder
 {
 
-// 
-// NOTE: We are going to encode the *register names* of non-volatile and other registers.  We will go ask
-//       the architecture service to map these to canonical IDs rather than embedding canonical numberings
-//       here.  Bear in mind as well that the disassembler has its own domain specific numbering which does 
-//       *NOT* align.  It will return names along with the IDs so everything can be correlated thorugh such.
-//
-//       @TODO: At some point, this should deal with MMX/AVX registers for floating point types.
-//
-
-CallingConvention::CallingConvention(_In_ SymbolBuilderManager *pManager,
-                                     _In_ size_t numNonVolatiles,
-                                     _In_reads_(numNonVolatiles) wchar_t const **ppNonVolatileNames)
-{
-    for (size_t i = 0; i < numNonVolatiles; ++i)
-    {
-        RegisterInformation *pRegInfo;
-        CheckHr(pManager->FindInformationForRegister(ppNonVolatileNames[i], &pRegInfo));
-        m_nonVolatiles.insert( { pRegInfo->Id } );
-    }
-}
-
-//*************************************************
-// AMD64 Calling Convention Understanding:
-//
-
-wchar_t const *g_AMD64_win_nonvolatiles[] =
-{
-    L"r12", L"r13", L"r14", L"r15", L"rdi", L"rsi", L"rbx", L"rbp", L"rsp"
-};
-
-wchar_t const *g_AMD64_win_ordinalparams[] =
-    L"rcx", L"rdx", L"r8", L"r9"
-};
-
-whcar_t const *g_AMD64_win_floatparams[] =
-    L"xmm0", "xmm1", "xmm2", "xmm3"
-};
-
-CallingConvention_Windows_AMD64::CallingConvention_Windows_AMD64(_In_ SymbolBuilderManager *pManager) :
-    CallingConvention(pManager, 
-                      ARRAYSIZE(g_AMD64_win_nonvolatiles), g_AMD64_win_nonvolatiles,
-                      ARRAYSIZE(g_AMD64_win_ordinalparamregs), g_AMD64_win_ordinalparamregs)
-{
-}
-
-void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCount,
-                                                             _In_reads_(paramCount) VariableSymbol **ppParameters,
-                                                             _Out_writes_(paramCount) SvcSymbolLocation *pLocations)
-{
-    //
-    // Pre-initialize everything to "no location".  That's simply what we'll do if we presently don't understand
-    // where it should go.
-    //
-    for (size_t i = 0; i < paramCount; ++i)
-    {
-        pLocations[i].Kind = SvcSymbolLocationNone;
-    }
-
-    ULONG64 stackOffset = 0;
-    for (size_t i = 0; i < paramCount; ++i)
-    {
-        VariableSymbol *pParameter = ppParameters[i];
-        ULONG symTypeId = pParameter->InternalGetSymbolTypeId();
-
-        //
-        // If it is a typedef, we need to unwind the typedef and continue.  The outer loop here is 
-        // explicitly for that.
-        //
-        for (;;)
-        {
-            BaseSymbol *pParamTypeSym = pParameter->InternalGetSymbolSet()->InternalGetSymbol(symTypeId);
-            if (pParamTypeSym == nullptr || pParamTypeSym->InternalGetKind() != SvcSymbolType)
-            {
-                break;
-            }
-
-            BaseTypeSymbol *pParamType = static_cast<BaseTypeSymbol *>(pParamTypeSym);
-
-            SvcSymbolTypeKind tyk = pParamType->InternalGetTypeKind();
-            ULONG64 tySz = pParamType->InternalGetTypeSize();
-
-            //
-            // If it's a typedef, we really need to unwind it to understand where things go.
-            //
-            if (tyk == SvcSymbolTypeTypedef)
-            {
-                TypedefTypeSymbol *pTypedefType = static_cast<TypedefTypeSymbol *>(pParamType);
-                symTypeId = pTypedefType->InternalGetTypedefOfType();
-                continue;
-            }
-
-            //
-            // Is it ordinal or is it a floating point value that goes in xmm* ...?
-            //
-            bool ordinal = true;
-            if (tyk == SvcSymbolTypeIntrinsic)
-            {
-                BasicTypeSymbol *pBasicType = static_cast<BasicTypeSymbol *>(pParamType);
-                SvcSymbolIntrinsicKind tyik = pBasicType->InternalGetIntrinsicKind();
-                if (tyik == SvcSymbolIntrinsicFloat)
-                {
-                    ordinal = false;
-                }
-            }
-
-
-
-
-
-
-
-
-    }
-}
-
-//*************************************************
-// ARM64 Calling Convention Understnading:
-//
-
-wchar_t const *g_ARM64_win_nonvolatiles[] =
-{
-    L"x18", L"x19", L"x20", L"x21", L"x22", L"x23", L"x24", L"x25", L"x26", L"x27", L"x28", L"x29", L"x30"
-};
-
-wchar_t const *g_ARM64_win_ordinalparamregs[] =
-{
-
-};
-
-CallingConvention_Windows_ARM64::CallingConvention_Windows_ARM64(_In_ SymbolBuilderManager *pManager) :
-    CallingConvention(pManager, ARRAYSIZE(g_ARM64_win_nonvolatiles), g_ARM64_win_nonvolatiles)
-{
-}
-
 //*************************************************
 // General Range Builder:
 //
+
+bool LocationsAreEquivalent(_In_ const SvcSymbolLocation &a, _In_ const SvcSymbolLocation &b)
+{
+    return (a.Kind == b.Kind &&
+            a.RegInfo.Number == b.RegInfo.Number &&
+            a.RegInfo.Size == b.RegInfo.Size &&
+            a.Offset == b.Offset);
+}
 
 RangeBuilder::RangeBuilder()
 {
@@ -174,38 +49,142 @@ RangeBuilder::RangeBuilder()
     m_dis = codeNS.CallMethod(L"CreateDisassembler");
 }
 
-void RangeBuilder::TraverseBlockAt(_In_ ULONG64 bbAddr, _In_ ULONG64 bbFrom)
+bool RangeBuilder::CarryoverLiveRange(_In_ BasicBlockInfo& bbTo,
+                                      _In_ size_t paramNum,
+                                      _In_ LocationRange const& liveRange)
+{
+    bool matched = false;
+    ULONG64 bbToStart = bbTo.StartAddress;
+
+    ParameterRanges& pr = bbTo.BlockParameterRanges[paramNum];
+    for (size_t i = 0; i < pr.size(); ++i)
+    {
+        LocationRange &lrTo = pr[i];
+        if (lrTo.StartAddress == bbTo.StartAddress)
+        {
+            //
+            // Is this the same...?
+            //
+            if (LocationsAreEquivalent(lrTo.ParamLocation.ParamLocation, liveRange.ParamLocation.ParamLocation))
+            {
+                matched = true;
+                lrTo.ParamLocation.TraversalCount++;
+            }
+        }
+    }
+
+    if (!matched)
+    {
+        pr.push_back(
+            { 
+                bbTo.StartAddress,                  // [StartAddress, StartAddress) -- "empty" until traversed
+                bbTo.StartAddress,
+                { liveRange.ParamLocation.ParamLocation, 1 }
+            });
+    }
+
+    return !matched;
+}
+
+bool RangeBuilder::CarryoverLiveRanges(_In_ BasicBlockInfo& bbFrom, 
+                                       _In_ BasicBlockInfo& bbTo,
+                                       _In_ TraversalEntry const& entry)
+{
+    bool firstEntry = (bbTo.TraversalCount == 0);
+    bool changedRanges = false;
+
+    //
+    // If this is the first entry into this basic block, initialize the parameter lists.
+    //
+    if (firstEntry)
+    {
+        bbTo.BlockParameterRanges.resize(bbFrom.BlockParameterRanges.size());
+    }
+
+    //
+    // Find every parameter live range in bbFrom at entry.SourceBlockInstructionAddress and compare it against
+    // what's already in bbTo.  If necessary, add or modify ranges in bbTo.
+    //
+    for (size_t p = 0; p < bbFrom.BlockParameterRanges.size(); ++p)
+    {
+        ParameterRanges& pr = bbFrom.BlockParameterRanges[p];
+        for (size_t i = 0; i < pr.size(); ++i)
+        {
+            //
+            // Does pr[i] include the one byte at entry.SourceBlockInstructionAddress...?
+            //
+            LocationRange const& lr = pr[i];
+            if (lr.StartAddress <= entry.SourceBlockInstructionAddress &&
+                lr.EndAddress > entry.SourceBlockInstructionAddress)
+            {
+                changedRanges = CarryoverLiveRange(bbTo, p, lr);
+            }
+        }
+    }
+
+    return (changedRanges && !firstEntry);
+}
+
+void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ Object instr)
+{
+    ULONG64 instrLength = (ULONG64)instr.KeyValue(L"Length");
+
+    for (auto&& operand : instr.KeyValue(L"Operands"))
+    {
+        Object operandAttrs = operand.KeyValue(L"Attributes");
+        bool isOutput = (bool)operandAttrs.KeyValue(L"IsOutput");
+        bool isInput = (bool)operandAttrs.KeyValue(L"IsInput");
+        bool isRegister = (bool)operandAttrs.KeyValue(L"IsRegister");
+        bool isMemoryReference = (bool)operandAttrs.KeyValue(L"IsMemoryReference");
+
+    }
+        
+    //
+    // Update any unaffected live ranges to include the span of this instruction.
+    //
+    for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
+    {
+        ParameterRanges& pr = block.BlockParameterRanges[p];
+        for (size_t i = 0; i < pr.size(); ++i)
+        {
+            pr[i].EndAddress += instrLength;
+        }
+    }
+}
+
+void RangeBuilder::TraverseBasicBlock(_In_ TraversalEntry const& entry)
 {
     //
     // We should already have traversed the basic block list, so nothing should ever "not be found"
     //
-    auto itbbAddr = m_bbInfo.find(bbAddr);
+    auto itbbAddr = m_bbInfo.find(entry.BlockAddress);
     if (itbbAddr == m_bbInfo.end())
     {
         throw std::logic_error("Unexpected failure to find basic block");
     }
-    BasicBlockInfo& bbInfo = *itbbAddr;
+    BasicBlockInfo& bbInfo = itbbAddr->second;
 
     bool changedRanges = false;
-    if (bbFrom != 0)
+    if (entry.SourceBlockAddress != 0)
     {
-        auto itbbFrom = m_bbInfo.find(bbFrom);
+        auto itbbFrom = m_bbInfo.find(entry.SourceBlockAddress);
         if (itbbFrom == m_bbInfo.end())
         {
             throw std::logic_error("Unexpected failure to find basic block");
         }
-        BasicBlockInfo& bbInfoFrom = *itbbFrom;
-        changedRanges = CarryoverLiveRanges(bbInfo, bbInfoFrom);
+        BasicBlockInfo& bbInfoFrom = itbbFrom->second;
+        changedRanges = CarryoverLiveRanges(bbInfoFrom, bbInfo, entry);
     }
+
+    bool firstTraversal = (bbInfo.TraversalCount == 0);
+    ++bbInfo.TraversalCount;
 
     //
     // We only want to traverse this block if it's the first time we've hit this block *OR* there has been
     // some change in the list of live ranges entering the block from a different control flow.
     //
-    if (bbInfo.TraversalCount == 0 || changedRanges)
+    if (firstTraversal || changedRanges)
     {
-        ++bbInfo.TraversalCount;
-
         //
         // Walk each instruction in the block and update live range information as appropriate based on
         // what the instructions are doing.
@@ -213,19 +192,44 @@ void RangeBuilder::TraverseBlockAt(_In_ ULONG64 bbAddr, _In_ ULONG64 bbFrom)
         Object instrs = bbInfo.BasicBlock.KeyValue(L"Instructions");
         for (auto&& instr : instrs)
         {
+            UpdateRangesForInstruction(bbInfo, instr);
         }
 
         //
         // Add each outbound control flow to the list of blocks to traverse (whether it is a fall through
         // flow, a branch flow, ...)
         //
-        Object outboundFlows = m_bbInfo.BasicBlock.KeyValue(L"OutboundControlFlows");
+        Object outboundFlows = bbInfo.BasicBlock.KeyValue(L"OutboundControlFlows");
         for (auto&& outboundFlow : outboundFlows)
         {
             Object destBlock = outboundFlow.KeyValue(L"LinkedBlock");
+            Object linkageInstr = outboundFlow.KeyValue(L"SourceInstruction");
+            ULONG64 linkageInstrAddr = (ULONG64)linkageInstr.KeyValue(L"Address");
             ULONG64 destAddr = (ULONG64)destBlock.KeyValue(L"StartAddress");
-            m_bbTrav.push_back( { destAddr, bbAddr });
+            m_bbTrav.push( { destAddr, bbInfo.StartAddress, linkageInstrAddr });
         }
+    }
+}
+
+void RangeBuilder::InitializeParameterLocations(_In_ CallingConvention *pConvention, 
+                                                _In_ BasicBlockInfo &entryBlock)
+{
+    std::vector<SvcSymbolLocation> entryLocations(m_parameters.size());
+
+    pConvention->GetParameterPlacements(m_parameters.size(),
+                                        &m_parameters[0],
+                                        &entryLocations[0]);
+
+    entryBlock.BlockParameterRanges.resize(m_parameters.size());
+    for (size_t i = 0; i < m_parameters.size(); ++i)
+    {
+        ParameterRanges& ranges = entryBlock.BlockParameterRanges[i];
+        ranges.push_back(
+            { 
+                entryBlock.StartAddress,                // [StartAddress, StartAddress) -- "empty" until traversed
+                entryBlock.StartAddress,
+                { entryLocations[i], 1 }
+            });
     }
 }
 
@@ -233,7 +237,10 @@ void RangeBuilder::PropagateParameterRanges(_In_ FunctionSymbol *pFunction,
                                             _In_ CallingConvention *pConvention)
 {
     m_bbInfo.clear();
-    m_bbTrav.clear();
+    {
+        decltype(m_bbTrav) emptyQueue;
+        std::swap(m_bbTrav, emptyQueue);
+    }
     m_parameters.clear();
 
     //
@@ -272,13 +279,198 @@ void RangeBuilder::PropagateParameterRanges(_In_ FunctionSymbol *pFunction,
             m_bbInfo.insert( { startAddress, bb } );
         }
 
-        m_bbTrav.push_back({ m_modBase + m_functionOffset, 0 });
+        auto itbbFirst = m_bbInfo.find(m_modBase + m_functionOffset);
+        if (itbbFirst == m_bbInfo.end())
+        {
+            throw std::runtime_error("Unable to find entry basic block to function");
+        }
+        InitializeParameterLocations(pConvention, itbbFirst->second);
 
+        //
+        // Start at the entry basic block and keep walking control flows until we reach a state where
+        // we have no more control flows with different variable locations on entry.
+        //
+        m_bbTrav.push({ m_modBase + m_functionOffset, 0, 0 });
         while (!m_bbTrav.empty())
         {
-            std::pair<ULONG64, ULONG64> addrAndFrom = m_bbTrav.front();
+            TraversalEntry entry = m_bbTrav.front();
             m_bbTrav.pop();
-            TraverseBasicBlockAt(addrAndFrom.first, addrAndFrom.second);
+            TraverseBasicBlock(entry);
+        }
+
+        //
+        // Move our built data over to the parameter symbol.
+        //
+        CreateLiveRangeSets();
+    }
+}
+
+bool RangeBuilder::AddParameterRangeToFunction(_In_ size_t paramNum,
+                                               _In_ ULONG64 &startAddress,
+                                               _In_ ULONG64 &endAddress,
+                                               _In_ SvcSymbolLocation const& location)
+{
+    VariableSymbol *pParam = m_parameters[paramNum];
+
+    ULONG64 uniqueId;
+    HRESULT hr = pParam->AddLiveRange(startAddress - m_modBase - m_functionOffset, 
+                                      endAddress - startAddress,
+                                      location,
+                                      &uniqueId);
+
+    //
+    // Mark there as no "current range" from the caller's side.
+    //
+    startAddress = endAddress = 0;
+
+    return SUCCEEDED(hr);
+}
+
+void RangeBuilder::CreateLiveRangeSets()
+{
+    //
+    // We need to merge data from basic blocks so that:
+    //
+    //     - We never have contiguous ranges [A, B), [B, C).  This should merge into [A, C)
+    //
+    //     - We never have overlapping ranges.  We always pick one as the canonical representation of where
+    //       the location is.  For instance, we may see a variable in @rcx and the following instructions:
+    //
+    //       1: mov rbx, rcx
+    //       2: xor rcx, rcx
+    //       3: ...
+    //
+    //       At (2), the variable is live in both rbx and rcx.  We must pick one.
+    //
+    // It makes this a bit easier if we first sort all the basic blocks by their start address.
+    //
+    std::vector<BasicBlockInfo *> bbsByAddress;
+    for (auto&& kvp : m_bbInfo)
+    {
+        bbsByAddress.push_back(&kvp.second);
+    }
+    std::sort(bbsByAddress.begin(), bbsByAddress.end(),
+              [&](_In_ BasicBlockInfo const* a, _In_ BasicBlockInfo const* b)
+              {
+                  return a->StartAddress < b->StartAddress;
+              });
+
+    for (size_t p = 0; p < m_parameters.size(); ++p)
+    {
+        ULONG64 instrp = bbsByAddress[0]->StartAddress;
+        ULONG64 curRangeStart = 0;
+        ULONG64 curRangeEnd = 0;
+        SvcSymbolLocation curLocation;
+
+        for (auto&& pbb : bbsByAddress)
+        {
+            BasicBlockInfo &bb = *pbb;
+            ULONG traversalCount = bb.TraversalCount;
+
+            auto&& pr = bb.BlockParameterRanges[p];
+
+            //
+            // Ranges may have gotten out of order linearly depending on how many control flows entered the 
+            // block.  Sort them to make it easier to figure out.
+            //
+            std::sort(pr.begin(), pr.end(),
+                      [&](_In_ const LocationRange& a, _In_ const LocationRange& b)
+                      {
+                          return a.StartAddress < b.StartAddress;
+                      });
+
+            while (instrp < bb.EndAddress)
+            {
+                //
+                // Find the next range we're going to use.  We want a range that either covers 'instrp' or is above
+                // instrp.  It cannot be one which ends *BELOW* 'instrp'.  Remember that everything is half-open, so
+                // the range's EndAddress must be above 'instrp' for it to be useful to us.
+                //
+                LocationRange const *pLR = nullptr;
+                for (size_t i = 0; i < pr.size(); ++i)
+                {
+                    //
+                    // @TODO: For now, we are choosing to ignore control flow dependent locations.  In reality, if
+                    //        there are no better options, we should be able to plumb this upward.
+                    //
+                    LocationRange const& lr = pr[i];
+                    if (lr.ParamLocation.TraversalCount == traversalCount && lr.EndAddress > instrp &&
+                        lr.EndAddress > lr.StartAddress)
+                    {
+                        pLR = &lr;
+                    }
+                }
+
+                //
+                // Are there other ranges in this basic block that we need to deal with...?  Do we need to merge
+                // this with an existing range...?
+                //
+                if (pLR != nullptr)
+                {
+                    if (curRangeStart == 0)
+                    {
+                        if (pLR->StartAddress >= instrp)
+                        {
+                            curRangeStart = pLR->StartAddress;
+                        }
+                        else
+                        {
+                            curRangeStart = instrp;
+                        }
+                        curRangeEnd = pLR->EndAddress;
+                        curLocation = pLR->ParamLocation.ParamLocation;
+                        instrp = pLR->EndAddress;
+                    }
+                    else
+                    {
+                        if (pLR->StartAddress >= curRangeStart &&
+                            pLR->StartAddress <= curRangeEnd &&
+                            pLR->EndAddress > curRangeEnd &&
+                            LocationsAreEquivalent(curLocation, pLR->ParamLocation.ParamLocation))
+                        {
+                            curRangeEnd = pLR->EndAddress;
+                            instrp = pLR->EndAddress;
+                        }
+                        else
+                        {
+                            //
+                            // The range doesn't merge.  Add what we have and start a new range.
+                            //
+                            (void)AddParameterRangeToFunction(p, curRangeStart, curRangeEnd, curLocation);
+
+                            //
+                            // Note that we cannot simply set instrp to pLR->StartAddress as pLR might
+                            // overlap with our current range.  We only want the subset that does *NOT* overlap
+                            //
+                            if (pLR->StartAddress >= curRangeEnd)
+                            {
+                                instrp = pLR->StartAddress;
+                            }
+                            else
+                            {
+                                instrp = curRangeEnd;
+                            }
+
+                        }
+                    }
+                }
+                else
+                {
+                    //
+                    // We're done.
+                    //
+                    if (curRangeStart != 0)
+                    {
+                        (void)AddParameterRangeToFunction(p, curRangeStart, curRangeEnd, curLocation);
+                    }
+                    instrp = bb.EndAddress;
+                }
+            }
+        }
+
+        if (curRangeStart != 0)
+        {
+            (void)AddParameterRangeToFunction(p, curRangeStart, curRangeEnd, curLocation);
         }
     }
 }

@@ -24,83 +24,7 @@ namespace Services
 namespace SymbolBuilder
 {
 
-// CallingConvention:
-//
-// An abstraction of a calling convention.
-//
-class CallingConvention
-{
-public:
-
-    // CallingConvention():
-    //
-    // Initializes a calling convention object.
-    //
-    CallingConvention(_In_ SymbolBuilderManager *pManager,
-                      _In_ size_t numNonVolatiles,
-                      _In_reads_(numNonVolatiles) wchar_t const **ppNonVolatileNames);
-
-    // GetParameterPlacements():
-    //
-    // Given a list of parameters to a function, fill in their locations with knowledge of the calling
-    // convention.
-    //
-    virtual void GetParameterPlacements(_In_ size_t paramCount,
-                                        _In_reads_(paramCount) VariableSymbol **ppParameters,
-                                        _Out_writes_(paramCount) SvcSymbolLocation *pLocations) =0;
-
-    // IsNonVolatile():
-    //
-    // Returns whether a register 'canonId' is non-volatile in the given calling convention or not.  Note that
-    // the register id is given by the *CANONICAL* numbering of the register (often CodeView) and *NOT* the
-    // domain specific register numbering that might be used by the disassembler.
-    //
-    virtual bool IsNonVolatile(_In_ ULONG canonId)
-    {
-        auto it = m_nonVolatiles.find(canonId);
-        return (it != m_nonVolatiles.end());
-    }
-
-protected:
-
-    SymbolBuilderManager *m_pManager;
-    std::unordered_set<ULONG> m_nonVolatiles;
-};
-
-// CallingConvention_Windows_AMD64:
-//
-// Represents our understanding of the standard calling convention on Windows for AMD64.
-//
-class CallingConvention_Windows_AMD64 : public CallingConvention
-{
-public:
-
-    CallingConvention_Windows_AMD64(_In_ SymbolBuilderManager *pManager);
-
-    //
-    // Given a list of parameters to a function, fill in their locations with knowledge of the calling
-    // convention.
-    //
-    virtual void GetParameterPlacements(_In_ size_t paramCount,
-                                        _In_reads_(paramCount) VariableSymbol **ppParameters,
-                                        _Out_writes_(paramCount) SvcSymbolLocation *pLocations);
-
-private:
-
-    // Register identifiers for ordinal/floating point parameters (rcx/rdx/r8/r9, xmm0->3)
-    std::vector<ULONG> m_ordIds;
-    std::vector<ULONG> m_fltIds;
-
-};
-
-// CallingConvention_Windows_ARM64:
-//
-// Represents our understanding of the standard calling convention on Windows for ARM64.
-//
-class CallingConvention_Windows_ARM64 : public CallingConvention
-{
-public:
-};
+using namespace Debugger::DataModel::ClientEx;
 
 // RangeBuilder:
 //
@@ -121,33 +45,6 @@ public:
 private:
 
     //*************************************************
-    // Private Methods:
-    //
-    
-    // TraverseBasicBlockAt():
-    //
-    // Walks through the instructions in the basic block starting at 'bbAddr' until it hits the end of the
-    // basic block.  During the instruction traversal, propagate information we have about the state of parameters
-    // at the start of the basic block through to the end of the basic block.
-    //
-    // If 'bbFrom' is not nullptr, the state from the end of 'bbFrom' will carry into the start of the 'bbAddr'
-    // traversal.  If this does not change the live ranges at the start of 'bbAddr', the traversal is
-    // considered complete.  Otherwise, the block will be traversed again to find and propagate any control flow 
-    // dependent locations.
-    //
-    // If the block starting at 'bbAddr' is traversed, this will add outbound control flows from the traversed 
-    // block to the traversal queue.
-    //
-    void TraverseBasicBlockAt(_In_ ULONG64 bbAddr, _In_ ULONG64 bbFrom = 0)
-
-    // CarryoverLiveRanges():
-    //
-    // Takes the live ranges at the end of 'bbFrom' and carries them into 'bbTo'.  If this changes any live
-    // ranges at the start of 'bbTo', this returns true; otherwise, this returns false.
-    //
-    bool CarryoverLiveRanges(_In_ BasicBlockInfo& bbFrom, _In_ BasicBlockInfo& bbTo);
-
-    //*************************************************
     // Permanent State:
     //
 
@@ -166,6 +63,33 @@ private:
     ULONG64 m_functionOffset;
     ULONG64 m_modBase;
 
+    // LocationInfo:
+    //
+    // Information about the location of a variable at a particular instruction.
+    //
+    struct LocationInfo
+    {
+        SvcSymbolLocation ParamLocation;
+        ULONG TraversalCount;
+    };
+
+    // LocationRange:
+    //
+    // Defines a location over a range of instructions defined by a half-open set [StartAddress, EndAddress)
+    //
+    struct LocationRange
+    {
+        ULONG64 StartAddress;
+        ULONG64 EndAddress;
+        LocationInfo ParamLocation;
+    };
+
+    // ParameterRanges:
+    //
+    // The locations of a variable within a particular range of instructions.
+    //
+    using ParameterRanges = std::vector<LocationRange>;
+
     // BasicBlockInfo:
     //
     // Records information about a particular basic block.
@@ -181,6 +105,11 @@ private:
         ULONG64 StartAddress;
         ULONG64 EndAddress;
 
+        //
+        // The locations of parameters within this basic block.
+        //
+        std::vector<ParameterRanges> BlockParameterRanges;
+
         // How many times has our traversal entered this basic block.
         ULONG TraversalCount;
 
@@ -190,7 +119,7 @@ private:
 
         // Constructs a basic block info
         BasicBlockInfo(_In_ Object basicBlock) :
-            BasicBlock(std::move(baasicBlock))
+            BasicBlock(std::move(basicBlock))
         {
             StartAddress = (ULONG64)BasicBlock.KeyValue(L"StartAddress");
             EndAddress = (ULONG64)BasicBlock.KeyValue(L"EndAddress");
@@ -198,10 +127,90 @@ private:
         }
     };
 
+    // TraversalEntry
+    //
+    // Describes the need to traverse BlockAddress as entered from the basic block starting at SourceBlockAddress.
+    // The instruction which transferred control between blocks (whether a branch or fall through) is
+    // SourceBlockInstructionAddress.
+    //
+    // The initial block will have 0 for source block fields.
+    //
+    struct TraversalEntry
+    {
+        ULONG64 BlockAddress;
+        ULONG64 SourceBlockAddress;
+        ULONG64 SourceBlockInstructionAddress;
+    };
+
     std::unordered_map<ULONG64, BasicBlockInfo> m_bbInfo;
-    std::queue<std::pair<ULONG64, ULONG64>> m_bbTrav;
+    std::queue<TraversalEntry> m_bbTrav;
     std::vector<VariableSymbol *> m_parameters;
 
+    //*************************************************
+    // Private Methods:
+    //
+
+    // CreateLiveRangeSets():
+    //
+    // Transfers live range data from our build to the parameters.
+    //
+    void CreateLiveRangeSets();
+
+    // InitializeParameterLocations():
+    //
+    // Creates the initial placement of parameters via calling convention on the first instruction in the given
+    // basic block (which should be the entry block into the given function).
+    //
+    void InitializeParameterLocations(_In_ CallingConvention *pConvention, _In_ BasicBlockInfo &entryBlock);
+    
+    // TraverseBasicBlock():
+    //
+    // Walks through the instructions in the basic block starting at 'entry.BlockAddress' until it hits the end of the
+    // basic block.  During the instruction traversal, propagate information we have about the state of parameters
+    // at the start of the basic block through to the end of the basic block.
+    //
+    // If 'entry.SourceBlock*' is not 0, the state from the end of that block will carry into the start of the 
+    // traversal.  If this does not change the live ranges at the start of 'entry.BlockAddress', the traversal is
+    // considered complete.  Otherwise, the block will be traversed again to find and propagate any control flow 
+    // dependent locations.
+    //
+    // If the block starting at 'entry.BlockAddress' is traversed, this will add outbound control flows from the 
+    // traversed block to the traversal queue.
+    //
+    void TraverseBasicBlock(_In_ TraversalEntry const& entry);
+
+    // UpdateRangesForInstruction():
+    // 
+    // Updates parameter live range information *WITHIN* this basic block given the disassembled instruction
+    // "instr".
+    //
+    void UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ Object instr);
+
+    // CarryoverLiveRange():
+    //
+    // Takes a given live range and carries it into bbTo.  This returns whether or not a change was made
+    // to 'bbTo'
+    //
+    bool CarryoverLiveRange(_In_ BasicBlockInfo& bbTo,
+                            _In_ size_t paramNum,
+                            _In_ LocationRange const& liveRange);
+
+    // CarryoverLiveRanges():
+    //
+    // Takes the live ranges at the end of 'bbFrom' and carries them into 'bbTo'.  If this changes any live
+    // ranges at the start of 'bbTo', this returns true; otherwise, this returns false.
+    //
+    bool CarryoverLiveRanges(_In_ BasicBlockInfo& bbFrom, _In_ BasicBlockInfo& bbTo, _In_ TraversalEntry const& entry);
+
+    // AddParameterRangeToFunction()
+    //
+    // For the [startAddress, endAddress) half-open range (given by absolute VAs), add the range to the function
+    // we are building data for.
+    //
+    bool AddParameterRangeToFunction(_In_ size_t paramNum,
+                                     _Inout_ ULONG64 &startAddress,
+                                     _Inout_ ULONG64 &endAddress,
+                                     _In_ SvcSymbolLocation const& location);
 
 };
 
@@ -209,3 +218,5 @@ private:
 } // Services
 } // TargetComposition
 } // Debugger
+
+#endif // __RANGEBUILDER_H__

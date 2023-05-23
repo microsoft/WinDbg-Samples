@@ -226,6 +226,13 @@ DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
     //
     STDMETHOD(LocationToString)(_In_ SvcSymbolLocation const *pLocation,
                                 _Out_ std::wstring *pString) PURE;
+
+    // GetDefaultCallingConvention():
+    //
+    // Gets an abstraction for the platform's default calling convention if we are aware of it; otherwise, 
+    // this will fail.
+    //
+    STDMETHOD(GetDefaultCallingConvention)(_Outptr_ CallingConvention **ppDefaultConvention) PURE;
 };
 
 // SymbolBuilderManager:
@@ -284,7 +291,7 @@ public:
         if (sizeHardDependencies == 0 && sizeSoftDependencies == 0)
         {
             *pNumHardDependencies = 3;
-            *pNumSoftDependencies = 1;
+            *pNumSoftDependencies = 2;
             return S_OK;
         }
 
@@ -293,7 +300,7 @@ public:
             return E_INVALIDARG;
         }
 
-        if (sizeSoftDependencies < 1)
+        if (sizeSoftDependencies < 2)
         {
             return E_INVALIDARG;
         }
@@ -309,8 +316,14 @@ public:
         //
         pSoftDependencies[0] = DEBUG_SERVICE_VIRTUAL_MEMORY;
 
+        //
+        // We can absolutely function without the OS information service.  We only need this for detecting which
+        // platform we are running on to identify calling conventions for some advanced functionality.
+        //
+        pSoftDependencies[1] = DEBUG_SERVICE_OS_INFORMATION;
+
         *pNumHardDependencies = 3;
-        *pNumSoftDependencies = 1;
+        *pNumSoftDependencies = 2;
         return hr;
     }
 
@@ -343,6 +356,7 @@ public:
         (void)pServiceManager->QueryService(DEBUG_SERVICE_MODULE_ENUMERATOR, IID_PPV_ARGS(&m_spModEnum));
         (void)pServiceManager->QueryService(DEBUG_SERVICE_ARCHINFO, IID_PPV_ARGS(&m_spArchInfo));
         (void)pServiceManager->QueryService(DEBUG_SERVICE_VIRTUAL_MEMORY, IID_PPV_ARGS(&m_spVirtualMemory));
+        (void)pServiceManager->QueryService(DEBUG_SERVICE_OS_INFORMATION, IID_PPV_ARGS(&m_spOSPlatformInformation));
 
         //
         // We want to listen to modules that disappear so that we can "unload" our cached copy of the symbols.
@@ -428,6 +442,26 @@ public:
                 // *EVERY* VM service is *REQUIRED* to support ISvcMemoryAccess
                 //
                 IfFailedReturn(pNewService->QueryInterface(IID_PPV_ARGS(&m_spVirtualMemory)));
+            }
+        }
+        else if (serviceGuid == DEBUG_SERVICE_OS_INFORMATION)
+        {
+            //
+            // If the OS platform service changed, alter our cached copy of it so that we are calling
+            // the correct service.
+            //
+            m_spOSPlatformInformation = nullptr;
+            if (pNewService != nullptr)
+            {
+                if (FAILED(pNewService->QueryInterface(IID_PPV_ARGS(&m_spOSPlatformInformation))))
+                {
+                    m_spOSPlatformInformation = nullptr;
+                }
+
+                //
+                // As part of arch initialization is platform calling conventions, reinitialize...
+                //
+                IfFailedReturn(InitArchBased());
             }
         }
 
@@ -531,6 +565,13 @@ public:
     IFACEMETHOD(LocationToString)(_In_ SvcSymbolLocation const *pLocation,
                                   _Out_ std::wstring *pString);
 
+    // GetDefaultCallingConvention():
+    //
+    // Gets an abstraction for the platform's default calling convention if we are aware of it; otherwise, 
+    // this will fail.
+    //
+    IFACEMETHOD(GetDefaultCallingConvention)(_COM_Outptr_ CallingConvention **ppDefaultConvention);
+
     // GetServiceManager():
     //
     // Gets the service manager that this process was created from.
@@ -591,6 +632,12 @@ private:
 
     // Our container's VM service.
     Microsoft::WRL::ComPtr<ISvcMemoryAccess> m_spVirtualMemory;
+
+    // Our container's platform information.
+    Microsoft::WRL::ComPtr<ISvcOSPlatformInformation> m_spOSPlatformInformation;
+
+    // Our understanding of the default calling convention of the underlying platform (if we are aware of it)
+    std::unique_ptr<CallingConvention> m_spDefaultCallingConvention;
 
     // The service manager which contains and owns our lifetime.
     IDebugServiceManager *m_pOwningManager;

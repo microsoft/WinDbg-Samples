@@ -197,6 +197,7 @@ HRESULT SymbolBuilderManager::InitArchBased()
 
         m_regInfosById.clear();
         m_regIds.clear();
+        m_spDefaultCallingConvention = nullptr;
 
         ComPtr<ISvcRegisterEnumerator> spRegEnum;
         IfFailedReturn(m_spArchInfo->EnumerateRegisters(static_cast<SvcContextFlags>(
@@ -222,6 +223,41 @@ HRESULT SymbolBuilderManager::InitArchBased()
 
             m_regInfosById.insert( { regId, { regName, regId, regSize } } );
             m_regIds.insert( { regName, regId } );
+        }
+
+        //
+        // If we can identify the underlying platform and it is Windows, use that.  If we cannot identify
+        // the underlying platform, assume it's Windows (as that is the default for WinDbg).  Initialize
+        // some basic calling convention information between the architecture and platform.
+        //
+        SvcOSPlatform plat = SvcOSPlatWindows;
+        if (m_spOSPlatformInformation != nullptr)
+        {
+            IfFailedReturn(m_spOSPlatformInformation->GetOSPlatform(&plat));
+        }
+
+        ULONG arch = m_spArchInfo->GetArchitecture();
+        switch(arch)
+        {
+            case IMAGE_FILE_MACHINE_AMD64:
+            {
+                if (plat == SvcOSPlatWindows)
+                {
+                    m_spDefaultCallingConvention = std::make_unique<CallingConvention_Windows_AMD64>(this);
+                    if (m_spDefaultCallingConvention == nullptr)
+                    {
+                        return E_OUTOFMEMORY;
+                    }
+                    break;
+                }
+            }
+            default:
+                //
+                // Right now, we do not understand the default calling convention of this platform.  That
+                // simply means we cannot auto-propagate live ranges by walking the control flow graph
+                // of disassembled functions.
+                //
+                break;
         }
 
         return hr;
@@ -567,6 +603,19 @@ HRESULT SymbolBuilderManager::FindInformationForRegisterById(_In_ ULONG id,
     }
 
     *ppRegisterInfo = &(itr->second);
+    return S_OK;
+}
+
+HRESULT SymbolBuilderManager::GetDefaultCallingConvention(_Outptr_ CallingConvention **ppDefaultConvention)
+{
+    *ppDefaultConvention = nullptr;
+
+    if (m_spDefaultCallingConvention == nullptr)
+    {
+        return E_NOT_SET;
+    }
+
+    *ppDefaultConvention = m_spDefaultCallingConvention.get();
     return S_OK;
 }
 

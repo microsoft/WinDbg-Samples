@@ -1865,6 +1865,17 @@ Object ParametersObject::Add(_In_ const Object& /*parametersObject*/,
 void ParametersObject::PropagateLiveRangesFromCallingConvention(_In_ const Object& /*parametersObject*/,
                                                                 _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
+    //
+    // Determine the platform default calling convention.  If we do not understand the calling convention,
+    // generate an error.
+    //
+    auto pManager = spFunctionSymbol->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+    CallingConvention *pConvention;
+    CheckHr(pManager->GetDefaultCallingConvention(&pConvention));
+
+    RangeBuilder builder;
+    builder.PropagateParameterRanges(spFunctionSymbol.Get(), pConvention);
 }
 
 std::experimental::generator<Object> ParametersObject::GetIterator(_In_ const Object& /*parametersObject*/,
