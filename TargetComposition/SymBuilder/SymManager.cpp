@@ -221,7 +221,15 @@ HRESULT SymbolBuilderManager::InitArchBased()
             ULONG regId = spRegInfo->GetId();
             ULONG regSize = spRegInfo->GetSize();
 
-            m_regInfosById.insert( { regId, { regName, regId, regSize } } );
+            ULONG parentId;
+            ULONG subLsb, subMsb;
+            HRESULT hrSubRegister = spRegInfo->GetSubRegisterInformation(&parentId, &subLsb, &subMsb);
+            if (FAILED(hrSubRegister))
+            {
+                parentId = static_cast<ULONG>(-1);
+            }
+
+            m_regInfosById.insert( { regId, { regName, regId, regSize, parentId } } );
             m_regIds.insert( { regName, regId } );
         }
 

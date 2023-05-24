@@ -44,6 +44,8 @@ public:
 
 private:
 
+    static constexpr ULONG NoRegister = static_cast<ULONG>(-1);
+
     //*************************************************
     // Permanent State:
     //
@@ -82,6 +84,7 @@ private:
         ULONG64 StartAddress;
         ULONG64 EndAddress;
         LocationInfo ParamLocation;
+        bool Dead;
     };
 
     // ParameterRanges:
@@ -142,13 +145,55 @@ private:
         ULONG64 SourceBlockInstructionAddress;
     };
 
+    enum OperandFlags
+    {
+        OperandInput = 0x00000001,
+        OperandOutput = 0x000000002,
+        OperandRegister = 0x00000004,
+        OperandMemory = 0x00000008,
+        OperandImmediate = 0x00000010,
+    };
+
+    // OperandInfo:
+    //
+    // Information about an operand
+    //
+    struct OperandInfo
+    {
+        ULONG Flags;                // OperandFlags set
+        ULONG Regs[3];              // NoRegister if not present
+        ULONG ScalingFactor;        // regs[0] * scalingFactor (1)
+        LONG64 ConstantValue;       // immediate
+    };
+
     std::unordered_map<ULONG64, BasicBlockInfo> m_bbInfo;
     std::queue<TraversalEntry> m_bbTrav;
     std::vector<VariableSymbol *> m_parameters;
+    std::unordered_map<ULONG, ULONG> m_disRegToCanonical;           // Maps disassembler IDs to canonical ones
 
     //*************************************************
     // Private Methods:
     //
+
+    // GetBaseRegister():
+    //
+    // Gets the base register of a given canonical register.  This will return the topmost parent for any
+    // sub-register.  It will, for example, return 'rax' when passed ID for 'ah', 'al', 'ax', or 'eax'.
+    //
+    ULONG GetBaseRegister(_In_ ULONG canonId);
+
+    // GetCanonicalRegisterIdFromObject():
+    //
+    // For a given register object from the data model disassembler, get its canonical ID that must be passed
+    // upwards for our locations.
+    //
+    ULONG GetCanonicalRegisterId(_In_ Object regObj);
+
+    // UsesRegister():
+    //
+    // Determines whether a given location uses a register.  This includes sub-register overlap.
+    //
+    bool UsesRegister(_In_ SvcSymbolLocation const& location, _In_ ULONG canonId);
 
     // CreateLiveRangeSets():
     //
@@ -211,6 +256,47 @@ private:
                                      _Inout_ ULONG64 &startAddress,
                                      _Inout_ ULONG64 &endAddress,
                                      _In_ SvcSymbolLocation const& location);
+
+    // CheckForKill():
+    //
+    // Checks whether a given operand as a destination will kill the live range given by lr.
+    //
+    bool CheckForKill(_In_ OperandInfo const& opInfo, _In_ LocationRange const &lr);
+
+    // CheckAddAlias():
+    //
+    // For the instruction at 'instrAddr' where that instruction is functionally a mov of inputInfo to outputInfo, 
+    // see if this creates an aliasing of 'lr'.  If so, add such aliasing to 'ranges' starting at 
+    // 'instrAddr' + 'instrLen' and return true; otherwise, return false.
+    //
+    bool CheckAddAlias(_In_ ULONG64 instrAddr,
+                       _In_ ULONG64 instrLen,
+                       _In_ OperandInfo const& outputInfo,
+                       _In_ OperandInfo const& intputInfo,
+                       _In_ LocationRange const& lr,
+                       _Inout_ ParameterRanges& ranges);
+
+    // GetOperandInfo():
+    //
+    // Gets operand information from a data model disassembler operand object.
+    //
+    void GetOperandInfo(_In_ Object& operand, _Out_ OperandInfo *pOperandInfo);
+
+    // OperandToLocation():
+    //
+    // Given the operand, fill in a location structure for it.  False is returned if we cannot do such.
+    //
+    bool OperandToLocation(_In_ OperandInfo const& opInfo, _Out_ SvcSymbolLocation *pLocation);
+
+    //*************************************************
+    // Instruction Helpers:
+    //
+
+    // IsMov():
+    //
+    // Is this a "mov" instruction (or the equivalent on whatever architecture we understand)
+    //
+    bool IsMov(_In_ std::wstring const& mnemonic);
 
 };
 

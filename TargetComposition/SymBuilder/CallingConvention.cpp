@@ -62,6 +62,29 @@ void CallingConvention::FillRegisterCanonicalIds(_In_ size_t numRegisters,
     }
 }
 
+bool CallingConvention::IsNonVolatile(_In_ ULONG canonId)
+{
+    //
+    // If we are passed a sub-register (e.g.: 'al', 'ax', 'eax' of 'rax'), walk it up until we find the base register.
+    //
+    for(;;)
+    {
+        RegisterInformation *pRegInfo;
+        CheckHr(m_pManager->FindInformationForRegisterById(canonId, &pRegInfo));
+        if (pRegInfo->ParentId != static_cast<ULONG>(-1))
+        {
+            canonId = pRegInfo->ParentId;
+        }
+        else
+        {
+            break;
+        }
+    }
+    
+    auto it = m_nonVolatiles.find(canonId);
+    return (it != m_nonVolatiles.end());
+}
+
 //*************************************************
 // AMD64 Calling Convention Understanding:
 //

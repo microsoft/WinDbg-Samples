@@ -49,6 +49,237 @@ RangeBuilder::RangeBuilder()
     m_dis = codeNS.CallMethod(L"CreateDisassembler");
 }
 
+ULONG RangeBuilder::GetBaseRegister(_In_ ULONG canonId)
+{
+    auto pSymManager = m_pFunction->InternalGetSymbolSet()->GetSymbolBuilderManager();
+    for(;;)
+    {
+        RegisterInformation *pRegInfo;
+        CheckHr(pSymManager->FindInformationForRegisterById(canonId, &pRegInfo));
+        
+        if (pRegInfo->ParentId == static_cast<ULONG>(-1))
+        {
+            return canonId;
+        }
+        canonId = pRegInfo->ParentId;
+    }
+}
+
+ULONG RangeBuilder::GetCanonicalRegisterId(_In_ Object regObj)
+{
+    ULONG regId = (ULONG)regObj.KeyValue(L"Id");
+    auto it = m_disRegToCanonical.find(regId);
+    if (it == m_disRegToCanonical.end())
+    {
+        //
+        // If we haven't seen this register yet, we need to look it up by NAME.
+        //
+        std::wstring regName = regObj.ToDisplayString();
+        auto pSymManager = m_pFunction->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+        RegisterInformation *pRegInfo;
+        CheckHr(pSymManager->FindInformationForRegister(regName.c_str(), &pRegInfo));
+
+        m_disRegToCanonical.insert( { regId, pRegInfo->Id });
+        return pRegInfo->Id;
+    }
+
+    return it->second;
+}
+
+bool RangeBuilder::OperandToLocation(_In_ OperandInfo const& opInfo, _Out_ SvcSymbolLocation *pLocation)
+{
+    if ((opInfo.Flags & OperandMemory) != 0)
+    {
+        //
+        // Only one register.  We cannot express more than one.  We cannot express one with a scaling factor.
+        //
+        if (opInfo.Regs[1] == NoRegister && opInfo.ScalingFactor == 1)
+        {
+            pLocation->Kind = SvcSymbolLocationRegisterRelative;
+            pLocation->RegInfo.Number = opInfo.Regs[0];
+            pLocation->RegInfo.Size = 16; // @TODO!!!
+            
+            if ((opInfo.Flags & OperandImmediate) != 0)
+            {
+                pLocation->Offset = static_cast<ULONG64>(opInfo.ConstantValue);
+            }
+            else
+            {
+                pLocation->Offset = 0;
+            }
+
+            return true;
+        }
+    }
+    else if ((opInfo.Flags & OperandRegister) != 0)
+    {
+        //
+        // Only one register.  We cannot express more than one.  We cannot express one with a scaling factor.
+        //
+        if (opInfo.Regs[1] == NoRegister && opInfo.ScalingFactor == 1 &&
+            (opInfo.Flags & OperandImmediate) == 0)
+        {
+            pLocation->Kind = SvcSymbolLocationRegister;
+            pLocation->RegInfo.Number = opInfo.Regs[0];
+            pLocation->RegInfo.Size = 16; // @TODO!!!
+            pLocation->Offset = 0;
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool RangeBuilder::UsesRegister(_In_ SvcSymbolLocation const& location, _In_ ULONG canonId)
+{
+    if (location.Kind == SvcSymbolLocationRegister || location.Kind == SvcSymbolLocationRegisterRelative)
+    {
+        return GetBaseRegister(location.RegInfo.Number) == GetBaseRegister(canonId);
+    }
+    return false;
+}
+
+bool RangeBuilder::CheckAddAlias(_In_ ULONG64 instrAddr,
+                                 _In_ ULONG64 instrLen,
+                                 _In_ OperandInfo const& outputInfo,
+                                 _In_ OperandInfo const& inputInfo,
+                                 _In_ LocationRange const& lr,
+                                 _Inout_ ParameterRanges& ranges)
+{
+    SvcSymbolLocation inputLoc;
+    SvcSymbolLocation outputLoc;
+    if (OperandToLocation(inputInfo, &inputLoc) && 
+        LocationsAreEquivalent(lr.ParamLocation.ParamLocation, inputLoc) &&
+        OperandToLocation(outputInfo, &outputLoc))
+    {
+        ranges.push_back({ instrAddr + instrLen, instrAddr + instrLen, { outputLoc, 1 }, false });
+        return true;
+    }
+
+    return false;
+}
+
+bool RangeBuilder::CheckForKill(_In_ OperandInfo const& opInfo, _In_ LocationRange const &lr)
+{
+    //
+    // If the destination is a register and the live range uses that register, it is a kill.  Note that this
+    // isn't necessarily a 'kill' as might be defined in the compiler.  It's really impossible for us to tell
+    // the semantics of the write.  We cannot tell the semantic difference between some piece of code writing
+    // back to the parameter:
+    //
+    //    int myfunc(int n /* rcx*/)
+    //    {
+    //        ...
+    //        n = 42;   // mov rcx, 42
+    //        ..
+    //    }
+    //
+    // and the compiler having chosen to reuse the location for another semantic variable:
+    //
+    //    int mnfunc(int n /*rcx*/)
+    //    {
+    //        int j = n;    // mov rsi, rcx
+    //        ...           // 'n' never used again
+    //        ...           // compiler decides to reuse rcx for 'j'
+    //        j = 42;       // mov rcx, 42
+    //    }
+    //
+    // Thus, any write back to the location is treated as a 'kill'.  For memory locations, we are somewhat
+    // more relaxed.
+    //
+    if ((opInfo.Flags & OperandOutput) != 0)
+    {
+        if ((opInfo.Flags & (OperandRegister | OperandMemory)) == OperandRegister)
+        {
+            if (UsesRegister(lr.ParamLocation.ParamLocation, opInfo.Regs[0]))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void RangeBuilder::GetOperandInfo(_In_ Object& operand, _Out_ OperandInfo *pOperandInfo)
+{
+    pOperandInfo->Flags = 0;
+
+    for (size_t i = 0; i < ARRAYSIZE(pOperandInfo->Regs); ++i)
+    {
+        pOperandInfo->Regs[i] = NoRegister;
+    }
+    pOperandInfo->Regs[0] = NoRegister;
+    pOperandInfo->ScalingFactor = 1;
+    pOperandInfo->ConstantValue = 0;
+
+    Object operandAttrs = operand.KeyValue(L"Attributes");
+
+    bool isOutput = (bool)operandAttrs.KeyValue(L"IsOutput");
+    bool isInput = (bool)operandAttrs.KeyValue(L"IsInput");
+    bool isRegister = (bool)operandAttrs.KeyValue(L"IsRegister");
+    bool isMemoryReference = (bool)operandAttrs.KeyValue(L"IsMemoryReference");
+    bool hasImmediate = (bool)operandAttrs.KeyValue(L"HasImmediate");
+    bool isImmediate = (bool)operandAttrs.KeyValue(L"IsImmediate");
+
+    if (isOutput)
+    {
+        pOperandInfo->Flags |= OperandOutput;
+    }
+    if (isInput)
+    {
+        pOperandInfo->Flags |= OperandInput;
+    }
+    if (isRegister)
+    {
+        pOperandInfo->Flags |= OperandRegister;
+    }
+    if (isMemoryReference)
+    {
+        pOperandInfo->Flags |= OperandMemory;
+    }
+    if (isImmediate || hasImmediate)
+    {
+        pOperandInfo->Flags |= OperandImmediate;
+
+        LONG64 immVal = (LONG64)operand.KeyValue(L"ImmediateValue");
+        pOperandInfo->ConstantValue = immVal;
+    }
+
+    size_t regNum = 0;
+    bool hasScale = false;
+
+    Object opRegs = operand.KeyValue(L"Registers");
+    for (auto&& regObj : opRegs)
+    {
+        if (regNum > ARRAYSIZE(pOperandInfo->Regs))
+        {
+            throw std::logic_error("Unexpected number of registers on operand");
+        }
+
+        ULONG canonId = GetCanonicalRegisterId(regObj);
+        ULONG scaleFactor = (ULONG)regObj.KeyValue(L"ScaleFactor");
+
+        pOperandInfo->Regs[regNum] = canonId;
+        if (scaleFactor != 1)
+        {
+            if (hasScale)
+            {
+                throw std::logic_error("Unexpected multiple register scaling on operand");
+            }
+
+            pOperandInfo->ScalingFactor = scaleFactor;
+            if (regNum != 0)
+            {
+                std::swap(pOperandInfo->Regs[0], pOperandInfo->Regs[regNum]);
+            }
+            hasScale = true;
+        }
+    }
+}
+
 bool RangeBuilder::CarryoverLiveRange(_In_ BasicBlockInfo& bbTo,
                                       _In_ size_t paramNum,
                                       _In_ LocationRange const& liveRange)
@@ -79,7 +310,8 @@ bool RangeBuilder::CarryoverLiveRange(_In_ BasicBlockInfo& bbTo,
             { 
                 bbTo.StartAddress,                  // [StartAddress, StartAddress) -- "empty" until traversed
                 bbTo.StartAddress,
-                { liveRange.ParamLocation.ParamLocation, 1 }
+                { liveRange.ParamLocation.ParamLocation, 1 },
+                false
             });
     }
 
@@ -125,29 +357,136 @@ bool RangeBuilder::CarryoverLiveRanges(_In_ BasicBlockInfo& bbFrom,
     return (changedRanges && !firstEntry);
 }
 
+bool RangeBuilder::IsMov(_In_ std::wstring const& mnemonic)
+{
+    if (wcscmp(mnemonic.c_str(), L"mov") == 0) { return true; }
+    return false;
+}
+
 void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ Object instr)
 {
+    ULONG64 instrAddr = (ULONG64)instr.KeyValue(L"Address");
     ULONG64 instrLength = (ULONG64)instr.KeyValue(L"Length");
 
-    for (auto&& operand : instr.KeyValue(L"Operands"))
-    {
-        Object operandAttrs = operand.KeyValue(L"Attributes");
-        bool isOutput = (bool)operandAttrs.KeyValue(L"IsOutput");
-        bool isInput = (bool)operandAttrs.KeyValue(L"IsInput");
-        bool isRegister = (bool)operandAttrs.KeyValue(L"IsRegister");
-        bool isMemoryReference = (bool)operandAttrs.KeyValue(L"IsMemoryReference");
+    Object instrAttrs = instr.KeyValue(L"Attributes");
+    bool isCall = (bool)instrAttrs.KeyValue(L"IsCall");
 
-    }
-        
-    //
-    // Update any unaffected live ranges to include the span of this instruction.
-    //
-    for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
+    if (isCall)
     {
-        ParameterRanges& pr = block.BlockParameterRanges[p];
-        for (size_t i = 0; i < pr.size(); ++i)
+        //
+        // A call is only guaranteed to preserve registers which are non-volatile by calling convention.
+        // Go through any parameter register ranges which are currently live as of this instruction in this basic 
+        // block and only carry forward ones which are held by non-volatiles.
+        //
+        for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
         {
-            pr[i].EndAddress += instrLength;
+            ParameterRanges& pr = block.BlockParameterRanges[p];
+            for (size_t i = 0; i < pr.size(); ++i)
+            {
+                LocationRange &lr = pr[i];
+                if (!lr.Dead &&
+                    (lr.ParamLocation.ParamLocation.Kind == SvcSymbolLocationRegister ||
+                     lr.ParamLocation.ParamLocation.Kind == SvcSymbolLocationRegisterRelative))
+                {
+                    ULONG regRefId = lr.ParamLocation.ParamLocation.RegInfo.Number;
+                    if (!m_pConvention->IsNonVolatile(regRefId))
+                    {
+                        //
+                        // This range is now dead as of this instruction.  Do not carry it forward past the
+                        // end of this instruction.
+                        //
+                        lr.Dead = true;
+                    }
+                    lr.EndAddress += instrLength;
+                }
+            }
+        }
+    }
+    else
+    {
+        size_t numOperands = 0;
+        OperandInfo oprnds[4];
+
+        size_t numInputs = 0;
+        OperandInfo *pInput = nullptr;
+        size_t numOutputs = 0;
+        OperandInfo *pOutput = nullptr;
+
+        //
+        // Unfortunately, the data model disassembler does not presently have a property that gets
+        // us the instruction or mnemonic.  We need to grab this from the string conversion.
+        //
+        std::wstring instrStr = instr.ToDisplayString();
+        wchar_t const *pc = instrStr.c_str();
+        wchar_t const *pe = pc;
+        while (*pe && !iswspace(*pe)) { ++pe; }
+        std::wstring mnemonic(pc, pe - pc);
+
+        bool isMov = IsMov(mnemonic);
+
+        for (auto&& operand : instr.KeyValue(L"Operands"))
+        {
+            if (numOperands >= ARRAYSIZE(oprnds))
+            {
+                throw std::logic_error("Unexpected number of operands on instruction");
+            }
+            GetOperandInfo(operand, &oprnds[numOperands]);
+            if ((oprnds[numOperands].Flags & OperandInput) != 0)
+            {
+                numInputs++;
+                pInput = &(oprnds[numOperands]);
+            }
+            if ((oprnds[numOperands].Flags & OperandOutput) != 0)
+            {
+                numOutputs++;
+                pOutput = &(oprnds[numOperands]);
+            }
+
+            numOperands++;
+        }
+
+        //
+        // Look at all ranges that are presently live up to this instruction within this basic block 
+        // and see if they are live after this instruction.
+        //
+        for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
+        {
+            ParameterRanges& pr = block.BlockParameterRanges[p];
+            for (size_t i = 0; i < pr.size(); ++i)
+            {
+                LocationRange &lr = pr[i];
+                if (!lr.Dead)
+                {
+                    for (size_t o = 0; o < numOperands; ++o)
+                    {
+                        OperandInfo &opInfo = oprnds[o];
+                        if (CheckForKill(opInfo, lr))
+                        {
+                            lr.Dead = true;
+                        }
+                    }
+                    lr.EndAddress += instrLength;
+                }
+            }
+        }
+
+        //
+        // Deal with any instruction level semantics...
+        //
+        if (numInputs == 1 && numOutputs == 1 && isMov)
+        {
+            for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
+            {
+                ParameterRanges& pr = block.BlockParameterRanges[p];
+                for (size_t i = 0; i < pr.size(); ++i)
+                {
+                    LocationRange &lr = pr[i];
+                    if (instrAddr >= lr.StartAddress && instrAddr < lr.EndAddress)
+                    {
+                        CheckAddAlias(instrAddr, instrLength, *pOutput, *pInput, lr, pr);
+                    }
+                }
+            }
         }
     }
 }
@@ -228,7 +567,8 @@ void RangeBuilder::InitializeParameterLocations(_In_ CallingConvention *pConvent
             { 
                 entryBlock.StartAddress,                // [StartAddress, StartAddress) -- "empty" until traversed
                 entryBlock.StartAddress,
-                { entryLocations[i], 1 }
+                { entryLocations[i], 1 },
+                false
             });
     }
 }
@@ -398,6 +738,7 @@ void RangeBuilder::CreateLiveRangeSets()
                         lr.EndAddress > lr.StartAddress)
                     {
                         pLR = &lr;
+                        break;
                     }
                 }
 
@@ -436,19 +777,20 @@ void RangeBuilder::CreateLiveRangeSets()
                             //
                             // The range doesn't merge.  Add what we have and start a new range.
                             //
+                            ULONG64 tempEnd = curRangeEnd;
                             (void)AddParameterRangeToFunction(p, curRangeStart, curRangeEnd, curLocation);
 
                             //
                             // Note that we cannot simply set instrp to pLR->StartAddress as pLR might
                             // overlap with our current range.  We only want the subset that does *NOT* overlap
                             //
-                            if (pLR->StartAddress >= curRangeEnd)
+                            if (pLR->StartAddress >= tempEnd)
                             {
                                 instrp = pLR->StartAddress;
                             }
                             else
                             {
-                                instrp = curRangeEnd;
+                                instrp = tempEnd;
                             }
 
                         }

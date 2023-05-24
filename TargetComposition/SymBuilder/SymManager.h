@@ -140,6 +140,7 @@ struct RegisterInformation
     std::wstring Name;
     ULONG Id;
     ULONG Size;
+    ULONG ParentId;                     // (ULONG)-1 or the ID of the parent register if a sub-register
 };
 
 // ISvcSymbolBuilderManager:

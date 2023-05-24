@@ -57,11 +57,9 @@ public:
     // the register id is given by the *CANONICAL* numbering of the register (often CodeView) and *NOT* the
     // domain specific register numbering that might be used by the disassembler.
     //
-    virtual bool IsNonVolatile(_In_ ULONG canonId)
-    {
-        auto it = m_nonVolatiles.find(canonId);
-        return (it != m_nonVolatiles.end());
-    }
+    // Note that we *MUST* take into account sub-registering.
+    //
+    virtual bool IsNonVolatile(_In_ ULONG canonId);
 
 protected:
 
