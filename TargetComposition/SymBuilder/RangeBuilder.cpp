@@ -89,6 +89,8 @@ ULONG RangeBuilder::GetCanonicalRegisterId(_In_ Object regObj)
 
 bool RangeBuilder::OperandToLocation(_In_ OperandInfo const& opInfo, _Out_ SvcSymbolLocation *pLocation)
 {
+    auto pSymManager = m_pFunction->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
     if ((opInfo.Flags & OperandMemory) != 0)
     {
         //
@@ -98,7 +100,7 @@ bool RangeBuilder::OperandToLocation(_In_ OperandInfo const& opInfo, _Out_ SvcSy
         {
             pLocation->Kind = SvcSymbolLocationRegisterRelative;
             pLocation->RegInfo.Number = opInfo.Regs[0];
-            pLocation->RegInfo.Size = 16; // @TODO!!!
+            pLocation->RegInfo.Size = 8;                                // pointer-sized memory ref
             
             if ((opInfo.Flags & OperandImmediate) != 0)
             {
@@ -120,9 +122,12 @@ bool RangeBuilder::OperandToLocation(_In_ OperandInfo const& opInfo, _Out_ SvcSy
         if (opInfo.Regs[1] == NoRegister && opInfo.ScalingFactor == 1 &&
             (opInfo.Flags & OperandImmediate) == 0)
         {
+            RegisterInformation *pRegInfo;
+            CheckHr(pSymManager->FindInformationForRegisterById(opInfo.Regs[0], &pRegInfo));
+
             pLocation->Kind = SvcSymbolLocationRegister;
             pLocation->RegInfo.Number = opInfo.Regs[0];
-            pLocation->RegInfo.Size = 16; // @TODO!!!
+            pLocation->RegInfo.Size = pRegInfo->Size;
             pLocation->Offset = 0;
 
             return true;

@@ -183,7 +183,7 @@ void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCo
             bool canEnregister = true;
 
             ULONG regBase;
-            ULONG64 maxRegSz = 16;
+            ULONG64 maxRegSz = 8;
             if (ordinal && i < m_ordIds.size())
             {
                 regBase = m_ordIds[i];
@@ -191,7 +191,7 @@ void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCo
             else if (!ordinal && i < m_fltIds.size())
             {
                 regBase = m_fltIds[i];
-                maxRegSz = 32;
+                maxRegSz = 16;
             }
             else
             {
@@ -205,13 +205,49 @@ void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCo
                 // will be placed.  If someone put struct in the symbol builder's debug info, generate a live
                 // range which is register relative.
                 //
-                pLocations[i].Kind = (tySz <= maxRegSz ? SvcSymbolLocationRegister : SvcSymbolLocationRegisterRelative);
-
-                //
-                // @TODO: subregisters...
-                //
                 pLocations[i].RegInfo.Number = regBase;
-                pLocations[i].RegInfo.Size = 16;
+                pLocations[i].RegInfo.Size = 8;
+
+                if (tySz <= maxRegSz)
+                {
+                    pLocations[i].Kind = SvcSymbolLocationRegister;
+
+                    //
+                    // Is this a sub-register portion...?
+                    //
+                    if (tySz < maxRegSz)
+                    {
+                        //
+                        // Sub-registering is always going to be a power-of-two size.  Find the closest power-of-two
+                        // that fits the given type.
+                        //
+                        ULONG64 rsz = maxRegSz;
+                        while (rsz > 0 && (rsz / 2) >= tySz) { rsz /= 2; }
+
+                        RegisterInformation *pParentInfo;
+                        CheckHr(m_pManager->FindInformationForRegisterById(regBase, &pParentInfo));
+
+                        for (size_t sr = 0; sr < pParentInfo->SubRegisters.size(); ++sr)
+                        {
+                            RegisterInformation *pSubRegister;
+                            CheckHr(m_pManager->FindInformationForRegisterById(pParentInfo->SubRegisters[sr],
+                                                                               &pSubRegister));
+
+                            if (pSubRegister->Size == rsz && pSubRegister->SubLsb == 0)
+                            {
+                                
+                                pLocations[i].RegInfo.Number = pSubRegister->Id;
+                                pLocations[i].RegInfo.Size = static_cast<ULONG>(rsz);
+                                break;
+                            }
+                        }
+                    }
+
+                } else {
+                    pLocations[i].Kind = SvcSymbolLocationRegisterRelative;
+                    pLocations[i].RegInfo.Size = 8;
+                }
+
                 pLocations[i].Offset = 0;
             }
             else
@@ -221,13 +257,14 @@ void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCo
                 //
                 pLocations[i].Kind = SvcSymbolLocationRegisterRelative;
                 pLocations[i].RegInfo.Number = m_spId;
-                pLocations[i].RegInfo.Size = 16;
+                pLocations[i].RegInfo.Size = 8;
                 pLocations[i].Offset = stackOffset;
 
                 //
                 // The stack must stay 8 byte aligned regardless of the parameter size.
                 //
-                stackOffset += (tySz < 8 ? 8 : tySz);
+                ULONG64 alignSz = (tySz + 7) & ~7;
+                stackOffset += alignSz;
             }
 
             break;

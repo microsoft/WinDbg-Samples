@@ -222,15 +222,51 @@ HRESULT SymbolBuilderManager::InitArchBased()
             ULONG regSize = spRegInfo->GetSize();
 
             ULONG parentId;
-            ULONG subLsb, subMsb;
+            ULONG subLsb = 0;
+            ULONG subMsb = 0;
             HRESULT hrSubRegister = spRegInfo->GetSubRegisterInformation(&parentId, &subLsb, &subMsb);
             if (FAILED(hrSubRegister))
             {
                 parentId = static_cast<ULONG>(-1);
             }
+            else
+            {
+                //
+                // Work around a bug where some sub-registers are being reported as the size of the base parent
+                // register.  As we have the bit mappings within the parent register, this is easy to detect.
+                //
+                ULONG subMappingSize = (subMsb - subLsb + 1) / 8;
+                if (subMappingSize < regSize)
+                {
+                    regSize = subMappingSize;
+                }
+            }
 
-            m_regInfosById.insert( { regId, { regName, regId, regSize, parentId } } );
+            m_regInfosById.insert({ regId, { regName, regId, regSize, parentId, subLsb, subMsb, { } } });
             m_regIds.insert( { regName, regId } );
+        }
+
+        //
+        // Go through and add all sub-register (parent->child) mappings for quick lookup.  
+        //
+        for (auto&& kvp : m_regInfosById)
+        {
+            RegisterInformation const& childInfo = kvp.second;
+            if (childInfo.ParentId != static_cast<ULONG>(-1))
+            {
+                auto itp = m_regInfosById.find(childInfo.ParentId);
+                if (itp == m_regInfosById.end())
+                {
+                    //
+                    // The architecture service gave us a mapping for which it did not define the parent
+                    // register.  This is broken.
+                    //
+                    return E_UNEXPECTED;
+                }
+
+                RegisterInformation &parentInfo = itp->second;
+                parentInfo.SubRegisters.push_back(childInfo.Id);
+            }
         }
 
         //

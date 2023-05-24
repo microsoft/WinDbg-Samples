@@ -141,6 +141,9 @@ struct RegisterInformation
     ULONG Id;
     ULONG Size;
     ULONG ParentId;                     // (ULONG)-1 or the ID of the parent register if a sub-register
+    ULONG SubLsb;                       // If a subregister, LSB of the mapping
+    ULONG SubMsb;                       // If a subregister, MSB of the mapping
+    std::vector<ULONG> SubRegisters;    // The list of sub-register IDs for this register
 };
 
 // ISvcSymbolBuilderManager:
