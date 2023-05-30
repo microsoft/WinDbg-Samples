@@ -130,6 +130,21 @@ private:
         }
     };
 
+    // RecognizedInstruction:
+    //
+    // Defines instructions that we recognize for specific purposes.
+    //
+    enum class RecognizedInstruction
+    {
+        Unknown,
+        Mov,
+        Push,
+        Pop,
+        Add,
+        Sub,
+        Lea
+    };
+
     // TraversalEntry
     //
     // Describes the need to traverse BlockAddress as entered from the basic block starting at SourceBlockAddress.
@@ -288,15 +303,44 @@ private:
     //
     bool OperandToLocation(_In_ OperandInfo const& opInfo, _Out_ SvcSymbolLocation *pLocation);
 
+    // BuildOperand():
+    //
+    // Builds an OperandInfo for a given register/memory/immediate operand that uses a single register.
+    //
+    void BuildOperand(_In_ ULONG registerNumber,
+                      _In_ bool output,
+                      _Out_ OperandInfo& opInfo,
+                      _In_ LONG64 immediate = 0,
+                      _In_ bool memory = false,
+                      _In_ ULONG scalingFactor = 1)
+    {
+        for (size_t r = 0; r < ARRAYSIZE(opInfo.Regs); ++r)
+        {
+            opInfo.Regs[r] = NoRegister;
+        }
+        opInfo.Flags = (output) ? OperandOutput : OperandInput;
+        if (registerNumber != NoRegister)
+        {
+            opInfo.Regs[0] = registerNumber;
+            opInfo.Flags |= memory ? OperandMemory : OperandRegister;
+        }
+        if (immediate != 0)
+        {
+            opInfo.Flags |= OperandImmediate;
+        }
+        opInfo.ScalingFactor = scalingFactor;
+        opInfo.ConstantValue = immediate;
+    }
+
     //*************************************************
     // Instruction Helpers:
     //
 
-    // IsMov():
+    // GetRecognizedInstruction():
     //
-    // Is this a "mov" instruction (or the equivalent on whatever architecture we understand)
+    // Is this a "*" instruction (or the equivalent on whatever architecture we understand)
     //
-    bool IsMov(_In_ std::wstring const& mnemonic);
+    RecognizedInstruction GetRecognizedInstruction(_In_ std::wstring const& mnemonic);
 
 };
 

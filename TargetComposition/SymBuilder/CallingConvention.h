@@ -61,6 +61,12 @@ public:
     //
     virtual bool IsNonVolatile(_In_ ULONG canonId);
 
+    // GetSpId():
+    //
+    // Get the register number of the stack pointer for the underlying architecture.
+    //
+    virtual ULONG GetSpId() =0;
+
 protected:
 
     // FillRegisterCanonicalIds():
@@ -100,6 +106,12 @@ public:
     virtual void GetParameterPlacements(_In_ size_t paramCount,
                                         _In_reads_(paramCount) VariableSymbol **ppParameters,
                                         _Out_writes_(paramCount) SvcSymbolLocation *pLocations);
+
+    // GetSpId():
+    //
+    // Get the register number of the stack pointer for the underlying architecture.
+    //
+    virtual ULONG GetSpId() { return m_spId; }
 
 private:
 
