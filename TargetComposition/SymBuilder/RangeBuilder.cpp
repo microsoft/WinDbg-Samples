@@ -165,7 +165,10 @@ bool RangeBuilder::CheckAddAlias(_In_ ULONG64 instrAddr,
         LocationsAreEquivalent(lr.ParamLocation.ParamLocation, inputLoc) &&
         OperandToLocation(outputInfo, &outputLoc))
     {
-        ranges.push_back({ instrAddr + instrLen, instrAddr + instrLen, { outputLoc, 1 }, false });
+        ranges.push_back({ instrAddr + instrLen, 
+                           instrAddr + instrLen, 
+                           { outputLoc, lr.ParamLocation.TraversalCountSlot }, 
+                           LiveState::Live });
         return true;
     }
 
@@ -184,7 +187,10 @@ bool RangeBuilder::CheckAddAlias(_In_ ULONG64 instrAddr,
     {
         SvcSymbolLocation newLoc = lr.ParamLocation.ParamLocation;
         newLoc.Offset = static_cast<ULONG64>(static_cast<LONG64>(newLoc.Offset) - inputInfo.ConstantValue);
-        ranges.push_back({ instrAddr + instrLen, instrAddr + instrLen, { newLoc, 1 }, false });
+        ranges.push_back({ instrAddr + instrLen, 
+                           instrAddr + instrLen, 
+                           { newLoc, lr.ParamLocation.TraversalCountSlot }, 
+                           LiveState::Live });
         return true;
     }
 
@@ -205,7 +211,10 @@ bool RangeBuilder::CheckAddAlias(_In_ ULONG64 instrAddr,
         newLoc.RegInfo.Number = outputInfo.Regs[0];
         newLoc.RegInfo.Size = 8;                                // pointer-sized memory ref
         newLoc.Offset = static_cast<ULONG64>(lr.ParamLocation.ParamLocation.Offset - inputInfo.ConstantValue);
-        ranges.push_back({ instrAddr + instrLen, instrAddr + instrLen, { newLoc, 1}, false });
+        ranges.push_back({ instrAddr + instrLen, 
+                           instrAddr + instrLen, 
+                           { newLoc, lr.ParamLocation.TraversalCountSlot }, 
+                           LiveState::Live });
         return true;
     }
 
@@ -350,19 +359,22 @@ bool RangeBuilder::CarryoverLiveRange(_In_ BasicBlockInfo& bbTo,
             if (LocationsAreEquivalent(lrTo.ParamLocation.ParamLocation, liveRange.ParamLocation.ParamLocation))
             {
                 matched = true;
-                lrTo.ParamLocation.TraversalCount++;
+                bbTo.TraversalCountSlots[lrTo.ParamLocation.TraversalCountSlot]++;
             }
         }
     }
 
     if (!matched)
     {
+        bbTo.TraversalCountSlots.push_back(1);
+        size_t traversalCountSlot = bbTo.TraversalCountSlots.size() - 1;
+
         pr.push_back(
             { 
                 bbTo.StartAddress,                  // [StartAddress, StartAddress) -- "empty" until traversed
                 bbTo.StartAddress,
-                { liveRange.ParamLocation.ParamLocation, 1 },
-                false
+                { liveRange.ParamLocation.ParamLocation, traversalCountSlot },
+                LiveState::Live
             });
     }
 
@@ -444,7 +456,7 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
             for (size_t i = 0; i < pr.size(); ++i)
             {
                 LocationRange &lr = pr[i];
-                if (!lr.Dead &&
+                if (lr.State == LiveState::Live &&
                     (lr.ParamLocation.ParamLocation.Kind == SvcSymbolLocationRegister ||
                      lr.ParamLocation.ParamLocation.Kind == SvcSymbolLocationRegisterRelative))
                 {
@@ -455,7 +467,7 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                         // This range is now dead as of this instruction.  Do not carry it forward past the
                         // end of this instruction.
                         //
-                        lr.Dead = true;
+                        lr.State = LiveState::MarkedForKill;
                     }
                     lr.EndAddress += instrLength;
                 }
@@ -555,14 +567,14 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
             for (size_t i = 0; i < pr.size(); ++i)
             {
                 LocationRange &lr = pr[i];
-                if (!lr.Dead)
+                if (lr.State == LiveState::Live)
                 {
                     for (size_t o = 0; o < numOperands; ++o)
                     {
                         OperandInfo &opInfo = oprnds[o];
                         if (CheckForKill(opInfo, lr))
                         {
-                            lr.Dead = true;
+                            lr.State = LiveState::MarkedForKill;
                         }
                     }
 
@@ -573,7 +585,7 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                     //
                     if (pImplicit != nullptr && CheckForKill(*pImplicit, lr))
                     {
-                        lr.Dead = true;
+                        lr.State = LiveState::MarkedForKill;
                     }
 
                     lr.EndAddress += instrLength;
@@ -593,7 +605,7 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                 for (size_t i = 0; i < pr.size(); ++i)
                 {
                     LocationRange &lr = pr[i];
-                    if (instrAddr >= lr.StartAddress && instrAddr < lr.EndAddress)
+                    if (lr.State != LiveState::Dead && instrAddr >= lr.StartAddress && instrAddr < lr.EndAddress)
                     {
                         OperandInfo op1, op2, op3;
                         OperandInfo *pInUsage = pInput;
@@ -708,6 +720,23 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
             }
         }
     }
+
+    //
+    // At the end of processing for this instruction, perform a final sweep and change any MarkedForKill
+    // to a Dead state.  No further processing is ever required.
+    //
+    for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
+    {
+        ParameterRanges& pr = block.BlockParameterRanges[p];
+        for (size_t i = 0; i < pr.size(); ++i)
+        {
+            LocationRange &lr = pr[i];
+            if (lr.State == LiveState::MarkedForKill)
+            {
+                lr.State = LiveState::Dead;
+            }
+        }
+    }
 }
 
 void RangeBuilder::TraverseBasicBlock(_In_ TraversalEntry const& entry)
@@ -763,7 +792,7 @@ void RangeBuilder::TraverseBasicBlock(_In_ TraversalEntry const& entry)
             for (size_t i = 0; i < pr.size(); ++i)
             {
                 LocationRange & lr = pr[i];
-                lr.Dead = true;
+                lr.State = LiveState::Dead;
             }
         }
 
@@ -796,12 +825,16 @@ void RangeBuilder::InitializeParameterLocations(_In_ CallingConvention *pConvent
     for (size_t i = 0; i < m_parameters.size(); ++i)
     {
         ParameterRanges& ranges = entryBlock.BlockParameterRanges[i];
+
+        entryBlock.TraversalCountSlots.push_back(1);
+        size_t traversalCountSlot = entryBlock.TraversalCountSlots.size() - 1;
+
         ranges.push_back(
             { 
                 entryBlock.StartAddress,                // [StartAddress, StartAddress) -- "empty" until traversed
                 entryBlock.StartAddress,
-                { entryLocations[i], 1 },
-                false
+                { entryLocations[i], traversalCountSlot },
+                LiveState::Live
             });
     }
 }
@@ -941,6 +974,7 @@ void RangeBuilder::CreateLiveRangeSets()
             ULONG traversalCount = bb.TraversalCount;
 
             auto&& pr = bb.BlockParameterRanges[p];
+            auto&& tc = bb.TraversalCountSlots;
 
             //
             // Ranges may have gotten out of order linearly depending on how many control flows entered the 
@@ -967,7 +1001,7 @@ void RangeBuilder::CreateLiveRangeSets()
                     //        there are no better options, we should be able to plumb this upward.
                     //
                     LocationRange const& lr = pr[i];
-                    if (lr.ParamLocation.TraversalCount == traversalCount && lr.EndAddress > instrp &&
+                    if (tc[lr.ParamLocation.TraversalCountSlot] == traversalCount && lr.EndAddress > instrp &&
                         lr.EndAddress > lr.StartAddress)
                     {
                         pLR = &lr;

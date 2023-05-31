@@ -72,7 +72,20 @@ private:
     struct LocationInfo
     {
         SvcSymbolLocation ParamLocation;
-        ULONG TraversalCount;
+        size_t TraversalCountSlot;
+    };
+
+    enum class LiveState
+    {
+        // The given location is still live
+        Live,
+        
+        // The given location is marked for kill during the processing of an instruction.  After the instruction
+        // finishes processing, it will change to dead.
+        MarkedForKill,
+
+        // The given location is dead.  No further processing or aliasing is required.
+        Dead,
     };
 
     // LocationRange:
@@ -84,7 +97,7 @@ private:
         ULONG64 StartAddress;
         ULONG64 EndAddress;
         LocationInfo ParamLocation;
-        bool Dead;
+        LiveState State;
     };
 
     // ParameterRanges:
@@ -112,6 +125,7 @@ private:
         // The locations of parameters within this basic block.
         //
         std::vector<ParameterRanges> BlockParameterRanges;
+        std::vector<ULONG> TraversalCountSlots;
 
         // How many times has our traversal entered this basic block.
         ULONG TraversalCount;
