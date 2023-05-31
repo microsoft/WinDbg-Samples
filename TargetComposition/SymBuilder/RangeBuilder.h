@@ -44,6 +44,15 @@ public:
 
 private:
 
+    // The maximum number of times that a basic block can be traversed before we consider it an error.  There
+    // are circumstances where we might not understand call semantics (e.g.: callee cleaned stack) which might cause
+    // us to keep seeing alternate stack locations in a basic block.
+    //
+    // If we hit this, we consider it a failure to propagate the live ranges.
+    //
+    static constexpr ULONG MaximumTraversalCount = 16;
+
+    // A constant defining no register
     static constexpr ULONG NoRegister = static_cast<ULONG>(-1);
 
     //*************************************************

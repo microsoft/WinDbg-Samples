@@ -764,7 +764,11 @@ void RangeBuilder::TraverseBasicBlock(_In_ TraversalEntry const& entry)
     }
 
     bool firstTraversal = (bbInfo.TraversalCount == 0);
-    ++bbInfo.TraversalCount;
+
+    if (++bbInfo.TraversalCount > MaximumTraversalCount)
+    {
+        throw std::runtime_error("Unable to propagate live ranges: maximum basic block traversal count exceeded");
+    }
 
     //
     // We only want to traverse this block if it's the first time we've hit this block *OR* there has been
@@ -872,6 +876,15 @@ void RangeBuilder::PropagateParameterRanges(_In_ FunctionSymbol *pFunction,
         m_pConvention = pConvention;
         CheckHr(pFunction->GetOffset(&m_functionOffset));
         CheckHr(pFunction->InternalGetSymbolSet()->GetModule()->GetBaseAddress(&m_modBase));
+
+        //
+        // If there are existing live ranges on any of the parameters, they need to be deleted at this point.
+        // Care needs to be taken to synchronize everything here properly.
+        //
+        for (auto&& pParam : m_parameters)
+        {
+            pParam->InternalDeleteAllLiveRanges();
+        }
 
         Object disResult = m_dis.CallMethod(L"DisassembleFunction", m_modBase + m_functionOffset);
         Object bbs = disResult.KeyValue(L"BasicBlocks");
