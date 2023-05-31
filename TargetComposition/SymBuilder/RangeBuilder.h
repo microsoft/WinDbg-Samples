@@ -50,7 +50,7 @@ private:
     //
     // If we hit this, we consider it a failure to propagate the live ranges.
     //
-    static constexpr ULONG MaximumTraversalCount = 16;
+    static constexpr ULONG MaximumTraversalCount = 1024;
 
     // A constant defining no register
     static constexpr ULONG NoRegister = static_cast<ULONG>(-1);
@@ -95,6 +95,9 @@ private:
 
         // The given location is dead.  No further processing or aliasing is required.
         Dead,
+
+        // The given location is live as of the end of the block.
+        LiveAtEndOfBlock
     };
 
     // LocationRange:
@@ -204,10 +207,28 @@ private:
         LONG64 ConstantValue;       // immediate
     };
 
+    // InstructionInfo:
+    //
+    // Information about an instruction
+    //
+    struct InstructionInfo
+    {
+        ULONG64 Address;
+        ULONG64 Length;
+        RecognizedInstruction Instr;
+        bool IsCall;
+        size_t NumOperands;
+        OperandInfo Operands[4];
+    };
+
     std::unordered_map<ULONG64, BasicBlockInfo> m_bbInfo;
     std::queue<TraversalEntry> m_bbTrav;
     std::vector<VariableSymbol *> m_parameters;
     std::unordered_map<ULONG, ULONG> m_disRegToCanonical;           // Maps disassembler IDs to canonical ones
+
+    InstructionInfo m_processingWindow[3];                          // Window of last three instructions walked
+    size_t m_processingWindowCur;
+    size_t m_processingWindowSize;
 
     //*************************************************
     // Private Methods:
@@ -320,6 +341,12 @@ private:
     //
     void GetOperandInfo(_In_ Object& operand, _Out_ OperandInfo *pOperandInfo);
 
+    // GetInstructionInfo():
+    //
+    // Gets instruction information from a data model disassembler instruction object.
+    //
+    void GetInstructionInfo(_In_ Object& instr, _Out_ InstructionInfo *pInstructionInfo);
+
     // OperandToLocation():
     //
     // Given the operand, fill in a location structure for it.  False is returned if we cannot do such.
@@ -364,6 +391,33 @@ private:
     // Is this a "*" instruction (or the equivalent on whatever architecture we understand)
     //
     RecognizedInstruction GetRecognizedInstruction(_In_ std::wstring const& mnemonic);
+
+    // FindFirst*():
+    //
+    // Finds the first input/output/immediate operand in the instruction or returns nullptr if there is no such
+    // operand.
+    //
+    OperandInfo const *FindFirstInput(_In_ InstructionInfo const& instructionInfo);
+    OperandInfo const *FindFirstOutput(_In_ InstructionInfo const& instructionInfo);
+    OperandInfo const *FindFirstImmediate(_In_ InstructionInfo const& instructionInfo);
+
+    // GetPreviousInstructionN():
+    //
+    // Gets the Nth previous instruction which was processed where 'n' defaults to 1.  If such instruction is
+    // not in the cache, nullptr is returned.  Note that it is assumed that the current instruction is not in
+    // the processing window.
+    //
+    InstructionInfo *GetPreviousInstructionN(_In_ size_t nback = 1)
+    {
+        if (m_processingWindowSize < nback)
+        {
+            return nullptr;
+        }
+        size_t pos = m_processingWindowCur;
+        if (pos < nback) { pos += ARRAYSIZE(m_processingWindow); }
+        pos -= nback;
+        return &(m_processingWindow[pos]);
+    }
 
 };
 

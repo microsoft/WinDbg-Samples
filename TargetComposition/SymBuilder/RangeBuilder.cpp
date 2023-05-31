@@ -308,6 +308,15 @@ void RangeBuilder::GetOperandInfo(_In_ Object& operand, _Out_ OperandInfo *pOper
         pOperandInfo->ConstantValue = immVal;
     }
 
+    //
+    // Anything which is an immediate operand is an input to the instruction's operation.  The data model
+    // disassembler doesn't mark it that way currently.  Make sure we do.
+    //
+    if (isImmediate && !isInput && !isOutput)
+    {
+        pOperandInfo->Flags |= OperandInput;
+    }
+
     size_t regNum = 0;
     bool hasScale = false;
 
@@ -338,6 +347,86 @@ void RangeBuilder::GetOperandInfo(_In_ Object& operand, _Out_ OperandInfo *pOper
             hasScale = true;
         }
     }
+}
+
+void RangeBuilder::GetInstructionInfo(_In_ Object& instr, _Out_ InstructionInfo *pInstructionInfo)
+{
+    Object instrAttrs = instr.KeyValue(L"Attributes");
+
+    pInstructionInfo->Address = (ULONG64)instr.KeyValue(L"Address");
+    pInstructionInfo->Length = (ULONG64)instr.KeyValue(L"Length");
+    pInstructionInfo->IsCall = (bool)instrAttrs.KeyValue(L"IsCall");
+
+    //
+    // Unfortunately, the data model disassembler does not presently have a property that gets
+    // us the instruction or mnemonic.  We need to grab this from the string conversion.
+    //
+    std::wstring instrStr = instr.ToDisplayString();
+    wchar_t const *pc = instrStr.c_str();
+    wchar_t const *pe = pc;
+    while (*pe && !iswspace(*pe)) { ++pe; }
+    std::wstring mnemonic(pc, pe - pc);
+    pInstructionInfo->Instr = GetRecognizedInstruction(mnemonic);
+    
+    pInstructionInfo->NumOperands = 0;
+
+    for (auto&& operand : instr.KeyValue(L"Operands"))
+    {
+        if (pInstructionInfo->NumOperands >= ARRAYSIZE(pInstructionInfo->Operands))
+        {
+            throw std::logic_error("Unexpected number of operands on instruction");
+        }
+        GetOperandInfo(operand, &(pInstructionInfo->Operands[pInstructionInfo->NumOperands]));
+
+        //
+        // NOTE: There is a bug in the data model disassembler that the second operand for a LEA instruction
+        //       is marked as neither input nor output.  We need to work around that in order to appropriately
+        //       alias LEA references.
+        //
+        if (pInstructionInfo->Instr == RecognizedInstruction::Lea && pInstructionInfo->NumOperands == 1)
+        {
+            pInstructionInfo->Operands[pInstructionInfo->NumOperands].Flags |= OperandInput;
+        }
+
+        pInstructionInfo->NumOperands++;
+    }
+}
+
+RangeBuilder::OperandInfo const *RangeBuilder::FindFirstInput(_In_ InstructionInfo const& instructionInfo)
+{
+    for (size_t i = 0; i < instructionInfo.NumOperands; ++i)
+    {
+        if ((instructionInfo.Operands[i].Flags & OperandInput) != 0)
+        {
+            return &instructionInfo.Operands[i];
+        }
+    }
+    return nullptr;
+}
+
+RangeBuilder::OperandInfo const *RangeBuilder::FindFirstOutput(_In_ InstructionInfo const& instructionInfo)
+{
+    for (size_t i = 0; i < instructionInfo.NumOperands; ++i)
+    {
+        if ((instructionInfo.Operands[i].Flags & OperandOutput) != 0)
+        {
+            return &instructionInfo.Operands[i];
+        }
+    }
+    return nullptr;
+}
+
+RangeBuilder::OperandInfo const *RangeBuilder::FindFirstImmediate(_In_ InstructionInfo const& instructionInfo)
+{
+    for (size_t i = 0; i < instructionInfo.NumOperands; ++i)
+    {
+        if ((instructionInfo.Operands[i].Flags & OperandImmediate) != 0 &&
+            instructionInfo.Operands[i].Regs[0] == NoRegister)
+        {
+            return &instructionInfo.Operands[i];
+        }
+    }
+    return nullptr;
 }
 
 bool RangeBuilder::CarryoverLiveRange(_In_ BasicBlockInfo& bbTo,
@@ -410,7 +499,8 @@ bool RangeBuilder::CarryoverLiveRanges(_In_ BasicBlockInfo& bbFrom,
             //
             LocationRange const& lr = pr[i];
             if (lr.StartAddress <= entry.SourceBlockInstructionAddress &&
-                lr.EndAddress > entry.SourceBlockInstructionAddress)
+                lr.EndAddress > entry.SourceBlockInstructionAddress &&
+                lr.State == LiveState::LiveAtEndOfBlock)
             {
                 changedRanges = CarryoverLiveRange(bbTo, p, lr);
             }
@@ -436,14 +526,14 @@ RangeBuilder::RecognizedInstruction RangeBuilder::GetRecognizedInstruction(_In_ 
 
 void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ Object instr)
 {
-    ULONG64 instrAddr = (ULONG64)instr.KeyValue(L"Address");
-    ULONG64 instrLength = (ULONG64)instr.KeyValue(L"Length");
+    auto pSymbolSet = m_pFunction->InternalGetSymbolSet();
+    auto pSymManager = pSymbolSet->GetSymbolBuilderManager();
     ULONG spId = m_pConvention->GetSpId();
 
-    Object instrAttrs = instr.KeyValue(L"Attributes");
-    bool isCall = (bool)instrAttrs.KeyValue(L"IsCall");
+    InstructionInfo curInstr;
+    GetInstructionInfo(instr, &curInstr);
 
-    if (isCall)
+    if (curInstr.IsCall)
     {
         //
         // A call is only guaranteed to preserve registers which are non-volatile by calling convention.
@@ -469,7 +559,7 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                         //
                         lr.State = LiveState::MarkedForKill;
                     }
-                    lr.EndAddress += instrLength;
+                    lr.EndAddress += curInstr.Length;
                 }
             }
         }
@@ -483,70 +573,17 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
     }
     else
     {
-        size_t numOperands = 0;
-        OperandInfo oprnds[4];
-
-        size_t numInputs = 0;
-        OperandInfo *pInput = nullptr;
-        size_t numOutputs = 0;
-        OperandInfo *pOutput = nullptr;
-        OperandInfo *pImmediate = nullptr;
         OperandInfo implicit;
-        OperandInfo *pImplicit = nullptr;
-
-        //
-        // Unfortunately, the data model disassembler does not presently have a property that gets
-        // us the instruction or mnemonic.  We need to grab this from the string conversion.
-        //
-        std::wstring instrStr = instr.ToDisplayString();
-        wchar_t const *pc = instrStr.c_str();
-        wchar_t const *pe = pc;
-        while (*pe && !iswspace(*pe)) { ++pe; }
-        std::wstring mnemonic(pc, pe - pc);
-
-        RecognizedInstruction insKind = GetRecognizedInstruction(mnemonic);
-
-        for (auto&& operand : instr.KeyValue(L"Operands"))
-        {
-            if (numOperands >= ARRAYSIZE(oprnds))
-            {
-                throw std::logic_error("Unexpected number of operands on instruction");
-            }
-            GetOperandInfo(operand, &oprnds[numOperands]);
-
-            //
-            // NOTE: There is a bug in the data model disassembler that the second operand for a LEA instruction
-            //       is marked as neither input nor output.  We need to work around that in order to appropriately
-            //       alias LEA references.
-            //
-            if ((oprnds[numOperands].Flags & OperandInput) != 0 ||
-                (insKind == RecognizedInstruction::Lea && numOperands == 1))
-            {
-                numInputs++;
-                pInput = &(oprnds[numOperands]);
-                if (insKind == RecognizedInstruction::Lea && numOperands == 1)
-                {
-                    oprnds[numOperands].Flags |= OperandInput;
-                }
-            }
-            if ((oprnds[numOperands].Flags & OperandOutput) != 0)
-            {
-                numOutputs++;
-                pOutput = &(oprnds[numOperands]);
-            }
-            if ((oprnds[numOperands].Flags & OperandImmediate) != 0 && oprnds[numOperands].Regs[0] == NoRegister)
-            {
-                pImmediate = &(oprnds[numOperands]);
-            }
-
-            numOperands++;
-        }
+        OperandInfo const *pImplicit = nullptr;
+        OperandInfo const *pInput = FindFirstInput(curInstr);
+        OperandInfo const *pOutput = FindFirstOutput(curInstr);
+        OperandInfo const *pImmediate = FindFirstImmediate(curInstr);
 
         //
         // Are there implicit operands we need to deal with.  A "push rcx" instruction, for instance, will
         // only have "rcx" as an operand but there is an implicit write to "rsp" in doing so.
         //
-        switch(insKind)
+        switch(curInstr.Instr)
         {
             case RecognizedInstruction::Push:
             case RecognizedInstruction::Pop:
@@ -569,9 +606,9 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                 LocationRange &lr = pr[i];
                 if (lr.State == LiveState::Live)
                 {
-                    for (size_t o = 0; o < numOperands; ++o)
+                    for (size_t o = 0; o < curInstr.NumOperands; ++o)
                     {
-                        OperandInfo &opInfo = oprnds[o];
+                        OperandInfo& opInfo = curInstr.Operands[o];
                         if (CheckForKill(opInfo, lr))
                         {
                             lr.State = LiveState::MarkedForKill;
@@ -588,15 +625,15 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                         lr.State = LiveState::MarkedForKill;
                     }
 
-                    lr.EndAddress += instrLength;
+                    lr.EndAddress += curInstr.Length;
                 }
             }
         }
 
         //
-        // Deal with any instruction level semantics...
+        // Deal with any instruction level semantics that might cause aliasing or other such semantics...
         //
-        if (numInputs <= 1 && numOutputs <= 1 && insKind != RecognizedInstruction::Unknown)
+        if (curInstr.Instr != RecognizedInstruction::Unknown)
         {
             for (size_t p = 0; p < block.BlockParameterRanges.size(); ++p)
             {
@@ -605,14 +642,20 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                 for (size_t i = 0; i < pr.size(); ++i)
                 {
                     LocationRange &lr = pr[i];
-                    if (lr.State != LiveState::Dead && instrAddr >= lr.StartAddress && instrAddr < lr.EndAddress)
+                    if (lr.State != LiveState::Dead && lr.State != LiveState::LiveAtEndOfBlock &&
+                        curInstr.Address >= lr.StartAddress && curInstr.Address < lr.EndAddress)
                     {
                         OperandInfo op1, op2, op3;
-                        OperandInfo *pInUsage = pInput;
-                        OperandInfo* pOutUsage = pOutput;
                         
-                        switch(insKind)
+                        switch(curInstr.Instr)
                         {
+                            case RecognizedInstruction::Mov:
+                            {
+                                CheckAddAlias(curInstr.Address, curInstr.Length, *pOutput, *pInput, lr, pr);
+                                handled = true;
+                                break;
+                            }
+
                             case RecognizedInstruction::Lea:
                             {
                                 //
@@ -629,7 +672,7 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                                 op1 = *pInput;
                                 op1.Flags &= ~OperandMemory;
                                 op1.Flags |= OperandRegister | OperandImmediate;
-                                CheckAddAlias(instrAddr, instrLength, *pOutUsage, op1, lr, pr);
+                                CheckAddAlias(curInstr.Address, curInstr.Length, *pOutput, op1, lr, pr);
                                 handled = true;
                                 break;
                             }
@@ -651,8 +694,8 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                                 BuildOperand(spId, true, op1);                              // in: rsp
                                 BuildOperand(spId, false, op2, -8);                         // in: rsp - 8
                                 BuildOperand(spId, false, op3, 0, true);                    // out: [rsp]
-                                CheckAddAlias(instrAddr, instrLength, op1, op2, lr, pr);
-                                CheckAddAlias(instrAddr, instrLength, op3, *pInUsage, lr, pr);
+                                CheckAddAlias(curInstr.Address, curInstr.Length, op1, op2, lr, pr);
+                                CheckAddAlias(curInstr.Address, curInstr.Length, op3, *pInput, lr, pr);
                                 handled = true;
                                 break;
                             }
@@ -672,8 +715,8 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                                 BuildOperand(spId, false, op1, 0, true);                    // in: [rsp]
                                 BuildOperand(spId, true, op2);                              // out: rsp
                                 BuildOperand(spId, false, op3, 8);                          // in: rsp + 8
-                                CheckAddAlias(instrAddr, instrLength, *pOutUsage, op1, lr, pr);
-                                CheckAddAlias(instrAddr, instrLength, op2, op3, lr, pr);
+                                CheckAddAlias(curInstr.Address, curInstr.Length, *pOutput, op1, lr, pr);
+                                CheckAddAlias(curInstr.Address, curInstr.Length, op2, op3, lr, pr);
                                 handled = true;
                                 break;
                             }
@@ -681,6 +724,94 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                             case RecognizedInstruction::Sub:
                             case RecognizedInstruction::Add:
                             {
+                                //
+                                // There are some very recognizable patterns around __chkstk which will seriously
+                                // impact our ability to propagate parameter ranges without a deep understanding
+                                // of the semantics of the method.  We will specially encode this hand-assembly 
+                                // coded function that appears in many places and this pattern:
+                                //
+                                //     mov [eax/rax], <size>
+                                //     call __chkstk
+                                //     sub rsp, rax
+                                //
+                                // We will instead rewrite the sub instruction (for the purposes of aliasing) as:
+                                //
+                                //     sub rsp, <size>
+                                //
+                                // If we recognize this pattern and symbol.
+                                //
+                                if (pOutput && !pImmediate && pInput == pOutput &&  
+                                    curInstr.NumOperands == 2 && 
+                                    curInstr.Instr == RecognizedInstruction::Sub &&
+                                    (curInstr.Operands[1].Flags & (OperandRegister | OperandInput | OperandMemory)) ==
+                                        (OperandRegister | OperandInput) &&
+                                    pOutput->Regs[0] == spId)
+                                {
+                                    //
+                                    // At this point, we've seen a sub rsp, <register>.  Look for the pattern.
+                                    //
+                                    InstructionInfo *pNMinus1 = GetPreviousInstructionN(1);
+                                    InstructionInfo *pNMinus2 = GetPreviousInstructionN(2);
+
+                                    if (pNMinus1 && pNMinus2 &&
+                                        pNMinus2->Address + pNMinus2->Length == pNMinus1->Address &&
+                                        pNMinus1->Address + pNMinus1->Length == curInstr.Address &&
+                                        pNMinus2->Instr == RecognizedInstruction::Mov &&
+                                        pNMinus1->IsCall)
+                                    {
+                                        //
+                                        // At this point, we have a recognized
+                                        //
+                                        // mov <reg1>, <size>
+                                        // call <something>
+                                        // sub rsp, <reg2>
+                                        //
+                                        OperandInfo const *pOutputNMinus2 = FindFirstOutput(*pNMinus2);
+                                        OperandInfo const *pImmNMinus2 = FindFirstImmediate(*pNMinus2);
+                                        OperandInfo const *pImmNMinus1 = FindFirstImmediate(*pNMinus1);
+                                        if (pImmNMinus2 && pOutputNMinus2 && pImmNMinus1)
+                                        {
+                                            RegisterInformation *pSrc;
+                                            RegisterInformation *pDest;
+                                            CheckHr(pSymManager->FindInformationForRegisterById(pOutputNMinus2->Regs[0], &pSrc));
+                                            CheckHr(pSymManager->FindInformationForRegisterById(curInstr.Operands[1].Regs[0], &pDest));
+
+                                            if (pOutputNMinus2->Regs[0] == curInstr.Operands[1].Regs[0] ||
+                                                GetBaseRegister(pOutputNMinus2->Regs[0]) == curInstr.Operands[1].Regs[0])
+                                            {
+                                                bool isChkStk = false;
+                                                ULONG64 offs = pImmNMinus1->ConstantValue - m_modBase;
+                                                ComPtr<ISvcSymbol> spSymbol;
+                                                ULONG64 displacement;
+                                                HRESULT hrSym = pSymbolSet->FindSymbolByOffset(offs,
+                                                                                               true,
+                                                                                               &spSymbol,
+                                                                                               &displacement);
+                                                if (SUCCEEDED(hrSym) && displacement == 0)
+                                                {
+                                                    BSTR symName;
+                                                    if (SUCCEEDED(spSymbol->GetName(&symName)))
+                                                    {
+                                                        isChkStk = (wcscmp(symName, L"__chkstk") == 0);
+                                                        SysFreeString(symName);
+                                                    }
+                                                }
+
+                                                if (isChkStk)
+                                                {
+                                                    //
+                                                    // We've recognized the pattern.  Substitute the <reg2> with
+                                                    // the immediate from the mov <reg1>, <size> for the purposes
+                                                    // of handling the sub.
+                                                    //
+                                                    op2 = *pImmNMinus2;
+                                                    pImmediate = &op2;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 //
                                 // Slightly different semantic.  Instead of:
                                 //
@@ -700,20 +831,16 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                                     (pOutput->Flags & (OperandRegister | OperandMemory)) == OperandRegister)
                                 {
                                     op1 = *pOutput;
-                                    op1.ConstantValue = (insKind == RecognizedInstruction::Add ? 
+                                    op1.ConstantValue = (curInstr.Instr == RecognizedInstruction::Add ? 
                                                              pImmediate->ConstantValue : -pImmediate->ConstantValue);
                                     op1.Flags |= OperandImmediate;
-                                    CheckAddAlias(instrAddr, instrLength, *pOutUsage, op1, lr, pr);
+                                    CheckAddAlias(curInstr.Address, curInstr.Length, *pOutput, op1, lr, pr);
                                     handled = true;
                                 }
 
+
                                 break;
                             }
-                        }
-
-                        if (pOutput != nullptr && pInput != nullptr && !handled)
-                        {
-                            CheckAddAlias(instrAddr, instrLength, *pOutput, *pInUsage, lr, pr);
                         }
                     }
                 }
@@ -736,6 +863,17 @@ void RangeBuilder::UpdateRangesForInstruction(_In_ BasicBlockInfo& block, _In_ O
                 lr.State = LiveState::Dead;
             }
         }
+    }
+
+    //
+    // Update the processing window so that we can go back and deal with some particular patterns that might
+    // be interesting.
+    //
+    m_processingWindow[m_processingWindowCur] = curInstr;
+    m_processingWindowCur = (m_processingWindowCur + 1) % ARRAYSIZE(m_processingWindow);
+    if (m_processingWindowSize < ARRAYSIZE(m_processingWindow))
+    {
+        ++m_processingWindowSize;
     }
 }
 
@@ -787,8 +925,8 @@ void RangeBuilder::TraverseBasicBlock(_In_ TraversalEntry const& entry)
         }
 
         //
-        // At the end of the basic block, mark every range as "dead" so that a subsequent traversal inbound
-        // from another basic block does not attempt to update those ranges again.
+        // At the end of the basic block, mark every range as "live at end of block" so that a subsequent traversal 
+        // inbound from another basic block does not attempt to update those ranges again.
         //
         for (size_t p = 0; p < bbInfo.BlockParameterRanges.size(); ++p)
         {
@@ -796,7 +934,10 @@ void RangeBuilder::TraverseBasicBlock(_In_ TraversalEntry const& entry)
             for (size_t i = 0; i < pr.size(); ++i)
             {
                 LocationRange & lr = pr[i];
-                lr.State = LiveState::Dead;
+                if (lr.State == LiveState::Live)
+                {
+                    lr.State = LiveState::LiveAtEndOfBlock;
+                }
             }
         }
 
@@ -852,6 +993,8 @@ void RangeBuilder::PropagateParameterRanges(_In_ FunctionSymbol *pFunction,
         std::swap(m_bbTrav, emptyQueue);
     }
     m_parameters.clear();
+
+    m_processingWindowCur = m_processingWindowSize = 0;
 
     //
     // Build a quick index of the parameters of the function.  If there are none, we need do nothing.

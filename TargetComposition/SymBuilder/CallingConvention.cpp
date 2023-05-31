@@ -130,10 +130,11 @@ void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCo
     }
 
     //
-    // On entry into the callee, rsp points to the return address.  rsp + 8 would point to the first stack based
-    // parameter
+    // On entry into the callee, rsp points to the return address.  rsp + 8 would point to the shadow space
+    // for the first four (rcx, rdx, r8, r9) arguments.  rsp + 8 + 32 would point to the first stack based
+    // parameter.
     //
-    ULONG64 stackOffset = 8;
+    ULONG64 stackOffset = 40;
     for (size_t i = 0; i < paramCount; ++i)
     {
         VariableSymbol *pParameter = ppParameters[i];
