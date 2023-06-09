@@ -197,6 +197,7 @@ HRESULT SymbolBuilderManager::InitArchBased()
 
         m_regInfosById.clear();
         m_regIds.clear();
+        m_spDefaultCallingConvention = nullptr;
 
         ComPtr<ISvcRegisterEnumerator> spRegEnum;
         IfFailedReturn(m_spArchInfo->EnumerateRegisters(static_cast<SvcContextFlags>(
@@ -220,8 +221,87 @@ HRESULT SymbolBuilderManager::InitArchBased()
             ULONG regId = spRegInfo->GetId();
             ULONG regSize = spRegInfo->GetSize();
 
-            m_regInfosById.insert( { regId, { regName, regId, regSize } } );
+            ULONG parentId;
+            ULONG subLsb = 0;
+            ULONG subMsb = 0;
+            HRESULT hrSubRegister = spRegInfo->GetSubRegisterInformation(&parentId, &subLsb, &subMsb);
+            if (FAILED(hrSubRegister))
+            {
+                parentId = static_cast<ULONG>(-1);
+            }
+            else
+            {
+                //
+                // Work around a bug where some sub-registers are being reported as the size of the base parent
+                // register.  As we have the bit mappings within the parent register, this is easy to detect.
+                //
+                ULONG subMappingSize = (subMsb - subLsb + 1) / 8;
+                if (subMappingSize < regSize)
+                {
+                    regSize = subMappingSize;
+                }
+            }
+
+            m_regInfosById.insert({ regId, { regName, regId, regSize, parentId, subLsb, subMsb, { } } });
             m_regIds.insert( { regName, regId } );
+        }
+
+        //
+        // Go through and add all sub-register (parent->child) mappings for quick lookup.  
+        //
+        for (auto&& kvp : m_regInfosById)
+        {
+            RegisterInformation const& childInfo = kvp.second;
+            if (childInfo.ParentId != static_cast<ULONG>(-1))
+            {
+                auto itp = m_regInfosById.find(childInfo.ParentId);
+                if (itp == m_regInfosById.end())
+                {
+                    //
+                    // The architecture service gave us a mapping for which it did not define the parent
+                    // register.  This is broken.
+                    //
+                    return E_UNEXPECTED;
+                }
+
+                RegisterInformation &parentInfo = itp->second;
+                parentInfo.SubRegisters.push_back(childInfo.Id);
+            }
+        }
+
+        //
+        // If we can identify the underlying platform and it is Windows, use that.  If we cannot identify
+        // the underlying platform, assume it's Windows (as that is the default for WinDbg).  Initialize
+        // some basic calling convention information between the architecture and platform.
+        //
+        SvcOSPlatform plat = SvcOSPlatWindows;
+        if (m_spOSPlatformInformation != nullptr)
+        {
+            IfFailedReturn(m_spOSPlatformInformation->GetOSPlatform(&plat));
+        }
+
+        ULONG arch = m_spArchInfo->GetArchitecture();
+        switch(arch)
+        {
+            case IMAGE_FILE_MACHINE_AMD64:
+            {
+                if (plat == SvcOSPlatWindows)
+                {
+                    m_spDefaultCallingConvention = std::make_unique<CallingConvention_Windows_AMD64>(this);
+                    if (m_spDefaultCallingConvention == nullptr)
+                    {
+                        return E_OUTOFMEMORY;
+                    }
+                    break;
+                }
+            }
+            default:
+                //
+                // Right now, we do not understand the default calling convention of this platform.  That
+                // simply means we cannot auto-propagate live ranges by walking the control flow graph
+                // of disassembled functions.
+                //
+                break;
         }
 
         return hr;
@@ -567,6 +647,19 @@ HRESULT SymbolBuilderManager::FindInformationForRegisterById(_In_ ULONG id,
     }
 
     *ppRegisterInfo = &(itr->second);
+    return S_OK;
+}
+
+HRESULT SymbolBuilderManager::GetDefaultCallingConvention(_Outptr_ CallingConvention **ppDefaultConvention)
+{
+    *ppDefaultConvention = nullptr;
+
+    if (m_spDefaultCallingConvention == nullptr)
+    {
+        return E_NOT_SET;
+    }
+
+    *ppDefaultConvention = m_spDefaultCallingConvention.get();
     return S_OK;
 }
 

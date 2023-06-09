@@ -669,6 +669,19 @@ HRESULT SymbolSet::FindTypeByName(_In_ std::wstring const& typeName,
     }
 
     //
+    // If we have an underlying importer, give it a shot at pulling in symbols that are relevant for
+    // the name in question.  It may immediately turn around and say "I've already done this" but
+    // such is the price for an on demand import like this.
+    //
+    if (HasImporter() && allowAutoCreations)
+    {
+        //
+        // Failure to import should NOT trigger failure in the rest of the symbol builder!
+        //
+        (void)m_spImporter->ImportForNameQuery(SvcSymbolType, typeName.c_str());
+    }
+
+    //
     // We cannot let a C++ exception escape.
     //
     auto fn = [&]()

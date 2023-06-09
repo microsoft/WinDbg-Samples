@@ -11,6 +11,8 @@
     <ClCompile Include="SymbolSet.cpp" />
     <ClCompile Include="SymbolTypes.cpp" />
     <ClCompile Include="SymManager.cpp" />
+    <ClCompile Include="RangeBuilder.cpp" />
+    <ClCompile Include="CallingConvention.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ApiProvider.h" />
@@ -26,6 +28,8 @@
     <ClInclude Include="SymbolTypes.h" />
     <ClInclude Include="SymBuilder.h" />
     <ClInclude Include="SymManager.h" />
+    <ClInclude Include="RangeBuilder.h" />
+    <ClInclude Include="CallingConvention.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="SymBuilder.rc" />
