@@ -117,7 +117,7 @@ CallingConvention_Windows_AMD64::CallingConvention_Windows_AMD64(_In_ SymbolBuil
 }
 
 void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCount,
-                                                             _In_reads_(paramCount) VariableSymbol **ppParameters,
+                                                             _In_reads_(paramCount) VariableSymbol const **ppParameters,
                                                              _Out_writes_(paramCount) SvcSymbolLocation *pLocations)
 {
     //
@@ -137,7 +137,7 @@ void CallingConvention_Windows_AMD64::GetParameterPlacements(_In_ size_t paramCo
     ULONG64 stackOffset = 40;
     for (size_t i = 0; i < paramCount; ++i)
     {
-        VariableSymbol *pParameter = ppParameters[i];
+        VariableSymbol const *pParameter = ppParameters[i];
         ULONG64 symTypeId = pParameter->InternalGetSymbolTypeId();
 
         //

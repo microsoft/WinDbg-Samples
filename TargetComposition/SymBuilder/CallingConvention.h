@@ -48,7 +48,7 @@ public:
     // convention.
     //
     virtual void GetParameterPlacements(_In_ size_t paramCount,
-                                        _In_reads_(paramCount) VariableSymbol **ppParameters,
+                                        _In_reads_(paramCount) VariableSymbol const **ppParameters,
                                         _Out_writes_(paramCount) SvcSymbolLocation *pLocations) =0;
 
     // IsNonVolatile():
@@ -104,7 +104,7 @@ public:
     // convention.
     //
     virtual void GetParameterPlacements(_In_ size_t paramCount,
-                                        _In_reads_(paramCount) VariableSymbol **ppParameters,
+                                        _In_reads_(paramCount) VariableSymbol const **ppParameters,
                                         _Out_writes_(paramCount) SvcSymbolLocation *pLocations);
 
     // GetSpId():

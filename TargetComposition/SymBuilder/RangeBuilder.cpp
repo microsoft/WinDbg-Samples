@@ -963,7 +963,7 @@ void RangeBuilder::InitializeParameterLocations(_In_ CallingConvention *pConvent
     std::vector<SvcSymbolLocation> entryLocations(m_parameters.size());
 
     pConvention->GetParameterPlacements(m_parameters.size(),
-                                        &m_parameters[0],
+                                        const_cast<VariableSymbol const **>(& m_parameters[0]),
                                         &entryLocations[0]);
 
     entryBlock.BlockParameterRanges.resize(m_parameters.size());

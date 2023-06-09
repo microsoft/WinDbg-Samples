@@ -272,7 +272,7 @@ private:
     //
     // Bound generator for iterating over types within a symbol set.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& typesObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object typesObject,
                                                      _In_ ComPtr<SymbolSet>& spSymbolSet);
 
 };
@@ -434,7 +434,7 @@ private:
     //
     // Bound generator for iterating over fields within a type.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& fieldsObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object fieldsObject,
                                                      _In_ ComPtr<UdtTypeSymbol>& spUdtTypeSymbol);
 
 };
@@ -468,7 +468,7 @@ private:
     //
     // Bound generator for iterating over enumerants within an enum.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& enumObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object enumObject,
                                                      _In_ ComPtr<EnumTypeSymbol>& spEnumTypeSymbol);
 
 
@@ -564,7 +564,7 @@ private:
     //
     // Bound generator for iterating over fields within a type.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& baseClassesObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object baseClassesObject,
                                                      _In_ ComPtr<UdtTypeSymbol>& spUdtTypeSymbol);
 
 };
@@ -662,7 +662,7 @@ private:
     //
     // Bound generator for iterating over data within a symbol set.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& dataObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object dataObject,
                                                      _In_ ComPtr<SymbolSet>& spSymbolSet);
 
 };
@@ -745,7 +745,7 @@ private:
     //
     // Bound generator for iterating over functions within a symbol set.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& functionsObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object functionsObject,
                                                      _In_ ComPtr<SymbolSet>& spSymbolSet);
 
 };
@@ -840,7 +840,7 @@ private:
     //
     // Bound generator for iterating over parameters within a function.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& parametersObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object parametersObject,
                                                      _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 
     // ToString():
@@ -881,7 +881,7 @@ private:
     //
     // Bound generator for iterating over local variables within a function.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& localVariablesObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object localVariablesObject,
                                                      _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 
 };
@@ -998,7 +998,7 @@ private:
     //
     // Bound generator for iterating over parameters within a function.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& liveRangesObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object liveRangesObject,
                                                      _In_ ComPtr<VariableSymbol>& spVariableSymbol);
 };
 
@@ -1091,7 +1091,7 @@ private:
     //
     // Bound generator for iterating over address ranges of the code bytes of a function.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& addressRangesObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object addressRangesObject,
                                                      _In_ ComPtr<FunctionSymbol>& spFunctionSymbol);
 };
 
@@ -1146,7 +1146,7 @@ private:
     //
     // Bound generator for iterating over public symbols within a symbol set.
     //
-    std::experimental::generator<Object> GetIterator(_In_ const Object& publicsObject,
+    std::experimental::generator<Object> GetIterator(_In_ const Object publicsObject,
                                                      _In_ ComPtr<SymbolSet>& spSymbolSet);
 
 };
