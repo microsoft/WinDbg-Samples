@@ -136,12 +136,17 @@ std::wstring ValueToString(_In_ VARIANT const& val)
 //
 void GetSymbolBuilderManager(_In_ const HostContext& ctx,
                              _COM_Outptr_ ISvcSymbolBuilderManager **ppSymbolBuilderManager,
-                             _COM_Outptr_opt_ ISvcProcess **ppProcess)
+                             _COM_Outptr_opt_result_maybenull_ ISvcProcess **ppProcess,
+                             _Out_opt_ bool *pIsKernel)
 {
     *ppSymbolBuilderManager = nullptr;
     if (ppProcess != nullptr)
     {
         *ppProcess = nullptr;
+    }
+    if (pIsKernel != nullptr)
+    {
+        *pIsKernel = false;
     }
 
     //
@@ -154,9 +159,38 @@ void GetSymbolBuilderManager(_In_ const HostContext& ctx,
     ComPtr<IDebugServiceManager> spServiceManager;
     ComPtr<ISvcProcess> spServiceProcess;
     CheckHr(spBridge->GetServiceManager(&spServiceManager));
+
+    //
+    // Check whether we represent a kernel target.  Any target which is a hardware centric view (e.g.:
+    // a kernel debug connection, EXDI target, or other similar view) will have a DEBUG_SERVICE_MACHINE
+    // which supports ISvcMachineDebug.
+    //
+    // We also want a generalized address context for the kernel so that we can perform kernel memory reads
+    // that aren't associated with any particular process context.
+    //
+    bool isKernel = false;
+    ComPtr<ISvcMachineDebug> spMachineDebug;
+    ComPtr<ISvcAddressContext> spKernelAddressContext;
+
+    if (SUCCEEDED(spServiceManager->QueryService(DEBUG_SERVICE_MACHINE, IID_PPV_ARGS(&spMachineDebug))))
+    {
+        isKernel = true;
+        CheckHr(spMachineDebug->GetDefaultAddressContext(&spKernelAddressContext));
+    }
+
     if (ppProcess != nullptr)
     {
-        CheckHr(spBridge->GetServiceProcess(&spServiceProcess));
+        //
+        // For a kernel or hardware centric target, we may *NOT* have any process.  We may not even know
+        // what the concept of a process is.  It is okay for this to fail.  In such a case, we will
+        // synthesize a "SymbolBuilderProcess" which represents the kernel so that we can synthesize symbols
+        // for kernel modules.
+        //
+        HRESULT hrProcess = spBridge->GetServiceProcess(&spServiceProcess);
+        if (!isKernel)
+        {
+            CheckHr(hrProcess);
+        }
     }
 
     //
@@ -170,7 +204,7 @@ void GetSymbolBuilderManager(_In_ const HostContext& ctx,
                                               IID_PPV_ARGS(&spSymManager))))
     {
         ComPtr<SymbolBuilderManager> spManager;
-        CheckHr(MakeAndInitialize<SymbolBuilderManager>(&spManager));
+        CheckHr(MakeAndInitialize<SymbolBuilderManager>(&spManager, spKernelAddressContext.Get()));
         CheckHr(spManager->RegisterServices(spServiceManager.Get()));
         spSymManager = std::move(spManager);
 
@@ -203,6 +237,10 @@ void GetSymbolBuilderManager(_In_ const HostContext& ctx,
     if (ppProcess != nullptr)
     {
         *ppProcess = spServiceProcess.Detach();
+    }
+    if (pIsKernel != nullptr)
+    {
+        *pIsKernel = isKernel;
     }
 }
 
@@ -369,10 +407,11 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
 
     ComPtr<ISvcSymbolBuilderManager> spSymbolManager;
     ComPtr<ISvcProcess> spProcess;
-    GetSymbolBuilderManager(moduleContext, &spSymbolManager, &spProcess);
+    bool isKernel;
+    GetSymbolBuilderManager(moduleContext, &spSymbolManager, &spProcess, &isKernel);
 
     ComPtr<SymbolBuilderProcess> spSymbolProcess;
-    CheckHr(spSymbolManager->TrackProcess(spProcess.Get(), &spSymbolProcess));
+    CheckHr(spSymbolManager->TrackProcess(isKernel, spProcess.Get(), &spSymbolProcess));
 
     ComPtr<ISvcModule> spModule;
     CheckHr(spSymbolManager->ModuleBaseToModule(spProcess.Get(), moduleBase, &spModule));
@@ -433,10 +472,11 @@ Object ModuleExtension::GetSymbolBuilderSymbols(_In_ const Object& moduleObject)
 
     ComPtr<ISvcSymbolBuilderManager> spSymbolManager;
     ComPtr<ISvcProcess> spProcess;
-    GetSymbolBuilderManager(moduleContext, &spSymbolManager, &spProcess);
+    bool isKernel;
+    GetSymbolBuilderManager(moduleContext, &spSymbolManager, &spProcess, &isKernel);
 
     ComPtr<SymbolBuilderProcess> spSymbolProcess;
-    CheckHr(spSymbolManager->TrackProcess(spProcess.Get(), &spSymbolProcess));
+    CheckHr(spSymbolManager->TrackProcess(isKernel, spProcess.Get(), &spSymbolProcess));
 
     ULONG64 moduleBase = (ULONG64)moduleObject.KeyValue(L"BaseAddress");
 

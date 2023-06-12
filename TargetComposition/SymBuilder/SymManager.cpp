@@ -73,7 +73,8 @@ HRESULT SymbolBuilderProcess::CreateSymbolsForModule(_In_ ISvcModule *pModule,
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
+HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ bool isKernel,
+                                                 _In_ ULONG64 processKey,
                                                  _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
@@ -84,7 +85,7 @@ HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
     auto it = m_trackedProcesses.find(processKey);
     if (it == m_trackedProcesses.end())
     {
-        IfFailedReturn(MakeAndInitialize<SymbolBuilderProcess>(&spProcess, processKey, this));
+        IfFailedReturn(MakeAndInitialize<SymbolBuilderProcess>(&spProcess, isKernel, processKey, this));
 
         //
         // We cannot let an exception escape the COM boundary.
@@ -105,35 +106,72 @@ HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ ISvcModule *pModule, 
+HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ bool isKernel,
+                                                    _In_ ISvcModule *pModule, 
                                                     _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
     *ppProcess = nullptr;
 
-    ULONG64 processKey;
-    IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
+    //
+    // See comments in ::TrackProcess.  For now, we won't track individual processes for a kernel mode target.
+    //
+    ULONG64 processKey = 0;
+    if (!isKernel)
+    {
+        IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
+    }
 
     ComPtr<SymbolBuilderProcess> spProcess;
-    IfFailedReturn(TrackProcessForKey(processKey, &spProcess));
+    IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcess(_In_ ISvcProcess *pProcess, 
+HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
+                                           _In_opt_ ISvcProcess *pProcess, 
                                            _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
     *ppProcess = nullptr;
 
-    ULONG64 processKey;
-    IfFailedReturn(pProcess->GetKey(&processKey));
+    if (pProcess == nullptr && !isKernel)
+    {
+        return E_INVALIDARG;
+    }
+
+    //
+    // For now, we won't track individual processes for a kernel mode target.  This does prevent us from completely
+    // dealing with user mode modules in a kernel target, but there are other issues which make that somewhat
+    // problematic at the moment (e.g.: at the moment, the module enumeration service for kernel targets only
+    // produces kernel mode modules)
+    //
+    ULONG64 processKey = 0;
+    if (!isKernel)
+    {
+        IfFailedReturn(pProcess->GetKey(&processKey));
+    }
 
     ComPtr<SymbolBuilderProcess> spProcess;
-    IfFailedReturn(TrackProcessForKey(processKey, &spProcess));
+    IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
+    return hr;
+}
+
+HRESULT SymbolBuilderManager::GetKernelAddressContext(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext)
+{
+    HRESULT hr = S_OK;
+    *ppKernelAddressContext = nullptr;
+
+    if (m_spKernelAddressContext == nullptr)
+    {
+        return E_NOT_SET;
+    }
+
+    ComPtr<ISvcAddressContext> spKernelAddressContext = m_spKernelAddressContext;
+    *ppKernelAddressContext = spKernelAddressContext.Detach();
     return hr;
 }
 
