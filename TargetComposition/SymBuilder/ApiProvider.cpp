@@ -837,7 +837,7 @@ Object TypesObject::CreateEnum(_In_ const Object& /*typesObject*/,
     return enumTypeFactory.CreateInstance(spEnum);
 }
 
-std::experimental::generator<Object> TypesObject::GetIterator(_In_ const Object& /*typesObject*/,
+std::experimental::generator<Object> TypesObject::GetIterator(_In_ const Object /*typesObject*/,
                                                               _In_ ComPtr<SymbolSet>& spSymbolSet)
 {
     //
@@ -1026,7 +1026,7 @@ Object EnumTypeObject::GetEnumerants(_In_ const Object& /*enumObject*/,
 // Fields APIs:
 //
 
-std::experimental::generator<Object> FieldsObject::GetIterator(_In_ const Object& /*fieldsObject*/,
+std::experimental::generator<Object> FieldsObject::GetIterator(_In_ const Object /*fieldsObject*/,
                                                                _In_ ComPtr<UdtTypeSymbol>& spUdtTypeSymbol)
 {
     //
@@ -1101,7 +1101,7 @@ Object FieldsObject::Add(_In_ const Object& /*fieldsObject*/,
 // Enumerants APIs:
 //
 
-std::experimental::generator<Object> EnumerantsObject::GetIterator(_In_ const Object& /*enumerantsObject*/,
+std::experimental::generator<Object> EnumerantsObject::GetIterator(_In_ const Object /*enumerantsObject*/,
                                                                    _In_ ComPtr<EnumTypeSymbol>& spEnumTypeSymbol)
 {
     //
@@ -1368,7 +1368,7 @@ void FieldObject::SetType(_In_ const Object& /*fieldObject*/, _In_ ComPtr<FieldS
 // Base Classes APIs:
 //
 
-std::experimental::generator<Object> BaseClassesObject::GetIterator(_In_ const Object& /*baseClassesObject*/,
+std::experimental::generator<Object> BaseClassesObject::GetIterator(_In_ const Object /*baseClassesObject*/,
                                                                     _In_ ComPtr<UdtTypeSymbol>& spUdtTypeSymbol)
 {
     //
@@ -1589,7 +1589,7 @@ Object DataObject::CreateGlobal(_In_ const Object& /*dataObject*/,
     return globalDataFactory.CreateInstance(spGlobalData);
 }
 
-std::experimental::generator<Object> DataObject::GetIterator(_In_ const Object& /*dataObject*/,
+std::experimental::generator<Object> DataObject::GetIterator(_In_ const Object /*dataObject*/,
                                                              _In_ ComPtr<SymbolSet>& spSymbolSet)
 {
     //
@@ -1791,7 +1791,7 @@ Object FunctionsObject::Create(_In_ const Object& /*functionsObject*/,
     return functionFactory.CreateInstance(spFunction);
 }
 
-std::experimental::generator<Object> FunctionsObject::GetIterator(_In_ const Object& /*functionsObject*/,
+std::experimental::generator<Object> FunctionsObject::GetIterator(_In_ const Object /*functionsObject*/,
                                                                   _In_ ComPtr<SymbolSet>& spSymbolSet)
 {
     //
@@ -1902,7 +1902,23 @@ Object ParametersObject::Add(_In_ const Object& /*parametersObject*/,
     return parameterFactory.CreateInstance(spParameter);
 }
 
-std::experimental::generator<Object> ParametersObject::GetIterator(_In_ const Object& /*parametersObject*/,
+void ParametersObject::PropagateLiveRangesFromCallingConvention(_In_ const Object& /*parametersObject*/,
+                                                                _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
+{
+    //
+    // Determine the platform default calling convention.  If we do not understand the calling convention,
+    // generate an error.
+    //
+    auto pManager = spFunctionSymbol->InternalGetSymbolSet()->GetSymbolBuilderManager();
+
+    CallingConvention *pConvention;
+    CheckHr(pManager->GetDefaultCallingConvention(&pConvention));
+
+    RangeBuilder builder;
+    builder.PropagateParameterRanges(spFunctionSymbol.Get(), pConvention);
+}
+
+std::experimental::generator<Object> ParametersObject::GetIterator(_In_ const Object /*parametersObject*/,
                                                                _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
     //
@@ -2000,7 +2016,7 @@ Object LocalVariablesObject::Add(_In_ const Object& /*localVariablesObject*/,
     return localVariableFactory.CreateInstance(spLocalVariable);
 }
 
-std::experimental::generator<Object> LocalVariablesObject::GetIterator(_In_ const Object& /*localVariablesObject*/,
+std::experimental::generator<Object> LocalVariablesObject::GetIterator(_In_ const Object /*localVariablesObject*/,
                                                                        _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
     //
@@ -2159,7 +2175,7 @@ Object LiveRangesObject::Add(_In_ const Object& /*liveRangesObject*/,
     return liveRangeFactory.CreateInstance( { spVariableSymbol, uniqueId } );
 }
 
-std::experimental::generator<Object> LiveRangesObject::GetIterator(_In_ const Object& liveRangesObject,
+std::experimental::generator<Object> LiveRangesObject::GetIterator(_In_ const Object liveRangesObject,
                                                                    _In_ ComPtr<VariableSymbol>& spVariableSymbol)
 {
     //
@@ -2310,7 +2326,7 @@ void LiveRangeObject::Delete(_In_ const Object& /*liveRangeObject*/,
     liveRangeInfo.Variable->InternalDeleteLiveRange(liveRangeInfo.LiveRangeIdentity);
 }
 
-std::experimental::generator<Object> AddressRangesObject::GetIterator(_In_ const Object& /*addressRangesObject*/,
+std::experimental::generator<Object> AddressRangesObject::GetIterator(_In_ const Object /*addressRangesObject*/,
                                                                       _In_ ComPtr<FunctionSymbol>& spFunctionSymbol)
 {
     //
@@ -2393,7 +2409,7 @@ Object PublicsObject::Create(_In_ const Object& typesObject,
     return publicFactory.CreateInstance(spPublic);
 }
 
-std::experimental::generator<Object> PublicsObject::GetIterator(_In_ const Object& /*publicsObject*/,
+std::experimental::generator<Object> PublicsObject::GetIterator(_In_ const Object /*publicsObject*/,
                                                                 _In_ ComPtr<SymbolSet>& spSymbolSet)
 {
     //
@@ -2884,6 +2900,10 @@ ParametersObject::ParametersObject() :
 {
     AddMethod(L"Add", this, &ParametersObject::Add,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PARAMETERS_ADD },
+                       L"PreferShow", true));
+
+    AddMethod(L"PropagateLiveRangesFromCallingConvention", this, &ParametersObject::PropagateLiveRangesFromCallingConvention,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_PARAMETERS_PROPAGATELIVERANGESFROMCALLINGCONVENTION },
                        L"PreferShow", true));
 
     AddGeneratorFunction(this, &ParametersObject::GetIterator);

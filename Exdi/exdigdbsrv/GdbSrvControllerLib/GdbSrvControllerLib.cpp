@@ -1533,28 +1533,42 @@ public:
             throw _com_error(E_OUTOFMEMORY);
         }
 
-        ConfigExdiGdbServerHelper & cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+        //
+        // The maxPacketLength is the maximum PACKET length of an RSP packet, not how much memory we can push
+        // across.  At worst, the memory encodes each byte as two characters (hex) plus the packet overhead.
+        // All read requests need to be clamped to that size.
+        //
+        ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
         size_t maxPacketLength = cfgData.GetMaxServerPacketLength();
-        if (maxPacketLength != 0)
+        
+        //
+        // Add the $ #<2 byte checksum>
+        //
+        constexpr size_t packetOverhead = 4;
+        if (maxPacketLength == 0)
         {
-            maxPacketLength = (maxPacketLength < maxSize) ? maxPacketLength : maxSize;
+            maxPacketLength = maxSize * 2 + packetOverhead;
         }
-        else
-        {
-            maxPacketLength = maxSize;
-        }
+
         //  We need to support local configuration maximum packet size and packetsize that 
         //  the GdbServer dynamically supports by sending chunk of data until we reach the maximum requested size.
         while (maxSize != 0)
         {
-            size_t recvLength = 0;
             bool fError = false;
-            size_t size = maxPacketLength; 
-            //  We will send a sequence of ‘m addr,length’ request packets
+
+            size_t requestSize = (maxPacketLength - packetOverhead) / 2;
+            if (requestSize > maxSize)
+            {
+                requestSize = maxSize;
+            }
+            size_t size = requestSize;
+
+            //  We will send a sequence of ?m addr,length? request packets
             //  until we obtain the requested data length from the GdbServer.
             for (;;)
             {
-                char memoryCmd[256] = {0}; 
+                size_t recvLength = 0;
+                char memoryCmd[256] = { 0 };
                 PCSTR pFormat = GetReadMemoryCmd(memType);
                 sprintf_s(memoryCmd, _countof(memoryCmd), pFormat, address, size);
                 std::string reply = ExecuteCommandEx(memoryCmd, true, maxReplyLength);
@@ -1578,7 +1592,7 @@ public:
                     //  and let the caller's handles the returned data.
                     fError = true;
                     //  unless we didn't read anything, in which case fail
-                    if (recvLength == 0 && GetThrowExceptionEnabled())
+                    if (result.GetLength() == 0 && GetThrowExceptionEnabled())
                     {
                         throw _com_error(E_FAIL);
                     }
@@ -1586,7 +1600,7 @@ public:
                 }
 
                 //  Handle the received memory data
-                for (size_t pos = 0; pos < messageLength ; pos += 2)
+                for (size_t pos = 0; pos < messageLength; pos += 2)
                 {
                     std::string oneByteMemory = reply.substr(pos, 2);
                     int value = 0;
@@ -1612,8 +1626,7 @@ public:
             {
                 break;
             }
-            maxSize -= maxPacketLength;
-            maxPacketLength = (maxPacketLength >= maxSize) ? maxSize : maxPacketLength; 
+            maxSize -= requestSize;
         }
         return result;
     }

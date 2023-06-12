@@ -21,5 +21,6 @@
 #include <DbgModelClientEx.h>
 
 #include "ApiProvider.h"
+#include "RangeBuilder.h"
 
 #endif // __OBJECTMODEL_H__

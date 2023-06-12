@@ -20,8 +20,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ApiProvider.cpp" />
+    <ClCompile Include="CallingConvention.cpp" />
     <ClCompile Include="Extension.cpp" />
     <ClCompile Include="ImportSymbols.cpp" />
+    <ClCompile Include="RangeBuilder.cpp" />
     <ClCompile Include="SymbolBase.cpp" />
     <ClCompile Include="SymbolData.cpp" />
     <ClCompile Include="SymbolFunction.cpp" />
@@ -32,10 +34,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ApiProvider.h" />
+    <ClInclude Include="CallingConvention.h" />
     <ClInclude Include="HelpStrings.h" />
     <ClInclude Include="ImportSymbols.h" />
     <ClInclude Include="InternalGuids.h" />
     <ClInclude Include="ObjectModel.h" />
+    <ClInclude Include="RangeBuilder.h" />
     <ClInclude Include="SymbolBase.h" />
     <ClInclude Include="SymbolData.h" />
     <ClInclude Include="SymbolFunction.h" />
@@ -120,19 +124,19 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\native\inc;$(IncludePath)</IncludePath>
+    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
     <TargetName>SymbolBuilderComposition</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\native\inc;$(IncludePath)</IncludePath>
+    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
     <TargetName>SymbolBuilderComposition</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\native\inc;$(IncludePath)</IncludePath>
+    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
     <TargetName>SymbolBuilderComposition</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\native\inc;$(IncludePath)</IncludePath>
+    <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
     <TargetName>SymbolBuilderComposition</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -221,16 +225,16 @@
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets" Condition="Exists('packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" />
-    <Import Project="packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets" Condition="Exists('packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" />
-    <Import Project="packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets" Condition="Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" />
+    <Import Project="packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets" Condition="Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" />
+    <Import Project="packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets" Condition="Exists('packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" />
+    <Import Project="packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets" Condition="Exists('packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.TargetModel.SDK.20220912.1623.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets'))" />
-    <Error Condition="!Exists('packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.Platform.DbgEng.20220912.1623.0\build\Microsoft.Debugging.Platform.DbgEng.targets'))" />
-    <Error Condition="!Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.DataModel.CppLib.1.0.2\build\native\Microsoft.Debugging.DataModel.CppLib.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets'))" />
   </Target>
 </Project>

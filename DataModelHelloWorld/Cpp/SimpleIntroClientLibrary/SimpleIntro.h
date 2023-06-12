@@ -12,6 +12,7 @@
 #include <wrl/client.h>
 #include <wrl/implements.h>
 #include <wrl/module.h>
+#include <new>
 
 // This is needed when using SDK version 10.0.17763.0
 // For newer versions of the SDK, this is not necessary

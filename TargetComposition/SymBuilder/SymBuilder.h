@@ -31,6 +31,7 @@
 #include <string>
 #include <vector>
 #include <stack>
+#include <queue>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
@@ -167,6 +168,7 @@ HRESULT DiagnosticLog(_In_opt_ ISvcDiagnosticLogging *pDiagnosticLogging,
 #include "SymbolFunction.h"
 #include "ImportSymbols.h"
 #include "SymbolSet.h"
+#include "CallingConvention.h"
 #include "SymManager.h"
 #include "SymbolServices.h"
 

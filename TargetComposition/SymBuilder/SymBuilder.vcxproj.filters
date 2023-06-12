@@ -1,154 +1,56 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="x86">
-      <UniqueIdentifier>{d33ecf74-f353-4067-8906-5bd388c3a475}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="woa">
-      <UniqueIdentifier>{8c5b8740-4dc4-49bc-8d1b-90bd1de57aad}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="arm64">
-      <UniqueIdentifier>{99cf6baf-372a-4a7c-b717-6e791843283a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="amd64">
-      <UniqueIdentifier>{52586b47-9960-48d9-a656-88cc97c57cfb}</UniqueIdentifier>
-    </Filter>
+    <ClCompile Include="ApiProvider.cpp" />
+    <ClCompile Include="Extension.cpp" />
+    <ClCompile Include="ImportSymbols.cpp" />
+    <ClCompile Include="SymbolBase.cpp" />
+    <ClCompile Include="SymbolData.cpp" />
+    <ClCompile Include="SymbolFunction.cpp" />
+    <ClCompile Include="SymbolServices.cpp" />
+    <ClCompile Include="SymbolSet.cpp" />
+    <ClCompile Include="SymbolTypes.cpp" />
+    <ClCompile Include="SymManager.cpp" />
+    <ClCompile Include="RangeBuilder.cpp" />
+    <ClCompile Include="CallingConvention.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ApiProvider.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Extension.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymbolBase.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymbolData.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymbolServices.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymbolSet.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymbolTypes.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="SymbolFunction.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="ImportSymbols.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>    
+    <ClInclude Include="ApiProvider.h" />
+    <ClInclude Include="HelpStrings.h" />
+    <ClInclude Include="ImportSymbols.h" />
+    <ClInclude Include="InternalGuids.h" />
+    <ClInclude Include="ObjectModel.h" />
+    <ClInclude Include="SymbolBase.h" />
+    <ClInclude Include="SymbolData.h" />
+    <ClInclude Include="SymbolFunction.h" />
+    <ClInclude Include="SymbolServices.h" />
+    <ClInclude Include="SymbolSet.h" />
+    <ClInclude Include="SymbolTypes.h" />
+    <ClInclude Include="SymBuilder.h" />
+    <ClInclude Include="SymManager.h" />
+    <ClInclude Include="RangeBuilder.h" />
+    <ClInclude Include="CallingConvention.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ApiProvider.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="HelpStrings.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="InternalGuids.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ObjectModel.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymbolBase.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymbolData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymbolServices.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymbolSet.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymbolTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymBuilder.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="SymManager.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-      <Filter>Header Files</Filter>
-    </ClInclude>
+    <ResourceCompile Include="SymBuilder.rc" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="amd64\dbgcore.dll" />
+    <None Include="amd64\dbgeng.dll" />
+    <None Include="amd64\dbghelp.dll" />
+    <None Include="amd64\dbgmodel.dll" />
+    <None Include="arm64\dbgcore.dll" />
+    <None Include="arm64\dbgeng.dll" />
+    <None Include="arm64\dbghelp.dll" />
+    <None Include="arm64\dbgmodel.dll" />
     <None Include="packages.config" />
-    <None Include="x86\dbgmodel.dll">
-      <Filter>x86</Filter>
-    </None>
-    <None Include="x86\dbghelp.dll">
-      <Filter>x86</Filter>
-    </None>
-    <None Include="x86\dbgeng.dll">
-      <Filter>x86</Filter>
-    </None>
-    <None Include="x86\dbgcore.dll">
-      <Filter>x86</Filter>
-    </None>
-    <None Include="woa\dbgmodel.dll">
-      <Filter>woa</Filter>
-    </None>
-    <None Include="woa\dbghelp.dll">
-      <Filter>woa</Filter>
-    </None>
-    <None Include="woa\dbgeng.dll">
-      <Filter>woa</Filter>
-    </None>
-    <None Include="woa\dbgcore.dll">
-      <Filter>woa</Filter>
-    </None>
-    <None Include="arm64\dbgmodel.dll">
-      <Filter>arm64</Filter>
-    </None>
-    <None Include="arm64\dbghelp.dll">
-      <Filter>arm64</Filter>
-    </None>
-    <None Include="arm64\dbgeng.dll">
-      <Filter>arm64</Filter>
-    </None>
-    <None Include="arm64\dbgcore.dll">
-      <Filter>arm64</Filter>
-    </None>
-    <None Include="amd64\dbgmodel.dll">
-      <Filter>amd64</Filter>
-    </None>
-    <None Include="amd64\dbghelp.dll">
-      <Filter>amd64</Filter>
-    </None>
-    <None Include="amd64\dbgeng.dll">
-      <Filter>amd64</Filter>
-    </None>
-    <None Include="amd64\dbgcore.dll">
-      <Filter>amd64</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="SymBuilder.rc">
-      <Filter>Resource Files</Filter>
-    </ResourceCompile>
+    <None Include="woa\dbgcore.dll" />
+    <None Include="woa\dbgeng.dll" />
+    <None Include="woa\dbghelp.dll" />
+    <None Include="woa\dbgmodel.dll" />
+    <None Include="x86\dbgcore.dll" />
+    <None Include="x86\dbgeng.dll" />
+    <None Include="x86\dbghelp.dll" />
+    <None Include="x86\dbgmodel.dll" />
   </ItemGroup>
 </Project>
