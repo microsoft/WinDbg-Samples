@@ -15,7 +15,7 @@
 STRINGTABLE
 BEGIN
     SYMBOLBUILDER_IDS_MODULE_SYMBOLBUILDERSYMBOLS   "The symbol builder symbols for the module"
-    SYMBOLBUILDER_IDS_CREATESYMBOLS                 "CreateSymbols(module, [options]) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object.  'options' is an object with properties that configures the symbols.  'options' currently allows .AutoImportSymbols = true/false"
+    SYMBOLBUILDER_IDS_CREATESYMBOLS                 "CreateSymbols(module, [options]) - Creates symbol builder symbols for the module in question.  'module' can be the name or base address of a module or a module object.  'options' is an object with properties which configure the symbols.  'options' currently allows .AutoImportSymbols = true/false (default false).  If 'AutoImportSymbols' is true, symbols from available PDB/exports will be automatically imported to the symbol builder upon use"
     SYMBOLBUILDER_IDS_SYMBOLSET_TYPES               "The list of available types"
     SYMBOLBUILDER_IDS_SYMBOLSET_DATA                "The list of available global data"
     SYMBOLBUILDER_IDS_SYMBOLSET_FUNCTIONS           "The list of available functions"
@@ -68,6 +68,7 @@ BEGIN
     SYMBOLBUILDER_IDS_FUNCTION_ADDRESSRANGES        "The list of address ranges for code bytes of the function.  The first address range is the primary one and defines the entry point of the function"
     SYMBOLBUILDER_IDS_FUNCTION_DELETE               "Delete() - Deletes the function"
     SYMBOLBUILDER_IDS_PARAMETERS_ADD                "Add(name, parameterType) - Adds a new parameter of the given name and type"
+    SYMBOLBUILDER_IDS_PARAMETERS_PROPAGATELIVERANGESFROMCALLINGCONVENTION   "PropagateLiveRangesFromCallingConvention() - Uses knowledge of the function calling convention and a walk of the disassembly to determine the live ranges of each parameter throughout the function"
     SYMBOLBUILDER_IDS_LOCALVARIABLES_ADD            "Add(name, localVariableType) - Adds a new local variable (non parameter) of the given name and type"
     SYMBOLBUILDER_IDS_VARIABLE_NAME                 "The name of the variable (parameter or local)"
     SYMBOLBUILDER_IDS_VARIABLE_TYPE                 "The type of the variable (parameter or local)"

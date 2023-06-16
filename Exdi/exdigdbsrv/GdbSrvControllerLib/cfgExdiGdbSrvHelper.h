@@ -52,6 +52,7 @@ class ConfigExdiGdbServerHelper final
         void GetSystemRegistersMapAccessCode(_Out_ unique_ptr<SystemRegistersMapType>* spMapSystemRegs);
         bool GetTreatSwBpAsHwBp();
         bool IsExceptionThrowEnabled();
+        bool IsForcedLegacyResumeStepMode();
         bool IsSupportedSpecialMemoryCommand();
         bool IsSupportedPhysicalMemoryCommand();
         bool IsSupportedSupervisorMemoryCommand();

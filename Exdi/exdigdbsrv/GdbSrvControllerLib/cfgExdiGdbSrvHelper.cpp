@@ -204,6 +204,11 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         return m_ExdiGdbServerData.component.fExceptionThrowEnabled;
     }
 
+    inline bool ConfigExdiGdbServerHelperImpl::IsForcedLegacyResumeStepMode()
+    {
+        return m_ExdiGdbServerData.component.fForcedLegacyResumeStepCommands;
+    }
+
     inline TargetArchitecture ConfigExdiGdbServerHelperImpl::GetLastGdbServerRegisterArchitecture() const 
     {
         return m_ExdiGdbServerData.gdbServerRegisters.registerSet.back();
@@ -738,6 +743,12 @@ bool ConfigExdiGdbServerHelper::IsExceptionThrowEnabled()
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
     return m_pConfigExdiGdbServerHelperImpl->IsExceptionThrowEnabled();
+}
+
+bool ConfigExdiGdbServerHelper::IsForcedLegacyResumeStepMode()
+{
+    assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
+    return m_pConfigExdiGdbServerHelperImpl->IsForcedLegacyResumeStepMode();
 }
 
 void ConfigExdiGdbServerHelper::GetGdbServerRegisters(_Out_ unique_ptr<vector<RegistersStruct>> * spRegisters)

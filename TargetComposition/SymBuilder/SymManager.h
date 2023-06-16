@@ -76,8 +76,11 @@ public:
     //
     // Initializes a new SymbolBuilderProcess.
     //
-    HRESULT RuntimeClassInitialize(_In_ ULONG64 processKey, _In_ SymbolBuilderManager *pOwningManager)
+    HRESULT RuntimeClassInitialize(_In_ bool isKernel,
+                                   _In_ ULONG64 processKey, 
+                                   _In_ SymbolBuilderManager *pOwningManager)
     {
+        m_isKernel = isKernel;
         m_processKey = processKey;
         m_pOwningManager = pOwningManager;
         return S_OK;
@@ -112,13 +115,23 @@ public:
 
     // GetProcessKey():
     //
-    // Gets the process key for this process.
+    // Gets the process key for this process.  This will be zero if this represents the kernel and its
+    // set of modules.
     //
     ULONG64 GetProcessKey() const { return m_processKey; }
 
+    // IsKernel():
+    //
+    // Indicates whether or not this represents the kernel.
+    //
+    bool IsKernel() const { return m_isKernel; }
+
 private:
 
-    // The "key" used to identify the process we represent.
+    // Indicates if this represents the kernel and its set of modules
+    bool m_isKernel;
+
+    // The "key" used to identify the process we represent.  This will be zero if we represent the kernel.
     ULONG64 m_processKey;
 
     // A map tracking the "symbol sets" we have created for modules in this process.  This a map
@@ -140,6 +153,10 @@ struct RegisterInformation
     std::wstring Name;
     ULONG Id;
     ULONG Size;
+    ULONG ParentId;                     // (ULONG)-1 or the ID of the parent register if a sub-register
+    ULONG SubLsb;                       // If a subregister, LSB of the mapping
+    ULONG SubMsb;                       // If a subregister, MSB of the mapping
+    std::vector<ULONG> SubRegisters;    // The list of sub-register IDs for this register
 };
 
 // ISvcSymbolBuilderManager:
@@ -155,6 +172,13 @@ struct RegisterInformation
 #define INTERFACE ISvcSymbolBuilderManager
 DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
 {
+    // GetKernelAddressContext():
+    //
+    // If the target in question is a kernel mode target, this returns the address context for kernel mode
+    // (non process specific) reads.  If not, this will fail.
+    //
+    STDMETHOD(GetKernelAddressContext)(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext) PURE;
+
     // ProcessKeyToProcess():
     //
     // Converts a process key to the process object for it.
@@ -182,21 +206,24 @@ DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
     // For a given module, find its associated process, and create tracking structures associated with
     // that process.
     //
-    STDMETHOD(TrackProcessForModule)(_In_ ISvcModule *pModule, 
+    STDMETHOD(TrackProcessForModule)(_In_ bool isKernel,
+                                     _In_ ISvcModule *pModule, 
                                      _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // TrackProcessForKey():
     //
     // Create tracking structures associated with a process by its unique key.
     //
-    STDMETHOD(TrackProcessForKey)(_In_ ULONG64 processKey,
+    STDMETHOD(TrackProcessForKey)(_In_ bool isKernel,
+                                  _In_ ULONG64 processKey,
                                   _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // TrackProcess():
     //
     // Create tracking structures associated with a process by its interface.
     //
-    STDMETHOD(TrackProcess)(_In_ ISvcProcess *pProcess,
+    STDMETHOD(TrackProcess)(_In_ bool isKernel,
+                            _In_opt_ ISvcProcess *pProcess,
                             _COM_Outptr_ SymbolBuilderProcess **ppProcess) PURE;
 
     // FindInformationForRegisterByName():
@@ -226,6 +253,13 @@ DECLARE_INTERFACE_(ISvcSymbolBuilderManager, IUnknown)
     //
     STDMETHOD(LocationToString)(_In_ SvcSymbolLocation const *pLocation,
                                 _Out_ std::wstring *pString) PURE;
+
+    // GetDefaultCallingConvention():
+    //
+    // Gets an abstraction for the platform's default calling convention if we are aware of it; otherwise, 
+    // this will fail.
+    //
+    STDMETHOD(GetDefaultCallingConvention)(_Outptr_ CallingConvention **ppDefaultConvention) PURE;
 };
 
 // SymbolBuilderManager:
@@ -284,7 +318,7 @@ public:
         if (sizeHardDependencies == 0 && sizeSoftDependencies == 0)
         {
             *pNumHardDependencies = 3;
-            *pNumSoftDependencies = 1;
+            *pNumSoftDependencies = 2;
             return S_OK;
         }
 
@@ -293,7 +327,7 @@ public:
             return E_INVALIDARG;
         }
 
-        if (sizeSoftDependencies < 1)
+        if (sizeSoftDependencies < 2)
         {
             return E_INVALIDARG;
         }
@@ -309,8 +343,14 @@ public:
         //
         pSoftDependencies[0] = DEBUG_SERVICE_VIRTUAL_MEMORY;
 
+        //
+        // We can absolutely function without the OS information service.  We only need this for detecting which
+        // platform we are running on to identify calling conventions for some advanced functionality.
+        //
+        pSoftDependencies[1] = DEBUG_SERVICE_OS_INFORMATION;
+
         *pNumHardDependencies = 3;
-        *pNumSoftDependencies = 1;
+        *pNumSoftDependencies = 2;
         return hr;
     }
 
@@ -343,6 +383,7 @@ public:
         (void)pServiceManager->QueryService(DEBUG_SERVICE_MODULE_ENUMERATOR, IID_PPV_ARGS(&m_spModEnum));
         (void)pServiceManager->QueryService(DEBUG_SERVICE_ARCHINFO, IID_PPV_ARGS(&m_spArchInfo));
         (void)pServiceManager->QueryService(DEBUG_SERVICE_VIRTUAL_MEMORY, IID_PPV_ARGS(&m_spVirtualMemory));
+        (void)pServiceManager->QueryService(DEBUG_SERVICE_OS_INFORMATION, IID_PPV_ARGS(&m_spOSPlatformInformation));
 
         //
         // We want to listen to modules that disappear so that we can "unload" our cached copy of the symbols.
@@ -430,6 +471,26 @@ public:
                 IfFailedReturn(pNewService->QueryInterface(IID_PPV_ARGS(&m_spVirtualMemory)));
             }
         }
+        else if (serviceGuid == DEBUG_SERVICE_OS_INFORMATION)
+        {
+            //
+            // If the OS platform service changed, alter our cached copy of it so that we are calling
+            // the correct service.
+            //
+            m_spOSPlatformInformation = nullptr;
+            if (pNewService != nullptr)
+            {
+                if (FAILED(pNewService->QueryInterface(IID_PPV_ARGS(&m_spOSPlatformInformation))))
+                {
+                    m_spOSPlatformInformation = nullptr;
+                }
+
+                //
+                // As part of arch initialization is platform calling conventions, reinitialize...
+                //
+                IfFailedReturn(InitArchBased());
+            }
+        }
 
         return hr;
     }
@@ -449,6 +510,13 @@ public:
     //*************************************************
     // ISvcSymbolBuilderManager:
     //
+
+    // GetKernelAddressContext():
+    //
+    // If the target in question is a kernel mode target, this returns the address context for kernel mode
+    // (non process specific) reads.  If not, this will fail.
+    //
+    IFACEMETHOD(GetKernelAddressContext)(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext);
 
     // ProcessKeyToProcess():
     //
@@ -486,21 +554,24 @@ public:
     // For a given module, find its associated process, and create tracking structures associated with
     // that process.
     //
-    IFACEMETHOD(TrackProcessForModule)(_In_ ISvcModule *pModule, 
+    IFACEMETHOD(TrackProcessForModule)(_In_ bool isKernel, 
+                                       _In_ ISvcModule *pModule, 
                                        _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
     // TrackProcessForKey():
     //
     // Create tracking structures associated with a process by its unique key.
     //
-    IFACEMETHOD(TrackProcessForKey)(_In_ ULONG64 processKey,
+    IFACEMETHOD(TrackProcessForKey)(_In_ bool isKernel,
+                                    _In_ ULONG64 processKey,
                                     _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
     // TrackProcess():
     //
     // Create tracking structures associated with a process by its interface.
     //
-    IFACEMETHOD(TrackProcess)(_In_ ISvcProcess *pProcess,
+    IFACEMETHOD(TrackProcess)(_In_ bool isKernel,
+                              _In_ ISvcProcess *pProcess,
                               _COM_Outptr_ SymbolBuilderProcess **ppProcess);
 
     // FindInformationForRegisterByName():
@@ -531,6 +602,13 @@ public:
     IFACEMETHOD(LocationToString)(_In_ SvcSymbolLocation const *pLocation,
                                   _Out_ std::wstring *pString);
 
+    // GetDefaultCallingConvention():
+    //
+    // Gets an abstraction for the platform's default calling convention if we are aware of it; otherwise, 
+    // this will fail.
+    //
+    IFACEMETHOD(GetDefaultCallingConvention)(_COM_Outptr_ CallingConvention **ppDefaultConvention);
+
     // GetServiceManager():
     //
     // Gets the service manager that this process was created from.
@@ -556,6 +634,23 @@ public:
     ISvcMemoryAccess *GetVirtualMemory() const
     {
         return m_spVirtualMemory.Get();
+    }
+
+    //*************************************************
+    // Internal APIs:
+    //
+
+    // RuntimeClassInitialzie():
+    //
+    // Initializes the symbol builder manager for a given service container (e.g.: target).  If the 
+    // target in question is a kernel mode (or similar hardware centric) target, a "default" address context
+    // can be passed as 'pKernelAddressContext' such that memory reads to the kernel can take place outside
+    // of the context of any particular process.
+    //
+    HRESULT RuntimeClassInitialize(_In_opt_ ISvcAddressContext *pKernelAddressContext = nullptr)
+    {
+        m_spKernelAddressContext = pKernelAddressContext;
+        return S_OK;
     }
 
 private:
@@ -591,6 +686,16 @@ private:
 
     // Our container's VM service.
     Microsoft::WRL::ComPtr<ISvcMemoryAccess> m_spVirtualMemory;
+
+    // Our container's platform information.
+    Microsoft::WRL::ComPtr<ISvcOSPlatformInformation> m_spOSPlatformInformation;
+
+    // Our understanding of the default calling convention of the underlying platform (if we are aware of it)
+    std::unique_ptr<CallingConvention> m_spDefaultCallingConvention;
+	
+    // If we are included for a kernel mode / hardware centric target, this is the default address
+    // context of the kernel.
+    Microsoft::WRL::ComPtr<ISvcAddressContext> m_spKernelAddressContext;
 
     // The service manager which contains and owns our lifetime.
     IDebugServiceManager *m_pOwningManager;

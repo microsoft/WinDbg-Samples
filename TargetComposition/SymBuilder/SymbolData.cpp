@@ -1057,6 +1057,17 @@ bool VariableSymbol::InternalDeleteLiveRange(_In_ ULONG64 id)
     return true;
 }
 
+void VariableSymbol::InternalDeleteAllLiveRanges()
+{
+    auto fn = [&]()
+    {
+        m_liveRangeList.clear();
+        m_liveRanges.clear();
+        return S_OK;
+    };
+    (void)ConvertException(fn);
+}
+
 HRESULT VariableSymbol::MoveToBefore(_In_ ULONG64 position)
 {
     if (InternalGetKind() != SvcSymbolDataParameter)

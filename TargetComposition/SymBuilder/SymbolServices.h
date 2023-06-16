@@ -67,14 +67,14 @@ public:
                                         _Out_writes_(sizeHardDependencies) GUID *pHardDependencies,
                                         _Out_ ULONG64 *pNumHardDependencies,
                                         _In_ ULONG64 sizeSoftDependencies,
-                                        _Out_writes_(sizeSoftDependencies) GUID * /*pSoftDependencies*/,
+                                        _Out_writes_(sizeSoftDependencies) GUID *pSoftDependencies,
                                         _Out_ ULONG64 *pNumSoftDependencies)
     {
         HRESULT hr = S_OK;
         if (sizeHardDependencies == 0 && sizeSoftDependencies == 0)
         {
             *pNumHardDependencies = 1;
-            *pNumSoftDependencies = 0;
+            *pNumSoftDependencies = 1;
             return S_OK;
         }
 
@@ -83,10 +83,16 @@ public:
             return E_INVALIDARG;
         }
 
+        if (sizeSoftDependencies < 1)
+        {
+            return E_INVALIDARG;
+        }
+
         pHardDependencies[0] = DEBUG_PRIVATE_SERVICE_SYMBOLBUILDER_MANAGER;
+        pSoftDependencies[0] = DEBUG_SERVICE_MACHINE;
 
         *pNumHardDependencies = 1;
-        *pNumSoftDependencies = 0;
+        *pNumSoftDependencies = 1;
         return hr;
     }
 
@@ -115,6 +121,12 @@ public:
         //        and all our calls check m_spProcEnum.
         //
         (void)pServiceManager->QueryService(DEBUG_PRIVATE_SERVICE_SYMBOLBUILDER_MANAGER, IID_PPV_ARGS(&m_spSymManager));
+
+        //
+        // We have a soft dependency on the machine / machine debug service.  This can fail and we are absolutely
+        // okay.  This is merely an indication of whether we are a kernel / hardware view style target.
+        // 
+        (void)pServiceManager->QueryService(DEBUG_SERVICE_MACHINE, IID_PPV_ARGS(&m_spMachineDebug));
 
         return hr;
     }
@@ -145,6 +157,18 @@ public:
                 // a private interface that only we know about.  But still...
                 //
                 IfFailedReturn(pNewService->QueryInterface(IID_PPV_ARGS(&m_spSymManager)));
+            }
+        }
+        else if (serviceGuid == DEBUG_SERVICE_MACHINE)
+        {
+            m_spMachineDebug = nullptr;
+            if (pNewService != nullptr)
+            {
+                //
+                // Machine services are *NOT* required to support ISvcMachineDebug *UNLESS* they represent
+                // a kernel or hardware centric target.
+                //
+                (void)pNewService->QueryInterface(IID_PPV_ARGS(&m_spMachineDebug));
             }
         }
 
@@ -189,11 +213,31 @@ public:
 
 private:
 
+    //*************************************************
+    // Private Methods:
+    //
+
+    // IsKernelTarget():
+    //
+    // Returns whether we are in a service container for a kernel (or hardware view centric) target.
+    //
+    bool IsKernelTarget() const { return m_spMachineDebug != nullptr; }
+
+    //*************************************************
+    // Data:
+    //
+
     //
     // Cached copy of the symbol builder manager that we placed in the container.  This tracks
     // everything associated with what symbols we have constructed, etc...
     //
     Microsoft::WRL::ComPtr<ISvcSymbolBuilderManager> m_spSymManager;
+
+    //
+    // Cached copy of the machine debug service.  NOTE: This will only exist on a kernel (or hardware view)
+    // target.  This is a soft dependency.
+    //
+    Microsoft::WRL::ComPtr<ISvcMachineDebug> m_spMachineDebug;
 
 };
 

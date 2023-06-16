@@ -73,7 +73,8 @@ HRESULT SymbolBuilderProcess::CreateSymbolsForModule(_In_ ISvcModule *pModule,
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
+HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ bool isKernel,
+                                                 _In_ ULONG64 processKey,
                                                  _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
@@ -84,7 +85,7 @@ HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
     auto it = m_trackedProcesses.find(processKey);
     if (it == m_trackedProcesses.end())
     {
-        IfFailedReturn(MakeAndInitialize<SymbolBuilderProcess>(&spProcess, processKey, this));
+        IfFailedReturn(MakeAndInitialize<SymbolBuilderProcess>(&spProcess, isKernel, processKey, this));
 
         //
         // We cannot let an exception escape the COM boundary.
@@ -105,35 +106,72 @@ HRESULT SymbolBuilderManager::TrackProcessForKey(_In_ ULONG64 processKey,
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ ISvcModule *pModule, 
+HRESULT SymbolBuilderManager::TrackProcessForModule(_In_ bool isKernel,
+                                                    _In_ ISvcModule *pModule, 
                                                     _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
     *ppProcess = nullptr;
 
-    ULONG64 processKey;
-    IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
+    //
+    // See comments in ::TrackProcess.  For now, we won't track individual processes for a kernel mode target.
+    //
+    ULONG64 processKey = 0;
+    if (!isKernel)
+    {
+        IfFailedReturn(pModule->GetContainingProcessKey(&processKey));
+    }
 
     ComPtr<SymbolBuilderProcess> spProcess;
-    IfFailedReturn(TrackProcessForKey(processKey, &spProcess));
+    IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
     return hr;
 }
 
-HRESULT SymbolBuilderManager::TrackProcess(_In_ ISvcProcess *pProcess, 
+HRESULT SymbolBuilderManager::TrackProcess(_In_ bool isKernel,
+                                           _In_opt_ ISvcProcess *pProcess, 
                                            _COM_Outptr_ SymbolBuilderProcess **ppProcess)
 {
     HRESULT hr = S_OK;
     *ppProcess = nullptr;
 
-    ULONG64 processKey;
-    IfFailedReturn(pProcess->GetKey(&processKey));
+    if (pProcess == nullptr && !isKernel)
+    {
+        return E_INVALIDARG;
+    }
+
+    //
+    // For now, we won't track individual processes for a kernel mode target.  This does prevent us from completely
+    // dealing with user mode modules in a kernel target, but there are other issues which make that somewhat
+    // problematic at the moment (e.g.: at the moment, the module enumeration service for kernel targets only
+    // produces kernel mode modules)
+    //
+    ULONG64 processKey = 0;
+    if (!isKernel)
+    {
+        IfFailedReturn(pProcess->GetKey(&processKey));
+    }
 
     ComPtr<SymbolBuilderProcess> spProcess;
-    IfFailedReturn(TrackProcessForKey(processKey, &spProcess));
+    IfFailedReturn(TrackProcessForKey(isKernel, processKey, &spProcess));
 
     *ppProcess = spProcess.Detach();
+    return hr;
+}
+
+HRESULT SymbolBuilderManager::GetKernelAddressContext(_COM_Outptr_ ISvcAddressContext **ppKernelAddressContext)
+{
+    HRESULT hr = S_OK;
+    *ppKernelAddressContext = nullptr;
+
+    if (m_spKernelAddressContext == nullptr)
+    {
+        return E_NOT_SET;
+    }
+
+    ComPtr<ISvcAddressContext> spKernelAddressContext = m_spKernelAddressContext;
+    *ppKernelAddressContext = spKernelAddressContext.Detach();
     return hr;
 }
 
@@ -197,6 +235,7 @@ HRESULT SymbolBuilderManager::InitArchBased()
 
         m_regInfosById.clear();
         m_regIds.clear();
+        m_spDefaultCallingConvention = nullptr;
 
         ComPtr<ISvcRegisterEnumerator> spRegEnum;
         IfFailedReturn(m_spArchInfo->EnumerateRegisters(static_cast<SvcContextFlags>(
@@ -220,8 +259,87 @@ HRESULT SymbolBuilderManager::InitArchBased()
             ULONG regId = spRegInfo->GetId();
             ULONG regSize = spRegInfo->GetSize();
 
-            m_regInfosById.insert( { regId, { regName, regId, regSize } } );
+            ULONG parentId;
+            ULONG subLsb = 0;
+            ULONG subMsb = 0;
+            HRESULT hrSubRegister = spRegInfo->GetSubRegisterInformation(&parentId, &subLsb, &subMsb);
+            if (FAILED(hrSubRegister))
+            {
+                parentId = static_cast<ULONG>(-1);
+            }
+            else
+            {
+                //
+                // Work around a bug where some sub-registers are being reported as the size of the base parent
+                // register.  As we have the bit mappings within the parent register, this is easy to detect.
+                //
+                ULONG subMappingSize = (subMsb - subLsb + 1) / 8;
+                if (subMappingSize < regSize)
+                {
+                    regSize = subMappingSize;
+                }
+            }
+
+            m_regInfosById.insert({ regId, { regName, regId, regSize, parentId, subLsb, subMsb, { } } });
             m_regIds.insert( { regName, regId } );
+        }
+
+        //
+        // Go through and add all sub-register (parent->child) mappings for quick lookup.  
+        //
+        for (auto&& kvp : m_regInfosById)
+        {
+            RegisterInformation const& childInfo = kvp.second;
+            if (childInfo.ParentId != static_cast<ULONG>(-1))
+            {
+                auto itp = m_regInfosById.find(childInfo.ParentId);
+                if (itp == m_regInfosById.end())
+                {
+                    //
+                    // The architecture service gave us a mapping for which it did not define the parent
+                    // register.  This is broken.
+                    //
+                    return E_UNEXPECTED;
+                }
+
+                RegisterInformation &parentInfo = itp->second;
+                parentInfo.SubRegisters.push_back(childInfo.Id);
+            }
+        }
+
+        //
+        // If we can identify the underlying platform and it is Windows, use that.  If we cannot identify
+        // the underlying platform, assume it's Windows (as that is the default for WinDbg).  Initialize
+        // some basic calling convention information between the architecture and platform.
+        //
+        SvcOSPlatform plat = SvcOSPlatWindows;
+        if (m_spOSPlatformInformation != nullptr)
+        {
+            IfFailedReturn(m_spOSPlatformInformation->GetOSPlatform(&plat));
+        }
+
+        ULONG arch = m_spArchInfo->GetArchitecture();
+        switch(arch)
+        {
+            case IMAGE_FILE_MACHINE_AMD64:
+            {
+                if (plat == SvcOSPlatWindows)
+                {
+                    m_spDefaultCallingConvention = std::make_unique<CallingConvention_Windows_AMD64>(this);
+                    if (m_spDefaultCallingConvention == nullptr)
+                    {
+                        return E_OUTOFMEMORY;
+                    }
+                    break;
+                }
+            }
+            default:
+                //
+                // Right now, we do not understand the default calling convention of this platform.  That
+                // simply means we cannot auto-propagate live ranges by walking the control flow graph
+                // of disassembled functions.
+                //
+                break;
         }
 
         return hr;
@@ -567,6 +685,19 @@ HRESULT SymbolBuilderManager::FindInformationForRegisterById(_In_ ULONG id,
     }
 
     *ppRegisterInfo = &(itr->second);
+    return S_OK;
+}
+
+HRESULT SymbolBuilderManager::GetDefaultCallingConvention(_Outptr_ CallingConvention **ppDefaultConvention)
+{
+    *ppDefaultConvention = nullptr;
+
+    if (m_spDefaultCallingConvention == nullptr)
+    {
+        return E_NOT_SET;
+    }
+
+    *ppDefaultConvention = m_spDefaultCallingConvention.get();
     return S_OK;
 }
 

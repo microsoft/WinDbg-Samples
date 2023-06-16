@@ -462,6 +462,20 @@ private:
             case CBA_SYMBOLS_UNLOADED:
                 return false;
 
+            case CBA_XML_LOG:
+            {
+                //
+                // @TODO: Various diagnostic information from DbgHelp flows through this channel which will
+                //        end up in the WinDbg Preview logs window.  If the diagnostic services for target
+                //        composition ever allow for funneling this information through, we should push
+                //        this through that channel so that any diagnostics from us trying to find and load
+                //        import sources end up in the logs as well.
+                //
+                //        At present, diagnostics are only available in textual form via ISvcDiagnosticLogging.
+                //
+                return false;
+            }
+
             case CBA_READ_MEMORY:
             {
                 IMAGEHLP_CBA_READ_MEMORY *pReadMemory = reinterpret_cast<IMAGEHLP_CBA_READ_MEMORY *>(pCallbackData);
