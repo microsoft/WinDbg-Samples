@@ -66,6 +66,91 @@ function __isAbsolute(path)
            (path.length > 3 && path.charAt(1) == ":" && path.charAt(2) == "\\");
 }
 
+function __pathCombine(a, b)
+{
+    if (a.endsWith("\\"))
+    {
+        return a + b;
+    }
+    else
+    {
+        return a + "\\" + b;
+    }
+}
+
+// __findAndOpenHeader():
+//
+// Given a header name and an include path and optional sdkPath, find the given heaer.
+//
+function __findAndOpenHeader(name, includePath, sdkPath)
+{
+    var includeFile = null;
+    try
+    {
+        if (__diag)
+        {
+            host.diagnostics.debugLog("Trying to open '" + name + "'\n");
+        }
+        includeFile = __getAPI().FileSystem.OpenFile(name);
+    }
+    catch(exc)
+    {
+    }
+
+    if (!includeFile && !__isAbsolute(name))
+    {
+        var nameInPath = __pathCombine(includePath, name);
+        if (__diag)
+        {
+            host.diagnostics.debugLog("Trying to open '" + nameInPath + "'\n");
+        }
+        try
+        {
+            includeFile = __getAPI().FileSystem.OpenFile(nameInPath);
+        }
+        catch(exc)
+        {
+        }
+
+        if (!includeFile && sdkPath && sdkPath != "")
+        {
+            //
+            // @TODO: The FileSystem APIs provide no way to enumerate an arbitrary directory other than cwd or temp
+            //        For now, hardcode the standard include directories in the platform (Windows) SDK.
+            //
+            var sdkDirs = ["shared", "um", "ucrt", "winrt", "cppwinrt"];
+            for (var subDir of sdkDirs)
+            {
+                var path = __pathCombine(sdkPath, subDir);
+                var fileName = __pathCombine(path, name);
+                if (__diag)
+                {
+                    host.diagnostics.debugLog("Trying to open '" + fileName + "'\n");
+                }
+                try
+                {
+                    includeFile = __getAPI().FileSystem.OpenFile(fileName);
+                }
+                catch(exc)
+                {
+                }
+
+                if (includeFile)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!includeFile)
+    {
+        throw new Error("Unable to open include file '" + name + "'");
+    }
+
+    return includeFile;
+}
+
 //*************************************************
 // Simple C struct header parser.
 //
@@ -137,6 +222,8 @@ var __tokenTypes =
     Int64: 207,
     True: 208,
     False: 209,
+    __Ptr32: 210,                           /* Microsoft specific pointer annotation __ptr32 */
+    __Ptr64: 211,                           /* Microsoft specific pointer annotation __ptr64 */
 
     //
     // Other
@@ -252,6 +339,8 @@ __tokenMappings["__int64"] = __tokenTypes.Int64;
 __tokenMappings["enum"] = __tokenTypes.Enum;
 __tokenMappings["true"] = __tokenTypes.True;
 __tokenMappings["false"] = __tokenTypes.False;
+__tokenMappings["__ptr32"] = __tokenTypes.__Ptr32;
+__tokenMappings["__ptr64"] = __tokenTypes.__Ptr64;
 
 // __windowsTypedefs:
 //
@@ -672,11 +761,20 @@ class __CTokenStream
     //
     // Performs a macro substitution.
     //
-    performMacroSubstitution(line, macros)
+    performMacroSubstitution(line, macros, inSubstMacro)
     {
         var macroNames = Object.getOwnPropertyNames(macros);
         for (var macro of macroNames)
         {
+            //
+            // Self referrential macros are legal in C.  The self-referrential name isn't a target
+            // for further macro replacement.
+            //
+            if (inSubstMacro && macro == inSubstMacro)
+            {
+                continue;
+            }
+
             var startIdx = 0;
             var idx = line.indexOf(macro);
             var len = macro.length;
@@ -698,8 +796,16 @@ class __CTokenStream
 
                 if (doReplace)
                 {
-                    line = line.substr(0, idx) + macros[macro] + line.substr(idx + len);
-                    idx = line.indexOf(macro);
+                    var linePostMacro = line.substr(idx + len);
+                    var substText = this.performMacroSubstitution(macros[macro], macros, macro);
+                    var substTextLen = substText.length;
+                    line = line.substr(0, idx) + substText + linePostMacro;
+                    var lpmIdx = linePostMacro.indexOf(macro);
+                    if (lpmIdx != -1)
+                    {
+                        lpmIdx += (idx + substTextLen);
+                    }
+                    idx = lpmIdx;
                 }
                 else
                 {
@@ -927,7 +1033,19 @@ class __CTokenStream
                             line = this.performMacroSubstitutionIf(line, macros);
                             var macroTokenizer = new __CTokenStream(line);
                             var macroParser = new __CMacroParser(macroTokenizer);
+
+                            if (__diag)
+                            {
+                                host.diagnostics.debugLog("Evaluating conditional for '" + line + "'\n");
+                            }
+
                             var conditional = macroParser.macroConditionEval(macros);
+
+                            if (__diag)
+                            {
+                                host.diagnostics.debugLog("    Result == '" + conditional.toString() + "'\n");
+                            }
+
                             conditionals.push(conditional);
                         }
                         else
@@ -980,60 +1098,68 @@ class __CTokenStream
                             if (startIdx < endIdx && endIdx < includeFile.length)
                             {
                                 //
-                                // We have a file.  Combine it with our include path.
+                                // We have a file.  See if we can find the header in either the specified
+                                // include path or in a specified part of the SDK.
                                 //
                                 var filePath = includeFile.substring(startIdx + 1, endIdx);
-                                if (!__isAbsolute(filePath))
-                                {
-                                    if (this.__details.includePath && this.__details.includePath.length > 0)
-                                    {
-                                        filePath = this.__details.includePath + filePath;
 
+                                if (__diag)
+                                {
+                                    host.diagnostics.debugLog("Performing include of '", filePath, "'\n");
+                                }
+
+                                var includeFile = null;
+                                var openedFile = false;
+                                try
+                                {
+                                    includeFile = __findAndOpenHeader(filePath, 
+                                                                      this.__details.includePath,
+                                                                      this.__details.sdkPath);
+                                    openedFile = true;
+                                }
+                                catch(exc)
+                                {
+                                    if (__diag)
+                                    {
+                                        host.diagnostics.debugLog("Unable to open '", filePath, "': skipping\n");
+                                    }
+                                }
+
+                                //
+                                // Read from the #include header.  Note that we will throw to the outer
+                                // Import call if something fails, but we *ALWAYS* want to close the file
+                                // before doing so!
+                                //
+                                if (openedFile)
+                                {
+                                    var caughtException = null;
+                                    try
+                                    {
+                                        var reader = __getAPI().FileSystem.CreateTextReader(includeFile);
+                                        var parser = new __CParser(reader, macros, true, includeFile, this.__details);
                                         if (__diag)
                                         {
-                                            host.diagnostics.debugLog("Performing include of '", filePath, "'\n");
+                                            host.diagnostics.debugLog(">>>> Begin #include of '" + filePath + "'\n");
                                         }
-
-                                        var includeFile = null;
-                                        var openedFile = false;
-                                        try
+                                        parser.importInto(this.__details.symbolSet);
+                                        if (__diag)
                                         {
-                                            includeFile = __getAPI().FileSystem.OpenFile(filePath);
-                                            openedFile = true;
+                                            host.diagnostics.debugLog("<<<< End #include of '" + filePath + "'\n");
                                         }
-                                        catch(exc)
+                                    }
+                                    catch(caughtException)
+                                    {
+                                        if (__diag)
                                         {
-                                            if (__diag)
-                                            {
-                                                host.diagnostics.debugLog("Unable to open '", filePath, "': skipping\n");
-                                            }
+                                            host.diagnostics.debugLog("<<<< **** EXCEPTION '" + caughtException.toString() + "' when processing #include of '" + filePath + "'\n");
                                         }
+                                    }
 
-                                        //
-                                        // Read from the #include header.  Note that we will throw to the outer
-                                        // Import call if something fails, but we *ALWAYS* want to close the file
-                                        // before doing so!
-                                        //
-                                        if (openedFile)
-                                        {
-                                            var caughtException = null;
-                                            try
-                                            {
-                                                var reader = __getAPI().FileSystem.CreateTextReader(includeFile);
-                                                var parser = new __CParser(reader, macros, true, includeFile, this.__details);
-                                                parser.importInto(this.__details.symbolSet);
-                                            }
-                                            catch(caughtException)
-                                            {
-                                            }
+                                    includeFile.Close();
 
-                                            includeFile.Close();
-
-                                            if (caughtException)
-                                            {
-                                                throw caughtException;
-                                            }
-                                        }
+                                    if (caughtException)
+                                    {
+                                        throw caughtException;
                                     }
                                 }
                             }
@@ -1632,7 +1758,9 @@ class __CParser
                 this.advance(true);
             }
             else if (this.__curToken.__tokenType == __tokenTypes.Const ||
-                     this.__curToken.__tokenType == __tokenTypes.Volatile)
+                     this.__curToken.__tokenType == __tokenTypes.Volatile ||
+                     this.__curToken.__tokenType == __tokenTypes.__Ptr32 ||
+                     this.__curToken.__tokenType == __tokenTypes.__Ptr64)
             {
                 //
                 // We don't care about qualifiers applied to pointer types (e.g.: foo * const *)
@@ -2350,6 +2478,10 @@ class __CParser
                     var typeTarget = typeName + quals;
                     if (name != typeTarget)
                     {
+                        if (__diag)
+                        {
+                            host.diagnostics.debugLog("Creating a typedef: '" + name + "' to '" + typeName + quals + "'\n");
+                        }
                         symbolSet.Types.CreateTypedef(name, typeName + quals);
                     }
 
@@ -2430,6 +2562,12 @@ class __SymbolBuilderExtension
             includePath = __pathOf(path);
         }
 
+        var sdkPath = null;
+        if (attributes && attributes.SDKPath !== undefined)
+        {
+            sdkPath = attributes.SDKPath;
+        }
+
         if (addWindowsTypedefs)
         {
             this.__AddWindowsTypedefs();
@@ -2440,7 +2578,7 @@ class __SymbolBuilderExtension
         try
         {
             var reader = __getAPI().FileSystem.CreateTextReader(file);
-            var parser = new __CParser(reader, macros, false, path, { allowIncludes: allowIncludes, includePath: includePath, symbolSet: this });
+            var parser = new __CParser(reader, macros, false, path, { allowIncludes: allowIncludes, includePath: includePath, symbolSet: this, sdkPath: sdkPath });
             parser.importInto(this);
         }
         catch(exc)
