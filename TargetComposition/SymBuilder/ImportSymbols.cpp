@@ -1331,14 +1331,29 @@ bool SymbolImporter_DbgHelp::LegacyReadMemory(_Inout_ IMAGEHLP_CBA_READ_MEMORY *
 {
     auto pOwningProcess = m_pOwningSet->GetOwningProcess();
     auto pVirtualMemory = pOwningProcess->GetVirtualMemory();
+    bool isKernel = pOwningProcess->IsKernel();
     ULONG64 processKey = pOwningProcess->GetProcessKey();
 
-    ComPtr<ISvcProcess> spProcess;
+    //
+    // If we have a generalized view of the kernel and not a specific "process context", we can go and ask
+    // for the generalized kernel address context in which to perform any memory reads.
+    //
     ComPtr<ISvcAddressContext> spAddrCtx;
-    if (FAILED(pOwningProcess->GetSymbolBuilderManager()->ProcessKeyToProcess(processKey, &spProcess)) ||
-        FAILED(spProcess.As(&spAddrCtx)))
+    if (isKernel && processKey == 0)
     {
-        return false;
+        if (FAILED(pOwningProcess->GetSymbolBuilderManager()->GetKernelAddressContext(&spAddrCtx)))
+        {
+            return false;
+        }
+    }
+    else
+    {
+        ComPtr<ISvcProcess> spProcess;
+        if (FAILED(pOwningProcess->GetSymbolBuilderManager()->ProcessKeyToProcess(processKey, &spProcess)) ||
+            FAILED(spProcess.As(&spAddrCtx)))
+        {
+            return false;
+        }
     }
 
     ULONG64 bytesRead;

@@ -64,6 +64,7 @@ BEGIN
     SYMBOLBUILDER_IDS_FUNCTION_ADDRESSRANGES        "The list of address ranges for code bytes of the function.  The first address range is the primary one and defines the entry point of the function"
     SYMBOLBUILDER_IDS_FUNCTION_DELETE               "Delete() - Deletes the function"
     SYMBOLBUILDER_IDS_PARAMETERS_ADD                "Add(name, parameterType) - Adds a new parameter of the given name and type"
+    SYMBOLBUILDER_IDS_PARAMETERS_PROPAGATELIVERANGESFROMCALLINGCONVENTION   "PropagateLiveRangesFromCallingConvention() - Uses knowledge of the function calling convention and a walk of the disassembly to determine the live ranges of each parameter throughout the function"
     SYMBOLBUILDER_IDS_LOCALVARIABLES_ADD            "Add(name, localVariableType) - Adds a new local variable (non parameter) of the given name and type"
     SYMBOLBUILDER_IDS_VARIABLE_NAME                 "The name of the variable (parameter or local)"
     SYMBOLBUILDER_IDS_VARIABLE_TYPE                 "The type of the variable (parameter or local)"

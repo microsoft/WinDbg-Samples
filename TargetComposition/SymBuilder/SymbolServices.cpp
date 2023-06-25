@@ -47,7 +47,7 @@ HRESULT SymbolProvider::LocateSymbolsForImage(_In_ ISvcModule *pImage,
     IfFailedReturn(pImage->GetKey(&moduleKey));
 
     ComPtr<SymbolBuilderProcess> spSymProcess;
-    IfFailedReturn(m_spSymManager->TrackProcessForModule(pImage, &spSymProcess));
+    IfFailedReturn(m_spSymManager->TrackProcessForModule(IsKernelTarget(), pImage, &spSymProcess));
 
     ComPtr<SymbolSet> spSymbolSet;
     if (spSymProcess->TryGetSymbolsForModule(moduleKey, &spSymbolSet))

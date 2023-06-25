@@ -403,6 +403,7 @@ public:
     bool InternalSetLiveRangeSize(_In_ ULONG64 id, _In_ ULONG64 size);
     bool InternalSetLiveRangeLocation(_In_ ULONG64 id, _In_ SvcSymbolLocation const& location);
     bool InternalDeleteLiveRange(_In_ ULONG64 id);
+    void InternalDeleteAllLiveRanges();
 
 private:
 
