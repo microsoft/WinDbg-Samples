@@ -210,7 +210,6 @@ public:
         {
             commandMonitor += "qRcmd,";
             commandMonitor += dataBuffer.c_str();
-            commandMonitor += dataBuffer.c_str();
         }
 
         std::string reply = ExecuteCommandOnProcessor(commandMonitor.c_str(), true, 0, core);
@@ -2619,8 +2618,6 @@ public:
         }
 
         ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
-        LPCSTR pStrGdbSrvType;
-        size_t gdbSrvStrTypeLength;
         wstring wGdbServerTarget;
         cfgData.GetGdbServerTargetName(wGdbServerTarget);
         using convert_type = std::codecvt_utf8<wchar_t>;
@@ -2631,8 +2628,6 @@ public:
             throw _com_error(E_FAIL);
         }
 
-        pStrGdbSrvType = sGdbServerTarget.c_str();
-        gdbSrvStrTypeLength = sGdbServerTarget.length();
         if (!cfgData.GetServerRequirePAMemoryAccess())
         {
             throw _com_error(E_FAIL);
