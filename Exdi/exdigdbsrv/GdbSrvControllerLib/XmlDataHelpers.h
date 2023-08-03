@@ -57,6 +57,7 @@ namespace GdbSrvControllerLib
         std::wstring qSupportedPacket;  //  GDB server supported, if this empty then will send the default "qsupported" packet
         bool fTreatSwBpAsHwBp;          //  GDB server client will convert SW bp as HW bp.
         bool fForcedLegacyResumeStepCommands; //  Flag if set the GDB server will use the legacy resume/step command mode
+        bool fPAMemoryAccess;          //  GDB server reuires memory access via PA
     } ConfigExdiData;
 
     //  This type indicates the Target data.
@@ -232,6 +233,7 @@ namespace GdbSrvControllerLib
         static inline bool IsRegisterFileReference(_In_ PCWSTR pTagName);
         static inline bool IsFeatureRegisterFile(_In_ PCWSTR pTagName);
         static inline bool IsRegisterFileEntry(_In_ PCWSTR pTagName);
+        static inline bool IsTargetEmptyAttribute(_In_ PCWSTR pTagName);
         static bool SetFileTargetArchitecture(_In_ PCWSTR pTagValue, _Out_ ConfigExdiGdbSrvData* pConfigTable);
         static bool SetRegistersByTargetFile(_In_ TAG_ATTR_LIST* const pTagAttrList,
             _Out_ ConfigExdiGdbSrvData* pConfigTable);

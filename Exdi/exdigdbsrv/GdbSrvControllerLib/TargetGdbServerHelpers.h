@@ -168,5 +168,26 @@ public:
     }
 };
 
+class BmcSmmDGdbServerMemoryHelpers
+{
+public:
+
+    static inline PCSTR GetGdbSrvReadMemoryCmd(
+        _In_ memoryAccessType memType,
+        _In_ bool is64BitArchitecture)
+    {
+
+        return is64BitArchitecture ? "m%I64x,%x" : "m%x,%x";
+    }
+
+    static inline PCSTR GetGdbSrvWriteMemoryCmd(
+        _In_ memoryAccessType memType,
+        _In_ bool is64BitArchitecture)
+    {
+
+        return is64BitArchitecture ? "M%I64x," : "M%x,";
+    }
+};
+
 #pragma endregion
 #pragma once

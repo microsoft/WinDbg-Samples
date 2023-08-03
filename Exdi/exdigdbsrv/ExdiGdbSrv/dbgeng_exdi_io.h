@@ -84,7 +84,8 @@ typedef struct
     struct
     {
         ULONG   HeuristicChunkSize:1;
-        ULONG   Reserved:31;
+        ULONG   RequireMemoryAccessByPA: 1;
+        ULONG   Reserved:30;
     } request;
 } DBGENG_EXDI_IOCTL_V3_GET_ADDITIONAL_SERVER_INFO_EX_IN;
 

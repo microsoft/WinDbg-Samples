@@ -100,6 +100,7 @@ typedef struct
     WCHAR qSupportedPacket[C_MAX_ATTR_LENGTH];          //  qSupported packet to send to the dbg server, if empty then just "qSupported"
     WCHAR fTreatSwBpAsHwBp[C_MAX_ATTR_LENGTH];          //  Treat SW bp as a HW bp.
     WCHAR fForcedLegacyResumeStepCommands[C_MAX_ATTR_LENGTH]; //  Flag if set, then use the legacy step/resume command mode.
+    WCHAR fServerRequirePAMemoryAccess[C_MAX_ATTR_LENGTH]; //  if set the server requires PAs for all memory access R/W.
 } ConfigExdiDataEntry;
 
 typedef struct
@@ -175,6 +176,7 @@ const WCHAR gdbServerConnectionValue[] = L"Value";
 const WCHAR gdbServerAgentNamePacket[] = L"agentNamePacket";
 const WCHAR gdbQSupportedPacket[] = L"qSupportedPacket";
 const WCHAR gdbTreatSwBpAsHwBp[] = L"enableTreatingSwBpAsHwBp";
+const WCHAR gdbRequirePAMemoryAccess[] = L"requirePAMemoryAccess";
 const WCHAR gdbServerUuid[] = L"uuid";
 const WCHAR displayCommPackets[] = L"displayCommPackets";
 const WCHAR debuggerSessionByCore[] = L"debuggerSessionByCore";
@@ -211,6 +213,7 @@ const WCHAR gdbSystemRegistersGdbMonitor[] = L"SystemRegistersGdbMonitor";
 const WCHAR gdbSystemRegisterDecoding[] = L"SystemRegisterDecoding";
 const WCHAR targetFileArchitectureName[] = L"architecture";
 //const WCHAR includeTargetFile[] = L"xi:include";
+const WCHAR includeTargetAttribute[] = L"target";
 const WCHAR includeTargetFile[] = L"includeTarget";
 const WCHAR hrefTargetFile[] = L"href";
 const WCHAR featureTag[] = L"feature";
@@ -253,6 +256,7 @@ const XML_ATTRNAME_HANDLER_STRUCT attrExdiServerHandlerMap[] =
     {exdiGdbServerConfigData, gdbQSupportedPacket,      XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, qSupportedPacket), C_MAX_ATTR_LENGTH},
     {exdiGdbServerConfigData, gdbTreatSwBpAsHwBp,       XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fTreatSwBpAsHwBp), C_MAX_ATTR_LENGTH},
     {exdiGdbServerConfigData, forceLegacyResumeStepCmds,XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fForcedLegacyResumeStepCommands), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbRequirePAMemoryAccess, XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fServerRequirePAMemoryAccess), C_MAX_ATTR_LENGTH},
 };
 
 //  Attribute name - handler map for the GdbServer server tag info
@@ -782,6 +786,10 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
             XmlDataGdbServerRegisterFile::IsRegisterFileReference(pTagAttrList->tagName))
         {
             isSet = XmlDataGdbServerRegisterFile::HandleTargetFileTags(pTagAttrList, pConfigTable);
+            if (isSet)
+            {
+                hr = S_OK;
+            }
         }
         else if (XmlDataGdbServerRegisterFile::IsFeatureRegisterFile(pTagAttrList->tagName) ||
             XmlDataGdbServerRegisterFile::IsRegisterFileEntry(pTagAttrList->tagName))
@@ -810,6 +818,7 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     pConfigTable->component.qSupportedPacket = exdiData.qSupportedPacket;
                     pConfigTable->component.fTreatSwBpAsHwBp = (_wcsicmp(exdiData.fTreatSwBpAsHwBp, L"yes") == 0) ? true : false;
                     pConfigTable->component.fForcedLegacyResumeStepCommands = (_wcsicmp(exdiData.fForcedLegacyResumeStepCommands, L"yes") == 0) ? true : false;
+                    pConfigTable->component.fPAMemoryAccess = (_wcsicmp(exdiData.fServerRequirePAMemoryAccess, L"yes") == 0) ? true : false;
                     isSet = true;
                 }
             }
@@ -1011,6 +1020,13 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     isSet = true;
                 }
             }
+            else if (XmlDataGdbServerRegisterFile::IsTargetEmptyAttribute(pTagAttrList->tagName) ||
+                (XmlDataGdbServerRegisterFile::IsTargetDescriptionFile(pTagAttrList->tagName) &&
+                pConfigTable->file.isTargetTagEmpty))
+            {
+                isSet = true;
+                hr = S_OK;
+            }
         }
         else
         {
@@ -1086,6 +1102,17 @@ inline bool XmlDataGdbServerRegisterFile::IsRegisterFileEntry(_In_ PCWSTR pTagNa
     return isDone;
 }
 
+inline bool XmlDataGdbServerRegisterFile::IsTargetEmptyAttribute(_In_ PCWSTR pTagName)
+{
+    assert(pTagName != nullptr);
+    bool isDone = false;
+
+    if (_wcsnicmp(pTagName, includeTargetAttribute, wcslen(includeTargetAttribute)) == 0)
+    {
+        isDone = true;
+    }
+    return isDone;
+}
 
 bool XmlDataGdbServerRegisterFile::SetFileTargetArchitecture(_In_ PCWSTR pTagValue,
     _Out_ ConfigExdiGdbSrvData* pConfigTable)
