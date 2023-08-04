@@ -339,6 +339,11 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         return m_ExdiGdbServerData.component.fTreatSwBpAsHwBp;
     }
 
+    inline bool ConfigExdiGdbServerHelperImpl::GetServerRequirePAMemoryAccess() const
+    {
+        return m_ExdiGdbServerData.component.fPAMemoryAccess;
+    }
+
     private:
     CComPtr<IXmlReader> m_XmlLiteReader;
     CComPtr<IStream> m_IStream;
@@ -878,4 +883,10 @@ void ConfigExdiGdbServerHelper::SetTargetArchitecture(_In_ TargetArchitecture ta
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
     m_pConfigExdiGdbServerHelperImpl->SetTargetArchitecture(targetArch);
+}
+
+bool ConfigExdiGdbServerHelper::GetServerRequirePAMemoryAccess()
+{
+    assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
+    return m_pConfigExdiGdbServerHelperImpl->GetServerRequirePAMemoryAccess();
 }

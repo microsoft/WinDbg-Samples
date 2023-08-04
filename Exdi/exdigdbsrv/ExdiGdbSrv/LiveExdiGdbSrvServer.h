@@ -64,7 +64,8 @@ public:
           m_fEnableSSEContext(false),
           m_lastPcAddress(0),
           m_lastPSRvalue(0),
-          m_heuristicChunkSize(0)
+          m_heuristicChunkSize(0),
+          m_RequireMemoryAccessByPA(false)
     {
     }
 
@@ -299,6 +300,7 @@ public:
         ADDRESS_TYPE m_lastPcAddress;
         DWORD64 m_lastPSRvalue;
         DWORD64 m_heuristicChunkSize;
+        bool m_RequireMemoryAccessByPA;
 
         inline GdbSrvControllerLib::AsynchronousGdbSrvController * GetGdbSrvController() {return m_pGdbSrvController;}
         ADDRESS_TYPE GetCurrentExecutionAddress(_Out_ DWORD *pProcessorNumberOfLastEvent);

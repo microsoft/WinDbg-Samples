@@ -597,7 +597,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadPhysicalMemoryOrPeriphIO(
         }
 
         memoryAccessType memoryType = {0};
-        memoryType.isPhysical = 1;
+        memoryType.isPhysical = pController->GetPAMemoryMode() ? 0 : 1;
         SimpleCharBuffer buffer = pController->ReadMemory(Address, dwBytesToRead, memoryType);
         return SafeArrayFromByteArray(buffer.GetInternalBuffer(), buffer.GetLength(), pReadBuffer);
     }
@@ -689,6 +689,16 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Ioctl(
                         size_t bytesToCopy = min(dwBuffOutSize, sizeof(m_heuristicChunkSize));
                         hr = SafeArrayFromByteArray(reinterpret_cast<const char *>(&m_heuristicChunkSize), bytesToCopy, pOutputBuffer);
                     }
+                    else if (pAdditionalInfo->request.RequireMemoryAccessByPA)
+                    {
+                        size_t bytesToCopy = min(dwBuffOutSize, sizeof(m_RequireMemoryAccessByPA));
+                        hr = SafeArrayFromByteArray(reinterpret_cast<const char*>(&m_RequireMemoryAccessByPA), bytesToCopy, pOutputBuffer);
+                    }
+                    else
+                    {
+                        hr = E_NOTIMPL;
+                    }
+
                 }
             }
             break;
@@ -1215,11 +1225,11 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         std::map<std::string, std::string> ::const_iterator it = registers.find("cr0");
         if (it != registers.end())
         {
-            pContext->RegCr0 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr0"]));
-            pContext->RegCr2 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr2"]));
-            pContext->RegCr3 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr3"]));
-            pContext->RegCr4 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr4"]));
-            pContext->RegCr8 = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["cr8"]));
+            pContext->RegCr0 = GdbSrvController::ParseRegisterValue(registers["cr0"]);
+            pContext->RegCr2 = GdbSrvController::ParseRegisterValue(registers["cr2"]);
+            pContext->RegCr3 = GdbSrvController::ParseRegisterValue(registers["cr3"]);
+            pContext->RegCr4 = GdbSrvController::ParseRegisterValue(registers["cr4"]);
+            pContext->RegCr8 = GdbSrvController::ParseRegisterValue(registers["cr8"]);
             pContext->RegGroupSelection.fSystemRegisters = TRUE;
         }
 
@@ -1238,14 +1248,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         //  Are the GDT & IDT system register present?
         if (registers.find("gdtrbase") != registers.end())
         {
-            pContext->GDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrbase"]));
-            pContext->GDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["gdtrlimit"]));
+            pContext->GDTBase = GdbSrvController::ParseRegisterValue(registers["gdtrbase"]);
+            pContext->GDTLimit = GdbSrvController::ParseRegisterValue32(registers["gdtrlimit"]);
         }
 
         if (registers.find("idtrbase") != registers.end())
         {
-            pContext->IDTBase = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrbase"]));
-            pContext->IDTLimit = static_cast<DWORD>(GdbSrvController::ParseRegisterValue(registers["idtrlimit"]));
+            pContext->IDTBase = GdbSrvController::ParseRegisterValue(registers["idtrbase"]);
+            pContext->IDTLimit = GdbSrvController::ParseRegisterValue32(registers["idtrlimit"]);
         }
 
         //  x87 registers (FPU)
@@ -1664,6 +1674,7 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerParameters()
         m_fDisplayCommData = cfgData.GetDisplayCommPacketsCharacters();
         m_fEnableSSEContext = cfgData.GetIntelSseContext();
         m_heuristicChunkSize = cfgData.GetHeuristicScanMemorySize();
+        m_RequireMemoryAccessByPA = cfgData.GetServerRequirePAMemoryAccess();
         unsigned numberOfCores = cfgData.GetNumberOfCores();
         std::vector<std::wstring> coreConnections;
         cfgData.GetGdbServerConnectionParameters(coreConnections);
@@ -1778,7 +1789,10 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerConnection(void)
         if (!pController->ConfigureGdbSrvCommSession(m_fDisplayCommData, C_ALLCORES))
         {
             //  Failed configuring the session.
-            MessageBox(0, _T("Error: Unable to configure the GdbServer session."), _T("EXDI-GdbServer"), MB_ICONERROR);
+            MessageBox(0, _T("Error: Unable to configure the GdbServer session.")
+                          _T("Please verify the SendPacketTimeout & ReceivePacketTimeout timeout value (msec unit)")
+                          _T("attributes for the current selected GDB server at the exdiconfigdata.xml file."),
+                          _T("EXDI-GdbServer"), MB_ICONERROR);
             return E_ABORT;
         }
 
@@ -2135,7 +2149,7 @@ void CLiveExdiGdbSrvServer::SetNeonRegisters(_In_ DWORD processorNumber, _In_ co
     }
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ExecuteExdiComponentFunction( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ExecuteExdiComponentFunction(
     /* [in] */ ExdiComponentFunctionType type,
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ LPCWSTR pFunctionToExecute)

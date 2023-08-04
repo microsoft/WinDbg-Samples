@@ -327,6 +327,9 @@ namespace GdbSrvControllerLib
         //  Set event interrupt
         void SetInterruptEvent();
 
+        //  GetPAMemoryMode
+        bool GetPAMemoryMode();
+
     protected:
         bool IsReplyOK(_In_ const std::string & reply);
 
