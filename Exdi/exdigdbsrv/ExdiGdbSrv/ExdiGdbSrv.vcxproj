@@ -133,6 +133,7 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
+      <AdditionalOptions>/SOURCELINK:".\sourcelink.json" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -168,6 +169,7 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
+      <AdditionalOptions>/SOURCELINK:".\sourcelink.json" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -205,6 +207,7 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
+      <AdditionalOptions>/SOURCELINK:".\sourcelink.json" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -243,6 +246,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/SOURCELINK:".\sourcelink.json" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -287,6 +291,7 @@
       <RuntimeTypeInfo>
       </RuntimeTypeInfo>
       <DiagnosticsFormat>Classic</DiagnosticsFormat>
+      <AdditionalOptions>/SOURCELINK:".\sourcelink.json" %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
