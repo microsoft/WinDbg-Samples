@@ -657,6 +657,43 @@ HRESULT SymbolImporter_DbgHelp::ImportConstantData(_In_ ULONG symIndex, _Out_ UL
     return hr;
 }
 
+HRESULT SymbolImporter_DbgHelp::ImportGlobalData(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId)
+{
+    HRESULT hr = S_OK;
+
+    ULONG childTI;
+    WCHAR *pDataName;
+    ULONG64 addr;
+
+    if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_TYPEID, &childTI) ||
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_ADDRESS, &addr) ||
+        !SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_SYMNAME, &pDataName))
+    {
+        return ImportFailure(E_FAIL);
+    }
+
+    localstr_ptr spDataName(pDataName);
+
+    ULONG64 dataBuilderType;
+    IfFailedReturn(ImportSymbol(childTI, &dataBuilderType));
+
+    ComPtr<GlobalDataSymbol> spGlobalData;
+    hr = MakeAndInitialize<GlobalDataSymbol>(&spGlobalData,
+                                             m_pOwningSet,
+                                             parentId,
+                                             addr - m_moduleBase,       // RVA, not absolute VA
+                                             dataBuilderType,
+                                             pDataName,
+                                             nullptr);
+    if (FAILED(hr))
+    {
+        return ImportFailure(hr);
+    }
+
+    *pBuilderId = spGlobalData->InternalGetId();
+    return hr;
+}
+
 HRESULT SymbolImporter_DbgHelp::ImportDataSymbol(_In_ ULONG symIndex, _Out_ ULONG64 *pBuilderId, _In_ ULONG64 parentId)
 {
     HRESULT hr = S_OK;
@@ -674,6 +711,9 @@ HRESULT SymbolImporter_DbgHelp::ImportDataSymbol(_In_ ULONG symIndex, _Out_ ULON
 
         case DataIsConstant:
             return ImportConstantData(symIndex, pBuilderId, parentId);
+
+        case DataIsGlobal:
+            return ImportGlobalData(symIndex, pBuilderId, parentId);
 
         default:
             //
@@ -855,8 +895,33 @@ HRESULT SymbolImporter_DbgHelp::ImportFunctionType(_In_ ULONG symIndex, _Out_ UL
         return ImportFailure(E_FAIL);
     }
 
+    //
+    // Now that we have some basic information about the function type, go and create the shell of it in the symbol
+    // builder and then copy over return types and parameter types we wish to import one by one.
+    //
+    ComPtr<FunctionTypeSymbol> spFunctionType;
+    hr = MakeAndInitialize<FunctionTypeSymbol>(&spFunctionType, m_pOwningSet);
+    if (FAILED(hr))
+    {
+        return ImportFailure(hr);
+    }
+
+    //
+    // A function type (e.g.: a prototype) may contain references to itself in either the return type of
+    // the function or one of the arguments types to the function (perhaps via some UDT).  In order for those 
+    // functionm types to resolve correctly, we must have this function type in the index
+    // table already so that the linkages can be set up without causing errors or an infinite import chain.
+    //
+    IfFailedReturn(ConvertException([&]()
+    {
+        m_importedIndexMap.insert({ symIndex, spFunctionType->InternalGetId() });
+        return S_OK;
+    }));
+
     ULONG64 funcReturnTypeBuilderId;
     IfFailedReturn(ImportSymbol(funcReturnTypeId, &funcReturnTypeBuilderId));
+
+    spFunctionType->InternalSetReturnType(funcReturnTypeBuilderId);
 
     std::unique_ptr<char []> spBuf(new char[sizeof(TI_FINDCHILDREN_PARAMS) + sizeof(ULONG) * childCount]);
     TI_FINDCHILDREN_PARAMS *pChildQuery = reinterpret_cast<TI_FINDCHILDREN_PARAMS *>(spBuf.get());
@@ -911,16 +976,7 @@ HRESULT SymbolImporter_DbgHelp::ImportFunctionType(_In_ ULONG symIndex, _Out_ UL
         }
     }
 
-    ComPtr<FunctionTypeSymbol> spFunctionType;
-    hr = MakeAndInitialize<FunctionTypeSymbol>(&spFunctionType,
-                                               m_pOwningSet,
-                                               funcReturnTypeBuilderId,
-                                               paramCount,
-                                               paramCount == 0 ? nullptr : spParams.get());
-    if (FAILED(hr))
-    {
-        return ImportFailure(hr);
-    }
+    IfFailedReturn(spFunctionType->InternalSetParameterTypes(paramCount, spParams.get()));
 
     *pBuilderId = spFunctionType->InternalGetId();
     return hr;

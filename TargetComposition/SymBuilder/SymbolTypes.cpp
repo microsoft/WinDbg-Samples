@@ -651,24 +651,36 @@ HRESULT FunctionTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                                    _In_ ULONG64 paramCount,
                                                    _In_reads_(paramCount) ULONG64 *pParamTypes)
 {
+    HRESULT hr = S_OK;
+
+    m_returnType = returnTypeId;
+    IfFailedReturn(InternalSetParameterTypes(paramCount, pParamTypes));
+    IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, SvcSymbolType, 0, nullptr, nullptr));
+
+    return hr;
+}
+
+HRESULT FunctionTypeSymbol::RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet)
+{
+    return BaseSymbol::BaseInitialize(pSymbolSet, SvcSymbolType, 0, nullptr, nullptr);
+}
+
+HRESULT FunctionTypeSymbol::InternalSetParameterTypes(_In_ ULONG64 paramCount,
+                                                      _In_reads_(paramCount) ULONG64 *pParamTypes)
+{
     auto fn = [&]()
     {
-        HRESULT hr = S_OK;
-
         if (paramCount > std::numeric_limits<size_t>::max())
         {
             return E_INVALIDARG;
         }
 
-        m_returnType = returnTypeId;
         for (ULONG64 i = 0; i < paramCount; ++i)
         {
             m_paramTypes.push_back(pParamTypes[static_cast<size_t>(i)]);
         }
 
-        IfFailedReturn(BaseSymbol::BaseInitialize(pSymbolSet, SvcSymbolType, 0, nullptr, nullptr));
-
-        return hr;
+        return S_OK;
     };
     return ConvertException(fn);
 }

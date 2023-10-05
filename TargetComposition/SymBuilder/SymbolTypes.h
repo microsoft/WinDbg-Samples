@@ -977,16 +977,43 @@ public:
     // Internal APIs:
     //
 
+    // RuntimeClassInitialize():
+    //
+    // Initializes a fully formed function type symbol (with the return types and paramter types known
+    // upfront).
+    //
     HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                    _In_ ULONG64 returnTypeId,
                                    _In_ ULONG64 paramCount,
                                    _In_reads_(paramCount) ULONG64 *pParamTypes);
 
+    // RuntimeClassInitialize():
+    //
+    // Initializes a shell function type symbol (where return types and parameter types will be filled
+    // in during an import or other similar operation).
+    //
+    HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet);
+
+    // InternalSetReturnType():
+    //
+    // Sets the return type of the function type symbol once it has been imported.
+    //
+    void InternalSetReturnType(_In_ ULONG64 returnType)
+    {
+        m_returnType = returnType;
+    }
+
+    // InternalSetParameterTypes():
+    //
+    // Sets the parameter types of the function type symbol once they have been imported.
+    //
+    HRESULT InternalSetParameterTypes(_In_ ULONG64 paramCount,
+                                      _In_reads_(paramCount) ULONG64 *pParamTypes);
+
 private:
 
     ULONG64 m_returnType;
     std::vector<ULONG64> m_paramTypes;
-
 };
 
 } // SymbolBuilder
