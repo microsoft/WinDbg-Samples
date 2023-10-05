@@ -1,5 +1,5 @@
 param(
-    [string]$GitRelativePath = ""
+    [string]$GitRelativePath = "",
     [string]$OutputDir = "$PSScriptRoot\\out"
 )
 
