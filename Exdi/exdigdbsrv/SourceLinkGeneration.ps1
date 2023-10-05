@@ -5,8 +5,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-
-Import-Module -Force -Name .\SourceControl.psm1
+$scriptDirectory = Split-Path -Parent $MyInvocation.MyCommand.Path
+Import-Module -Force -Name $scriptDirectory\SourceControl.psm1
 
 <#
     .SYNOPSIS
