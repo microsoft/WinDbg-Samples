@@ -1,4 +1,5 @@
 param(
+    [string]$GitRelativePath = ""
     [string]$OutputDir = "$PSScriptRoot\\out"
 )
 
@@ -33,9 +34,10 @@ Import-Module -Force -Name $scriptDirectory\SourceControl.psm1
     sourceLink will alias all paths to P (or $sourcesDirectoryPath
     in this case) to the git repo.
 #>
-Function GenerateSourceLinkJsonConfig($sourcesDirectoryPath, $sourceLinkOutputPath)
+Function GenerateSourceLinkJsonConfig($sourcesDirectoryPath, $sourceLinkOutputPath, $gitRelativePath)
 {
-    $sourceFilePath = "*"
+    # Note: SourceFilePath needs to end in a slash for this to work
+    $sourceFilePath = "${gitRelativePath}/*"
     $headCommitId = Get-RepositoryHeadCommitId
     $repository = Get-Repository
     $owner = Get-Repository-Owner
@@ -45,7 +47,7 @@ Function GenerateSourceLinkJsonConfig($sourcesDirectoryPath, $sourceLinkOutputPa
         Write-Error "One or more values are null or empty. [Repository Directory=$repositoryDirectory;Head Commit ID=$headCommitId;Repository=$repository]"
     }
 
-    $url = "https://raw.githubusercontent.com/${owner}/${repository}/${headCommitId}/${sourceFilePath}"
+    $url = "https://raw.githubusercontent.com/${owner}/${repository}/${headCommitId}${sourceFilePath}"
 
     $jsonObject = @{
         "documents" = [ordered]@{
@@ -60,6 +62,5 @@ Function GenerateSourceLinkJsonConfig($sourcesDirectoryPath, $sourceLinkOutputPa
 }
 
 ## Start Script Here
-
 $srcDir = $PSScriptRoot
-GenerateSourceLinkJsonConfig $srcDir "$OutputDir\sourcelink.json"
+GenerateSourceLinkJsonConfig $srcDir "$OutputDir\sourcelink.json" $GitRelativePath

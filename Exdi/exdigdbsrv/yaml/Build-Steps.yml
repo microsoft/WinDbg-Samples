@@ -15,7 +15,7 @@ steps:
   timeoutInMinutes: 30
   inputs:
     filePath: $(Build.SourcesDirectory)\Exdi\exdigdbsrv\SourceLinkGeneration.ps1
-    arguments: "-OutputDir $(Build.SourcesDirectory)\\Exdi\\exdigdbsrv\\exdigdbsrv\\"
+    arguments: "-GitRelativePath /Exdi/exdigdvsrv -OutputDir $(Build.SourcesDirectory)\\Exdi\\exdigdbsrv\\exdigdbsrv\\"
     pwsh: true
 
 - task: VSBuild@1
