@@ -161,6 +161,8 @@ public:
                            _In_ ULONG64 symTypeId,
                            _In_opt_ PCWSTR pwszName,
                            _In_opt_ PCWSTR pwszQualifiedName,
+                           _In_ ULONG64 bitFieldLength = 0,
+                           _In_ ULONG64 bitFieldPosition = 0,
                            _In_ bool newSymbol = true,
                            _In_ ULONG64 id = 0);
 
@@ -198,12 +200,16 @@ public:
     //
 
     virtual bool InternalIsConstantValue() const { return m_symOffset == ConstantValue; }
+    virtual bool InternalIsBitField() const { return m_bitFieldLength != 0; }
     virtual bool InternalHasType() const { return m_symTypeId != 0; }
 
     virtual ULONG64 InternalGetSymbolTypeId() const { return m_symTypeId; }
     virtual ULONG64 InternalGetSymbolOffset() const { return m_symOffset; }
     virtual ULONG64 InternalGetActualSymbolOffset() const { return m_symOffset; }
     virtual VARIANT const& InternalGetSymbolValue() const { return m_symValue; }
+    virtual ULONG64 InternalGetBitFieldLength() const { return m_bitFieldLength; }
+    virtual ULONG64 InternalGetBitFieldPosition() const { return m_bitFieldPosition; }
+    virtual ULONG64 InternalGetActualBitFieldPosition() const { return m_bitFieldPosition; }
 
     //*************************************************
     // Internal  Setters:
@@ -211,12 +217,26 @@ public:
 
     virtual HRESULT InternalSetSymbolTypeId(_In_ ULONG64 symTypeId);
     virtual HRESULT InternalSetSymbolOffset(_In_ ULONG64 symOffset);
+    virtual HRESULT InternalSetSymbolValue(_In_ VARIANT const* pVal);
+    virtual HRESULT InternalSetBitFieldLength(_In_ ULONG64 bitFieldLength);
+    virtual HRESULT InternalSetBitFieldPosition(_In_ ULONG64 bitFieldPosition);
 
 protected:
 
+    //*************************************************
+    // Helpers:
+    //
+
+    // CanBeBitField():
+    //
+    // Returns whether or not this particular symbol can be a bitfield (its type is compatible with this).
+    //
+    HRESULT CanBeBitField(_Out_ bool *pCanBeBitfield, _Out_ ULONG64 *pTypeSize);
 
     ULONG64 m_symTypeId;                // What is the **SYMBOL'S** type (enumerants will not have this)
     ULONG64 m_symOffset;                // Either hard coded or ConstantValue (derived classes may add to this)
+    ULONG64 m_bitFieldLength;           // Zero indicates not a bitfield; non-zero indicates a bitfield
+    ULONG64 m_bitFieldPosition;         // Either hard coded or ConstantValue (derived classes may add to this)
     VARIANT m_symValue;                 // Relevant only for constant valued fields
 
     //
