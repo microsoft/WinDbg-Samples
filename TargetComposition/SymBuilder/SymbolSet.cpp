@@ -454,6 +454,12 @@ HRESULT SymbolSet::AddBasicCTypes()
     IfFailedReturn(MakeAndInitialize<BasicTypeSymbol>(&spNew, this, SvcSymbolIntrinsicFloat, 4, L"float"));
     IfFailedReturn(MakeAndInitialize<BasicTypeSymbol>(&spNew, this, SvcSymbolIntrinsicFloat, 8, L"double"));
 
+    //
+    // "Architecture" dependent types.
+    //
+    IfFailedReturn(MakeAndInitialize<BasicTypeSymbol>(&spNew, this, SvcSymbolIntrinsicUInt, 
+                                                      static_cast<ULONG>(GetArchInfo()->GetBitness() / 8), L"size_t"));
+
     return hr;
 }
 
@@ -756,8 +762,33 @@ HRESULT SymbolSet::FindTypeByName(_In_ std::wstring const& typeName,
 
                 std::wstring baseName(pStart, pPrior - pStart + 1);
 
+                //
+                // NOTE: This is *NOT* a C++ "type name" parser.  We simply recurse to the base type.
+                //       This does mean that you can ask for "void **" and get it.  It also means that
+                //       without further intervention, you would be able to ask for "int [5] *" to get 
+                //       "pointer-to-array(5)-of-int" rather than asking for int (*)[5].
+                //
+                //       In order to avoid this nonsense without further complexity of a real type name
+                //       parser, we reject certain "pointed-to" types.
+                //
+
                 ULONG64 pointedToId = 0;
-                IfFailedReturn(FindTypeByName(baseName, &pointedToId, nullptr));
+                BaseTypeSymbol *pPointedToType = nullptr;
+                IfFailedReturn(FindTypeByName(baseName, &pointedToId, &pPointedToType, true));
+
+                switch(pPointedToType->InternalGetTypeKind())
+                {
+                    case SvcSymbolTypeFunction:
+                    case SvcSymbolTypeArray:
+                        //
+                        // In order to have gotten this, we saw something like "int [5] *" which is not valid
+                        // C-ish syntax.
+                        //
+                        return E_INVALIDARG;
+
+                    default:
+                        break;
+                }
 
                 ComPtr<PointerTypeSymbol> spPointerType;
                 IfFailedReturn(MakeAndInitialize<PointerTypeSymbol>(&spPointerType, this, pointedToId, pointerKind));
@@ -807,7 +838,15 @@ HRESULT SymbolSet::FindTypeByName(_In_ std::wstring const& typeName,
                     ++pDig;
                 }
 
-                std::wstring baseName(pStart, pb - pStart);
+                pb--;
+                while (pb > pStart && iswspace(*pb)) { --pb; }
+
+                if (pb == pStart)
+                {
+                    return E_INVALIDARG;
+                }
+
+                std::wstring baseName(pStart, pb - pStart + 1);
 
                 ULONG64 arrayOfId = 0;
                 IfFailedReturn(FindTypeByName(baseName, &arrayOfId, nullptr));
@@ -834,6 +873,8 @@ HRESULT SymbolSet::FindTypeByName(_In_ std::wstring const& typeName,
         {
             return E_INVALIDARG;
         }
+
+        *pTypeId = symId;
 
         if (ppTypeSymbol != nullptr)
         {

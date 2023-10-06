@@ -55,6 +55,19 @@ namespace SymbolBuilder
 // Standard Helpers:
 //
 
+std::string ToString(_In_ const std::wstring& str)
+{
+    std::string newStr;
+    if (!str.empty())
+    {
+        int sz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        newStr.resize(sz);
+        int rsz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, const_cast<char *>(newStr.data()), sz, nullptr, nullptr);
+        if (sz != rsz) { throw std::runtime_error("failed string conversion"); }
+    }
+    return newStr;
+}
+
 // ValueToString():
 //
 // Performs our string conversion of a constant valued symbol.
@@ -539,9 +552,15 @@ Object SymbolSetObject::GetPublics(_In_ const Object& /*symbolSetObject*/,
 
 BaseTypeSymbol *SymbolObjectHelpers::UnboxType(_In_ SymbolSet *pSymbolSet, 
                                                _In_ Object typeObject,
-                                               _In_ bool allowAutoCreations)
+                                               _In_ bool allowAutoCreations,
+                                               _Out_opt_ ULONG64 *pBitFieldLength)
 
 {
+    if (pBitFieldLength != nullptr)
+    {
+        *pBitFieldLength = 0;
+    }
+
     //
     // NOTE: Every raw assignment of pBaseType which holds a raw pointer from a ComPtr<> which will go out of 
     //       scope is perfectly safe *BECAUSE* there is a guarantee that the symbol is held globally by the
@@ -581,9 +600,70 @@ BaseTypeSymbol *SymbolObjectHelpers::UnboxType(_In_ SymbolSet *pSymbolSet,
     }
     else
     {
+        ULONG64 bitFieldLength = 0;
         std::wstring typeName = (std::wstring)typeObject;
+
+        //
+        // Only if 'pBitFieldLength' was passed in do we allow a string format with ":<ordinal>" at the end
+        // to specify a bitfield.  Only some types of "type unboxing" allow this (e.g.: for fields, etc...)
+        //
+        if (pBitFieldLength != nullptr)
+        {
+            wchar_t const *pwszTypeName = typeName.c_str();
+            wchar_t const *pwszColon = wcsrchr(pwszTypeName, L':');
+            if (pwszColon != nullptr && pwszColon != pwszTypeName)
+            {
+                //
+                // Is this at the end of the string with a decimal numeric afterward...?
+                //
+                wchar_t const *pNumStart = pwszColon + 1;
+                while (*pNumStart && iswspace(*pNumStart)) { ++pNumStart; }
+
+                if (pNumStart != nullptr)
+                {
+                    wchar_t const *pc = pNumStart;
+
+                    bool isFieldColon = true;
+                    while (*pc && isFieldColon)
+                    {
+                        if (!iswdigit(*pc)) { isFieldColon = false; }
+                        ++pc;
+                    }
+                
+                    if (isFieldColon)
+                    {
+                        bitFieldLength = _wtoi(pNumStart);
+                        --pwszColon;
+                        while (iswspace(*pwszColon) && pwszColon != pwszTypeName) { --pwszColon; }
+                        typeName = std::wstring(pwszTypeName, pwszColon - pwszTypeName + 1);
+                    }
+                }
+            }
+        }
+
         ULONG64 typeId;
-        CheckHr(pSymbolSet->FindTypeByName(typeName, &typeId, &pBaseType, allowAutoCreations));
+        HRESULT hr = pSymbolSet->FindTypeByName(typeName, &typeId, &pBaseType, allowAutoCreations);
+
+        //
+        // If this wasn't something like an "out of memory" error, make sure there's a reasonable exception
+        // message that can flow back to the caller.
+        //
+        if (hr == E_INVALIDARG)
+        {
+            std::string exceptionMessage = "unable to find type '";
+            exceptionMessage += ToString(typeName);
+            exceptionMessage += "'";
+            throw std::invalid_argument(exceptionMessage);
+        }
+        else
+        {
+            CheckHr(hr);
+        }
+
+        if (pBitFieldLength != nullptr)
+        {
+            *pBitFieldLength = bitFieldLength;
+        }
     }
 
     return pBaseType;
@@ -730,12 +810,12 @@ void TypesObject::AddBasicCTypes(_In_ const Object& /*typesObjec*/, _In_ ComPtr<
 
 Object TypesObject::Create(_In_ const Object& /*typesObject*/, 
                            _In_ ComPtr<SymbolSet>& spSymbolSet,
-                           _In_ std::wstring typeName,
+                           _In_ std::optional<std::wstring> typeName,
                            _In_ std::optional<std::wstring> qualifiedTypeName)
 {
     SymbolSet *pSymbolSet = spSymbolSet.Get();
 
-    PCWSTR pwszTypeName = typeName.c_str();
+    PCWSTR pwszTypeName = (typeName.has_value() ? typeName.value().c_str() : nullptr);
     PCWSTR pwszQualifiedName = (qualifiedTypeName.has_value() ? qualifiedTypeName.value().c_str() : nullptr);
 
     ComPtr<UdtTypeSymbol> spUdt;
@@ -835,6 +915,26 @@ Object TypesObject::CreateEnum(_In_ const Object& /*typesObject*/,
 
     EnumTypeObject &enumTypeFactory = ApiProvider::Get().GetEnumTypeFactory();
     return enumTypeFactory.CreateInstance(spEnum);
+}
+
+std::optional<Object> TypesObject::FindByName(_In_ const Object& /*typesObject*/,
+                                              _In_ ComPtr<SymbolSet>& spSymbolSet,
+                                              _In_ std::wstring typeName,
+                                              _In_ std::optional<bool> allowCreation)
+{
+    std::optional<Object> typeObject;
+
+    //
+    // This will return <novalue> if the type is not found.  It will not throw/fail.
+    //
+    BaseTypeSymbol *pTypeSymbol;
+    ULONG64 typeId;
+    if (SUCCEEDED(spSymbolSet->FindTypeByName(typeName, &typeId, &pTypeSymbol, allowCreation.value_or(true))))
+    {
+        typeObject = BoxType(pTypeSymbol);
+    }
+
+    return typeObject;
 }
 
 std::experimental::generator<Object> TypesObject::GetIterator(_In_ const Object /*typesObject*/,
@@ -1064,26 +1164,70 @@ Object FieldsObject::Add(_In_ const Object& /*fieldsObject*/,
                          _In_ ComPtr<UdtTypeSymbol>& spUdtTypeSymbol,
                          _In_ std::wstring fieldName,
                          _In_ Object fieldType,
-                         _In_ std::optional<ULONG64> fieldOffset)
+                         _In_ size_t argCount,                        // [fieldOffset], [details]
+                         _In_reads_(argCount) Object *pArgs)
 {
     SymbolSet *pSymbolSet = spUdtTypeSymbol->InternalGetSymbolSet();
 
-    ULONG64 fieldOffsetToUse = fieldOffset.value_or(UdtPositionalSymbol::AutomaticAppendLayout);
-    ULONG64 fieldTypeId = 0;
+    ULONG64 fieldOffsetToUse = UdtPositionalSymbol::AutomaticAppendLayout;
 
-    UdtTypeObject& udtTypeFactory = ApiProvider::Get().GetUdtTypeFactory();
-    if (udtTypeFactory.IsObjectInstance(fieldType))
+    //
+    // We are "overloaded" but must do our own overload resolution.  An ordinal is the field offset.  An object
+    // is the details object which supplies bitfield positions, etc...
+    //
+    size_t detailsArg = 0;
+    if (argCount > 0)
     {
-        ComPtr<UdtTypeSymbol> spFieldType_Udt = udtTypeFactory.GetStoredInstance(fieldType);
-        fieldTypeId = spFieldType_Udt->InternalGetId();
-    }
-    else
-    {
-        std::wstring fieldTypeName = (std::wstring)fieldType;
-        fieldTypeId = pSymbolSet->InternalGetSymbolIdByName(fieldTypeName);
+        if (pArgs[0].GetKind() == ObjectIntrinsic)
+        {
+            detailsArg = 1;
+            fieldOffsetToUse = (ULONG64)(pArgs[0]);
+        }
     }
 
-    BaseTypeSymbol *pFieldType = UnboxType(pSymbolSet, fieldType);
+    bool isBitField = false;
+    ULONG64 bitFieldPosition = UdtPositionalSymbol::AutomaticAppendLayout;
+    ULONG64 bitFieldLength = 0;
+
+    if (argCount > detailsArg)
+    {
+        Object details = pArgs[detailsArg];
+        std::optional<Object> bitFieldLengthObj = details.TryGetKeyValue(L"BitFieldLength");
+        if (bitFieldLengthObj.has_value())
+        {
+            bitFieldLength = (ULONG64)bitFieldLengthObj.value();
+            isBitField = true;
+        }
+
+        if (isBitField)
+        {
+            std::optional<Object> bitFieldPositionObj = details.TryGetKeyValue(L"BitFieldPosition");
+            if (bitFieldPositionObj.has_value())
+            {
+                bitFieldPosition = (ULONG64)bitFieldPositionObj.value();
+            }
+        }
+    }
+
+    //
+    // Explicitly allow type names such as "int :3" to be unboxed.  The unboxing will return int; however,
+    // UnboxType will return the "3" as a value so that we can apply it.
+    //
+    // NOTE: You cannot specify an explicit 'BitFieldLength' in the details object which conflicts with
+    //       whatever you put in the type name if you are using a string type name.
+    //
+    ULONG64 typeNameBitFieldLength;
+    BaseTypeSymbol *pFieldType = UnboxType(pSymbolSet, fieldType, true, &typeNameBitFieldLength);
+
+    if (typeNameBitFieldLength != 0)
+    {
+        if (bitFieldLength != 0 && bitFieldLength != typeNameBitFieldLength)
+        {
+            throw std::invalid_argument("explicit bit field length disagrees with length in string type name");
+        }
+
+        bitFieldLength = typeNameBitFieldLength;
+    }
 
     ComPtr<FieldSymbol> spField;
     CheckHr(MakeAndInitialize<FieldSymbol>(&spField, 
@@ -1091,7 +1235,9 @@ Object FieldsObject::Add(_In_ const Object& /*fieldsObject*/,
                                           spUdtTypeSymbol->InternalGetId(),
                                           fieldOffsetToUse,
                                           pFieldType->InternalGetId(),
-                                          fieldName.c_str()));
+                                          fieldName.c_str(),
+                                          bitFieldLength,
+                                          bitFieldPosition));
 
     FieldObject& fieldFactory = ApiProvider::Get().GetFieldFactory();
     return fieldFactory.CreateInstance(spField);
@@ -1222,8 +1368,23 @@ std::wstring FieldObject::ToString(_In_ const Object& /*fieldObject*/,
         displayString += L" ( type = '";
         displayString += (fieldTypeName.empty() ? L"<Unknown>" : fieldTypeName.c_str());
 
-        swprintf_s(buf, ARRAYSIZE(buf), L"', offset = %d )", (ULONG)spFieldSymbol->InternalGetActualSymbolOffset());
+        swprintf_s(buf, ARRAYSIZE(buf), L"', offset = %d", (ULONG)spFieldSymbol->InternalGetActualSymbolOffset());
         displayString += buf;
+
+        if (spFieldSymbol->InternalIsBitField())
+        {
+            ULONG64 bitFieldLength = spFieldSymbol->InternalGetBitFieldLength();
+            ULONG64 bitFieldPosition = spFieldSymbol->InternalGetActualBitFieldPosition();
+
+            swprintf_s(buf, ARRAYSIZE(buf), L", bits = %I64d:%I64d )",
+                       bitFieldPosition + bitFieldLength - 1,
+                       bitFieldPosition);
+            displayString += buf;
+        }
+        else
+        {
+            displayString += L" )";
+        }
     }
 
     return displayString;
@@ -1247,16 +1408,21 @@ void FieldObject::MoveBefore(_In_ const Object& /*fieldObject*/, _In_ ComPtr<Fie
     FieldObject& fieldFactory = ApiProvider::Get().GetFieldFactory();
     if (fieldFactory.IsObjectInstance(beforeObj))
     {
-        ComPtr<FieldSymbol> spFieldSymbol = fieldFactory.GetStoredInstance(beforeObj);
+        ComPtr<FieldSymbol> spFieldSymbolBefore = fieldFactory.GetStoredInstance(beforeObj);
 
-        SymbolSet *pSymbolSet = spFieldSymbol->InternalGetSymbolSet();
-        BaseSymbol *pParentSymbol = pSymbolSet->InternalGetSymbol(spFieldSymbol->InternalGetParentId());
-        if (pParentSymbol == nullptr)
+        if (spFieldSymbol->InternalGetParentId() != spFieldSymbolBefore->InternalGetParentId())
+        {
+            throw std::runtime_error("target position field reference cannot be in a differing type");
+        }
+
+        SymbolSet *pSymbolSet = spFieldSymbolBefore->InternalGetSymbolSet();
+        BaseSymbol *pParentSymbolBefore = pSymbolSet->InternalGetSymbol(spFieldSymbolBefore->InternalGetParentId());
+        if (pParentSymbolBefore == nullptr)
         {
             throw std::runtime_error("cannot rearrange an orphan field");
         }
 
-        CheckHr(pParentSymbol->GetChildPosition(spFieldSymbol->InternalGetId(), &pos));
+        CheckHr(pParentSymbolBefore->GetChildPosition(spFieldSymbolBefore->InternalGetId(), &pos));
     }
     else
     {
@@ -1334,10 +1500,64 @@ void FieldObject::SetOffset(_In_ const Object& /*fieldObject*/, _In_ ComPtr<Fiel
     }
     else if (spFieldSymbol->InternalIsConstantValue())
     {
-        throw std::runtime_error("cannot set field offset of a field which is constnat value");
+        throw std::runtime_error("cannot set field offset of a field which is constant value");
     }
 
     CheckHr(spFieldSymbol->InternalSetSymbolOffset(fieldOffset));
+}
+
+std::optional<Object> FieldObject::GetValue(_In_ const Object& /*fieldObject*/, _In_ ComPtr<FieldSymbol>& spFieldSymbol)
+{
+    std::optional<Object> value;
+
+    if (spFieldSymbol->InternalIsConstantValue())
+    {
+        VARIANT const& val = spFieldSymbol->InternalGetSymbolValue();
+
+        //
+        // Unfortunately, DbgModelClientEx.h does not provide a "create this from a variant" so we need
+        // to step down one level.
+        //
+        ComPtr<IModelObject> spVal;
+        CheckHr(GetManager()->CreateIntrinsicObject(ObjectIntrinsic, const_cast<VARIANT *>(&val), &spVal));
+        value = spVal;
+    }
+    return value;
+}
+
+void FieldObject::SetValue(_In_ const Object& /*fieldObject*/, _In_ ComPtr<FieldSymbol>& spFieldSymbol,
+                           _In_ Object fieldValue)
+{
+    if (!spFieldSymbol->InternalIsConstantValue())
+    {
+        throw std::runtime_error("cannot set field value of a field which is not of constant value");
+    }
+    
+    if (fieldValue.GetKind() != ObjectIntrinsic)
+    {
+        throw std::invalid_argument("illegal value for constant field");
+    }
+
+    VARIANT vtVal;
+    CheckHr(fieldValue->GetIntrinsicValue(&vtVal));
+    switch(vtVal.vt)
+    {
+        case VT_I1:
+        case VT_I2:
+        case VT_I4:
+        case VT_I8:
+        case VT_UI1:
+        case VT_UI2:
+        case VT_UI4:
+        case VT_UI8:
+            break;
+
+        default:
+            VariantClear(&vtVal);
+            throw std::invalid_argument("illegal constant type for field value");
+    }
+
+    CheckHr(spFieldSymbol->InternalSetSymbolValue(&vtVal));
 }
 
 Object FieldObject::GetType(_In_ const Object& /*fieldObject*/, _In_ ComPtr<FieldSymbol>& spFieldSymbol)
@@ -1362,6 +1582,53 @@ void FieldObject::SetType(_In_ const Object& /*fieldObject*/, _In_ ComPtr<FieldS
                                               fieldType);
 
     CheckHr(spFieldSymbol->InternalSetSymbolTypeId(pNewFieldType->InternalGetId()));
+}
+
+std::optional<ULONG64> FieldObject::GetBitFieldLength(_In_ const Object& /*fieldObject*/, 
+                                                      _In_ ComPtr<FieldSymbol>& spFieldSymbol)
+{
+    std::optional<ULONG64> bitFieldLength;
+    if (spFieldSymbol->InternalIsBitField())
+    {
+        bitFieldLength = spFieldSymbol->InternalGetBitFieldLength();
+    }
+
+    return bitFieldLength;
+}
+
+void FieldObject::SetBitFieldLength(_In_ const Object& /*fieldObject*/, 
+                                    _In_ ComPtr<FieldSymbol>& spFieldSymbol,
+                                    _In_ ULONG64 bitFieldLength)
+{
+    CheckHr(spFieldSymbol->InternalSetBitFieldLength(bitFieldLength));
+}
+
+std::optional<ULONG64> FieldObject::GetBitFieldPosition(_In_ const Object& /*fieldObject*/, 
+                                                        _In_ ComPtr<FieldSymbol>& spFieldSymbol)
+{
+    std::optional<ULONG64> bitFieldPosition;
+    if (spFieldSymbol->InternalIsBitField())
+    {
+        bitFieldPosition = spFieldSymbol->InternalGetActualBitFieldPosition();
+    }
+    return bitFieldPosition;
+}
+
+void FieldObject::SetBitFieldPosition(_In_ const Object& /*fieldObject*/,
+                                      _In_ ComPtr<FieldSymbol>& spFieldSymbol,
+                                      _In_ ULONG64 bitFieldPosition)
+{
+    if (!spFieldSymbol->InternalIsBitField())
+    {
+        throw std::runtime_error("unable to set bit field position of something which is not a bitfield");
+    }
+
+    if (spFieldSymbol->InternalIsAutomaticLayout())
+    {
+        throw std::runtime_error("unable to set bit field position of a field which is automatic layout");
+    }
+
+    CheckHr(spFieldSymbol->InternalSetBitFieldPosition(bitFieldPosition));
 }
 
 //*************************************************
@@ -1661,7 +1928,7 @@ void GlobalDataObject::SetOffset(_In_ const Object& /*globalDataObject*/,
 {
     if (spGlobalDataSymbol->InternalIsConstantValue())
     {
-        throw std::runtime_error("cannot set offset of global data which is constnat value");
+        throw std::runtime_error("cannot set offset of global data which is constant value");
     }
 
     CheckHr(spGlobalDataSymbol->InternalSetSymbolOffset(globalDataOffset));
@@ -2648,7 +2915,7 @@ ModuleExtension::ModuleExtension() :
 }
        
 SymbolSetObject::SymbolSetObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.SymbolSet"))
 {
     AddReadOnlyProperty(L"Data", this, &SymbolSetObject::GetData,
                         Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_SYMBOLSET_DATA }));
@@ -2664,7 +2931,7 @@ SymbolSetObject::SymbolSetObject() :
 }
 
 TypesObject::TypesObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.Types"))
 {
     AddMethod(L"AddBasicCTypes", this, &TypesObject::AddBasicCTypes,
                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_ADDBASICCTYPES },
@@ -2688,6 +2955,10 @@ TypesObject::TypesObject() :
 
     AddMethod(L"CreateTypedef", this, &TypesObject::CreateTypedef,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_CREATETYPEDEF },
+                       L"PreferShow", true));
+
+    AddMethod(L"FindByName", this, &TypesObject::FindByName,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_FINDBYNAME },
                        L"PreferShow", true));
 
     AddGeneratorFunction(this, &TypesObject::GetIterator);
@@ -2773,7 +3044,7 @@ EnumTypeObject::EnumTypeObject() :
 }
 
 FieldsObject::FieldsObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.Fields"))
 {
     AddMethod(L"Add", this, &FieldsObject::Add,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELDS_ADD },
@@ -2804,6 +3075,15 @@ FieldObject::FieldObject()
 
     AddProperty(L"Offset", this, &FieldObject::GetOffset, &FieldObject::SetOffset,
                 Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELD_OFFSET }));
+
+    AddProperty(L"Value", this, &FieldObject::GetValue, &FieldObject::SetValue,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELD_VALUE }));
+
+    AddProperty(L"BitFieldLength", this, &FieldObject::GetBitFieldLength, &FieldObject::SetBitFieldLength,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELD_BITFIELDLENGTH }));
+
+    AddProperty(L"BitFieldPosition", this, &FieldObject::GetBitFieldPosition, &FieldObject::SetBitFieldPosition,
+                Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELD_BITFIELDPOSITION }));
 
     AddMethod(L"Delete", this, &FieldObject::Delete,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FIELD_DELETE }));
@@ -2866,7 +3146,7 @@ GlobalDataObject::GlobalDataObject()
 }
 
 FunctionsObject::FunctionsObject() :
-    TypedInstanceModel()
+    TypedInstanceModel(NamedModelRegistration(L"Debugger.Models.Extensions.SymbolBuilder.Functions"))
 {
     AddMethod(L"Create", this, &FunctionsObject::Create,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_FUNCTIONS_CREATE },

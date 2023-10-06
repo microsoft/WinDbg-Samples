@@ -656,7 +656,7 @@ public:
         }
         return hr;
     }
-
+    
     HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                    _In_ ULONG64 basicEnumTypeId,
                                    _In_ ULONG64 parentId,
@@ -767,8 +767,19 @@ public:
             return E_UNEXPECTED;
         }
 
-        pLocation->Kind = SvcSymbolLocationStructureRelative;
-        pLocation->Offset = m_symOffsetActual;
+        if (!InternalIsBitField())
+        {
+            pLocation->Kind = SvcSymbolLocationStructureRelative;
+            pLocation->Offset = m_symOffsetActual;
+        }
+        else
+        {
+            pLocation->Kind = SvcSymbolLocationStructureRelativeBitField;
+            pLocation->BitField.Offset = static_cast<ULONG>(m_symOffsetActual);
+            pLocation->BitField.FieldPosition = m_bitFieldPositionActual;
+            pLocation->BitField.FieldSize = m_bitFieldLength;
+            pLocation->BitField.Reserved = 0;
+        }
         return S_OK;
     }
 
@@ -785,7 +796,9 @@ public:
                            _In_ ULONG64 owningTypeId,
                            _In_ ULONG64 symOffset,
                            _In_ ULONG64 symTypeId,
-                           _In_opt_ PCWSTR pwszName);
+                           _In_opt_ PCWSTR pwszName,
+                           _In_ ULONG64 bitFieldLength = 0,
+                           _In_ ULONG64 bitFieldPosition = AutomaticAppendLayout);
 
     // BaseInitialize():
     //
@@ -814,6 +827,7 @@ public:
     virtual bool InternalIsEnumerant() const { return InternalIsConstantValue() && !InternalHasType(); }
 
     virtual ULONG64 InternalGetActualSymbolOffset() const { return m_symOffsetActual; }
+    virtual ULONG64 InternalGetActualBitFieldPosition() const { return m_bitFieldPositionActual; }
 
     //*************************************************
     // Internal Computation Callbacks:
@@ -835,9 +849,18 @@ public:
         }
     }
 
+    void InternalSetComputedBitFieldPosition(_In_ ULONG64 bitFieldPosition)
+    {
+        if (m_bitFieldPosition == AutomaticAppendLayout)
+        {
+            m_bitFieldPositionActual = bitFieldPosition;
+        }
+    }
+
 protected:
 
     ULONG64 m_symOffsetActual;          // Either hard coded or computed from automatic layout
+    ULONG64 m_bitFieldPositionActual;   // Either hard coded or computed from automatic layout
 
 };
         
@@ -859,18 +882,26 @@ public:
 
     // RuntimeClassInitialize (normal field):
     //
+    // NOTE: If 'bitFieldLength' is specified as zero, the field is not a bitfield.  If it is non-zero it is.
+    //       The position of the bitfield may be manually specified or may be an automatic append as with 
+    //       standard field offset.
+    //
     HRESULT RuntimeClassInitialize(_In_ SymbolSet *pSymbolSet,
                                    _In_ ULONG64 owningTypeId,
                                    _In_ ULONG64 symOffset,
                                    _In_ ULONG64 symTypeId,
-                                   _In_ PCWSTR pwszName)
+                                   _In_ PCWSTR pwszName,
+                                   _In_ ULONG64 bitFieldLength = 0,
+                                   _In_ ULONG64 bitFieldPosition = UdtPositionalSymbol::AutomaticAppendLayout)
     {
         return UdtPositionalSymbol::BaseInitialize(pSymbolSet,
                                                    SvcSymbolField,
                                                    owningTypeId,
                                                    symOffset,
                                                    symTypeId,
-                                                   pwszName);
+                                                   pwszName,
+                                                   bitFieldLength,
+                                                   bitFieldPosition);
     }
 
     // RuntimeClassInitialize (constant valued field):

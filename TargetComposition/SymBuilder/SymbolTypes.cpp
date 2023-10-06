@@ -35,7 +35,9 @@ HRESULT UdtPositionalSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
                                             _In_ ULONG64 owningTypeId,
                                             _In_ ULONG64 symOffset,
                                             _In_ ULONG64 symTypeId,
-                                            _In_opt_ PCWSTR pwszName)
+                                            _In_opt_ PCWSTR pwszName,
+                                            _In_ ULONG64 bitFieldLength,
+                                            _In_ ULONG64 bitFieldPosition)
 {
     //
     // The base data symbol doesn't have a distinction between offset and actual offset.  Only we do.  Mark
@@ -43,7 +45,9 @@ HRESULT UdtPositionalSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
     // is marked as automatic.
     //
     m_symOffsetActual = symOffset;
-    return BaseDataSymbol::BaseInitialize(pSymbolSet, symKind, owningTypeId, symOffset, symTypeId, pwszName, nullptr);
+    m_bitFieldPositionActual = bitFieldPosition;
+    return  BaseDataSymbol::BaseInitialize(pSymbolSet, symKind, owningTypeId, symOffset, symTypeId, pwszName, nullptr,
+                                           bitFieldLength, bitFieldPosition);
 }
 
 HRESULT UdtPositionalSymbol::BaseInitialize(_In_ SymbolSet *pSymbolSet,
@@ -79,9 +83,24 @@ HRESULT UdtPositionalSymbol::MoveToBefore(_In_ ULONG64 position)
 
 HRESULT UdtTypeSymbol::LayoutType()
 {
-    ULONG64 typeSize = 0; 
     ULONG64 curOffset = 0;
+    ULONG64 typeSize = 0;
+    ULONG64 curBitFieldPosition = 0;
     ULONG64 maxAlignment = 1;
+
+    //
+    // Previous field being examined:
+    //
+    bool prevWasBitField = false;
+    ULONG64 prevSymTypeId = 0;
+    ULONG64 prevSymTypeSize = 0;
+
+    //
+    // Current field being examined:
+    //
+    bool isBitField = false;
+    ULONG64 symTypeId = 0;
+    ULONG64 symTypeSize = 0; 
 
     SvcSymbolKind passKinds[] = { SvcSymbolBaseClass, SvcSymbolField };
 
@@ -110,6 +129,10 @@ HRESULT UdtTypeSymbol::LayoutType()
                 continue;
             }
 
+            prevSymTypeId = symTypeId;
+            prevSymTypeSize = symTypeSize;
+            prevWasBitField = isBitField;
+
             UdtPositionalSymbol *pPosSymbol = static_cast<UdtPositionalSymbol *>(pBaseSymbol);
 
             //
@@ -117,7 +140,7 @@ HRESULT UdtTypeSymbol::LayoutType()
             // if we need to add requisite padding (assuming this is an auto-layout field).  If the field offset
             // was manually specified, it goes there REGARDLESS of what the alignment says.
             //
-            ULONG64 symTypeId = pPosSymbol->InternalGetSymbolTypeId();
+            symTypeId = pPosSymbol->InternalGetSymbolTypeId();
             BaseSymbol *pSymbolTypeBaseSymbol = InternalGetSymbolSet()->InternalGetSymbol(symTypeId);
             if (pSymbolTypeBaseSymbol == nullptr || pSymbolTypeBaseSymbol->InternalGetKind() != SvcSymbolType)
             {
@@ -126,7 +149,7 @@ HRESULT UdtTypeSymbol::LayoutType()
 
             BaseTypeSymbol *pSymbolTypeBase = static_cast<BaseTypeSymbol *>(pSymbolTypeBaseSymbol);
 
-            ULONG64 symTypeSize = pSymbolTypeBase->InternalGetTypeSize();
+            symTypeSize = pSymbolTypeBase->InternalGetTypeSize();
             ULONG64 symTypeAlign = pSymbolTypeBase->InternalGetTypeAlignment();
 
             if (symTypeAlign > maxAlignment)
@@ -137,21 +160,89 @@ HRESULT UdtTypeSymbol::LayoutType()
             ULONG64 symOffset = pPosSymbol->InternalGetSymbolOffset();
             bool autoLayoutField = (symOffset == UdtPositionalSymbol::AutomaticAppendLayout);
 
+            isBitField = (pPosSymbol->InternalIsBitField());
+            ULONG64 bitFieldPosition = pPosSymbol->InternalGetBitFieldPosition();
+            ULONG64 bitFieldLength = pPosSymbol->InternalGetBitFieldLength();
+
+            //
+            // If there was a fundamental change with respect to bitfields, we might need to move things forward
+            // early.
+            //
+            // Note that if the previous field was *NOT* a bitfield, the positioning cursor already fully moved
+            // forward!
+            //
+            if (prevWasBitField && (!isBitField || prevSymTypeId != symTypeId))
+            {
+                curOffset += prevSymTypeSize;
+                curBitFieldPosition = 0;
+                prevWasBitField = false;
+            }
+
             if (autoLayoutField)
             {
+                //
+                // Is this a bitfield which cannot fit into the bits remaining within this particular
+                // location, advance the cursor.
+                //
+                if (isBitField && (curBitFieldPosition + bitFieldLength > symTypeSize * 8))
+                {
+                    curBitFieldPosition = 0;
+                    curOffset += symTypeSize;
+                }
+                
                 symOffset = curOffset;
                 if (symTypeAlign != 1)
                 {
                     symOffset = ((symOffset + (symTypeAlign - 1)) / symTypeAlign) * symTypeAlign;
                 }
                 pPosSymbol->InternalSetComputedSymbolOffset(symOffset);
+
+                if (isBitField)
+                {
+                    pPosSymbol->InternalSetComputedBitFieldPosition(curBitFieldPosition);
+                    curBitFieldPosition += bitFieldLength;
+                }
+            }
+            else if (isBitField)
+            {
+                //
+                // For a manual layout bitfield, make sure that the field position is reset to the end
+                // of the bitfield so that the next automatic layout bitfield picks up from that point
+                // if such a field exists.
+                //
+                curBitFieldPosition = bitFieldPosition + bitFieldLength;
             }
 
-            curOffset = symOffset + symTypeSize;
-            if (typeSize < curOffset)
+            //
+            // For bitfields, do *NOT* move the positional cursor forward until we run out of bits in the
+            // field position.  Note that this may require us to do some handling at the end of field processing
+            // if we're still in the middle of filling out a bitfield!
+            //
+            if (isBitField)
             {
-                typeSize = curOffset;
+                curOffset = symOffset;
             }
+            else
+            {
+                curOffset = symOffset + symTypeSize;
+                if (typeSize < curOffset)
+                {
+                    typeSize = curOffset;
+                }
+            }
+        }
+    }
+
+    //
+    // If the last thing we processed was a bitfield, we need to move the positional cursor and type size forward
+    // to account for the bits used in the field.
+    //
+    if (isBitField)
+    {
+        curOffset += symTypeSize;
+        if (typeSize < curOffset)
+        {
+            typeSize = curOffset;
         }
     }
 
