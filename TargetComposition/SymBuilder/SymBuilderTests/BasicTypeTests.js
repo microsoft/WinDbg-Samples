@@ -657,15 +657,22 @@ function Test_PointerCreation()
     var fooFldB = foo.Fields.Add("b", "int *");
     var fooFldC = foo.Fields.Add("c", "char *");
     var fooFldD = foo.Fields.Add("d", name + " *");
+    var fooFldE = foo.Fields.Add("e", "int **");
+    var fooFldF = foo.Fields.Add("f", name + " * *");
 
     __VERIFY(fooFldA.Type.BaseType.Name == "int", "unexpected field type of 'a'");
     __VERIFY(fooFldA.Offset == 0, "unexpected offset of 'a'");
     __VERIFY(fooFldB.Type.BaseType.Name == "int", "unexpected field type of 'b'");
-    __VERIFY(fooFldB.Offset == ptrSize * 1, "unexpected offset of 'a'");
+    __VERIFY(fooFldB.Offset == ptrSize * 1, "unexpected offset of 'b'");
     __VERIFY(fooFldC.Type.BaseType.Name == "char", "unexpected field type of 'c'");
-    __VERIFY(fooFldC.Offset == ptrSize * 2, "unexpected offset of 'a'");
+    __VERIFY(fooFldC.Offset == ptrSize * 2, "unexpected offset of 'c'");
     __VERIFY(fooFldD.Type.BaseType.Name == name, "unexpected field type of 'd'");
-    __VERIFY(fooFldD.Offset == ptrSize * 3, "unexpected offset of 'a'");
+    __VERIFY(fooFldD.Offset == ptrSize * 3, "unexpected offset of 'd'");
+    __VERIFY(fooFldE.Type.BaseType.BaseType.Name == "int", "unexpected field type of 'e'");
+    __VERIFY(fooFldE.Offset == ptrSize * 4, "unexpected offset of 'e'");
+    __VERIFY(fooFldF.Type.BaseType.BaseType.Name == name, "unexpected field type of 'f'");
+    __VERIFY(fooFldF.Offset == ptrSize * 5, "unexpected offset of 'f'");
+
 
     var fooTy = host.getModuleType("notepad.exe", name);
     __VERIFY(fooTy.fields.a.type.typeKind == "pointer", "unexpected type system kind of field 'a'");
@@ -680,6 +687,12 @@ function Test_PointerCreation()
     __VERIFY(fooTy.fields.d.type.typeKind == "pointer", "unexpected type system kind of field 'd'");
     __VERIFY(fooTy.fields.d.type.pointerKind == "standard", "unexpected type system pointer kind of field 'd'");
     __VERIFY(fooTy.fields.d.type.baseType.name == name, "unexpected type system base type name of field 'd'");
+    __VERIFY(fooTy.fields.e.type.typeKind == "pointer", "unexpected type system kind of field 'e'");
+    __VERIFY(fooTy.fields.e.type.pointerKind == "standard", "unexpected type system pointer kind of field 'e'");
+    __VERIFY(fooTy.fields.e.type.baseType.baseType.name == "int", "unexpected type system base type name of field 'e'");
+    __VERIFY(fooTy.fields.f.type.typeKind == "pointer", "unexpected type system kind of field 'f'");
+    __VERIFY(fooTy.fields.f.type.pointerKind == "standard", "unexpected type system pointer kind of field 'f'");
+    __VERIFY(fooTy.fields.f.type.baseType.baseType.name == name, "unexpected type system base type name of field 'f'");
 
     foo.Delete();
     return true;
@@ -852,6 +865,300 @@ function Test_EnumMoveEnumerant()
     return true;
 }
 
+// Test_BitfieldWithAutoLayout:
+//
+// Verify that we can create UDTs with bitfields with auto layout and get expected results.
+//
+function Test_BitfieldWithAutoLayout()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fldA = foo.Fields.Add("a", "char: 1");              // [0, 1)   0:0
+    var fldB = foo.Fields.Add("b", "char: 3");              // [0, 1)   1:3
+    var fldC = foo.Fields.Add("c", "char: 2");              // [0, 1)   4:5
+    var fldD = foo.Fields.Add("d", "char: 4");              // [1, 2)   0:3
+    var fldE = foo.Fields.Add("e", "int: 30");              // [4, 8)   0:29
+    var fldF = foo.Fields.Add("f", "int");                  // [8, 12)  ---
+
+    __VERIFY(fldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fldA.BitFieldPosition == 0, "unexpected bitfield position of 'a'");
+    __VERIFY(fldA.BitFieldLength == 1, "unexpected bitfield length of 'a'");
+    __VERIFY(fldB.Offset == 0, "unexpected offset of 'b'");
+    __VERIFY(fldB.BitFieldPosition == 1, "unexpected bitfield position of 'b'");
+    __VERIFY(fldB.BitFieldLength == 3, "unexpected bitfield length of 'b'");
+    __VERIFY(fldC.Offset == 0, "unexpected offset of 'c'");
+    __VERIFY(fldC.BitFieldPosition == 4, "unexpected bitfield position of 'c'");
+    __VERIFY(fldC.BitFieldLength == 2, "unexpected bitfield length of 'c'");
+    __VERIFY(fldD.Offset == 1, "unexpected offset of 'd'");
+    __VERIFY(fldD.BitFieldPosition == 0, "unexpected bitfield position of 'd'");
+    __VERIFY(fldD.BitFieldLength == 4, "unexpected bitfield length of 'd'");
+    __VERIFY(fldE.Offset == 4, "unexpected offset of 'e'");
+    __VERIFY(fldE.BitFieldPosition == 0, "unexpected bitfield position of 'e'");
+    __VERIFY(fldE.BitFieldLength == 30, "unexpected bitfield length of 'e'");
+    __VERIFY(fldF.Offset == 8, "unexpected offset of 'f'");
+    __VERIFY(!fldF.BitFieldPosition, "unexpected bitfield property of non bitfield 'f'");
+    __VERIFY(!fldF.BitFieldLength, "unexpected bitfield property of non bitfield 'f'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected type system offset for 'a'");
+    __VERIFY(fooTy.fields.a.type.isBitField == true, "bitfield does not show up in type system for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.length == 1, "unexpected type system bitfield length for 'a'");
+    __VERIFY(fooTy.fields.b.offset == 0, "unexpected type system offset for 'b'");
+    __VERIFY(fooTy.fields.b.type.isBitField == true, "bitfield does not show up in type system for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.lsb == 1, "unexpected type system bitfield position for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.length == 3, "unexpected type system bitfield length for 'b'");
+    __VERIFY(fooTy.fields.c.offset == 0, "unexpected type system offset for 'c'");
+    __VERIFY(fooTy.fields.c.type.isBitField == true, "bitfield does not show up in type system for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.lsb == 4, "unexpected type system bitfield position for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.length == 2, "unexpected type system bitfield length for 'c'");
+    __VERIFY(fooTy.fields.d.offset == 1, "unexpected type system offset for 'd'");
+    __VERIFY(fooTy.fields.d.type.isBitField == true, "bitfield does not show up in type system for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.length == 4, "unexpected type system bitfield length for 'd'");
+    __VERIFY(fooTy.fields.e.offset == 4, "unexpected type system offset for 'e'");
+    __VERIFY(fooTy.fields.e.type.isBitField == true, "bitfield does not show up in type system for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.length == 30, "unexpected type system bitfield length for 'e'");
+    __VERIFY(fooTy.fields.f.offset == 8, "unexpected type system offset for 'f'");
+    __VERIFY(fooTy.fields.f.type.isBitField == false, "bitfield incorrectly shows up in type system for 'f'");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_BitfieldWithManualLayout:
+//
+// Verify that we can create UDTs with bitfields with manual layout and get expected results.
+//
+function Test_BitfieldWithManualLayout()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fldA = foo.Fields.Add("a", "char", 0, { BitFieldPosition: 7, BitFieldLength: 1 });  // [0, 1)   7:7
+    var fldB = foo.Fields.Add("b", "char", 0, { BitFieldPosition: 3, BitFieldLength: 2 });  // [0, 1)   3:4
+    var fldC = foo.Fields.Add("c", "char", 1, { BitFieldPosition: 2, BitFieldLength: 4 });  // [1, 2)   2:5
+
+    __VERIFY(fldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fldA.BitFieldPosition == 7, "unexpected bitfield position of 'a'");
+    __VERIFY(fldA.BitFieldLength == 1, "unexpected bitfield length of 'a'");
+    __VERIFY(fldB.Offset == 0, "unexpected offset of 'b'");
+    __VERIFY(fldB.BitFieldPosition == 3, "unexpected bitfield position of 'b'");
+    __VERIFY(fldB.BitFieldLength == 2, "unexpected bitfield length of 'b'");
+    __VERIFY(fldC.Offset == 1, "unexpected offset of 'c'");
+    __VERIFY(fldC.BitFieldPosition == 2, "unexpected bitfield position of 'c'");
+    __VERIFY(fldC.BitFieldLength == 4, "unexpected bitfield length of 'c'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected type system offset for 'a'");
+    __VERIFY(fooTy.fields.a.type.isBitField == true, "bitfield does not show up in type system for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.lsb == 7, "unexpected type system bitfield position for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.length == 1, "unexpected type system bitfield length for 'a'");
+    __VERIFY(fooTy.fields.b.offset == 0, "unexpected type system offset for 'b'");
+    __VERIFY(fooTy.fields.b.type.isBitField == true, "bitfield does not show up in type system for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.lsb == 3, "unexpected type system bitfield position for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.length == 2, "unexpected type system bitfield length for 'b'");
+    __VERIFY(fooTy.fields.c.offset == 1, "unexpected type system offset for 'c'");
+    __VERIFY(fooTy.fields.c.type.isBitField == true, "bitfield does not show up in type system for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.lsb == 2, "unexpected type system bitfield position for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.length == 4, "unexpected type system bitfield length for 'c'");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_BitfieldWithMixedAutoManualLayout:
+//
+// Verify that we can create UDTs with bitfields having mixed auto and manual layout and get expected results.
+//
+function Test_BitfieldWithMixedAutoManualLayout()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fldA = foo.Fields.Add("a", "char", 0, { BitFieldPosition: 2, BitFieldLength: 2 });  // [0, 1) 2:3
+    var fldB = foo.Fields.Add("b", "char:2");                                               // [0, 1) 4:5
+    var fldC = foo.Fields.Add("c", "char", 0, { BitFieldPosition: 6, BitFieldLength: 1 });  // [0, 1) 6:6
+    var fldD = foo.Fields.Add("d", "char:4");                                               // [1, 2) 0:3
+    var fldE = foo.Fields.Add("e", "int", 4, { BitFieldPosition: 20, BitFieldLength: 5 });  // [4, 7) 20:24
+    var fldF = foo.Fields.Add("f", "char:6");                                               // [8, 9) 0:5
+
+    __VERIFY(fldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fldA.BitFieldPosition == 2, "unexpected bitfield position of 'a'");
+    __VERIFY(fldA.BitFieldLength == 2, "unexpected bitfield length of 'a'");
+    __VERIFY(fldB.Offset == 0, "unexpected offset of 'b'");
+    __VERIFY(fldB.BitFieldPosition == 4, "unexpected bitfield position of 'b'");
+    __VERIFY(fldB.BitFieldLength == 2, "unexpected bitfield length of 'b'");
+    __VERIFY(fldC.Offset == 0, "unexpected offset of 'c'");
+    __VERIFY(fldC.BitFieldPosition == 6, "unexpected bitfield position of 'c'");
+    __VERIFY(fldC.BitFieldLength == 1, "unexpected bitfield length of 'c'");
+    __VERIFY(fldD.Offset == 1, "unexpected offset of 'd'");
+    __VERIFY(fldD.BitFieldPosition == 0, "unexpected bitfield position of 'd'");
+    __VERIFY(fldD.BitFieldLength == 4, "unexpected bitfield length of 'd'");
+    __VERIFY(fldE.Offset == 4, "unexpected offset of 'e'");
+    __VERIFY(fldE.BitFieldPosition == 20, "unexpected bitfield position of 'e'");
+    __VERIFY(fldE.BitFieldLength == 5, "unexpected bitfield length of 'e'");
+    __VERIFY(fldF.Offset == 8, "unexpected offset of 'e'");
+    __VERIFY(fldF.BitFieldPosition == 0, "unexpected bitfield position of 'e'");
+    __VERIFY(fldF.BitFieldLength == 6, "unexpected bitfield length of 'e'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected type system offset for 'a'");
+    __VERIFY(fooTy.fields.a.type.isBitField == true, "bitfield does not show up in type system for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.lsb == 2, "unexpected type system bitfield position for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.length == 2, "unexpected type system bitfield length for 'a'");
+    __VERIFY(fooTy.fields.b.offset == 0, "unexpected type system offset for 'b'");
+    __VERIFY(fooTy.fields.b.type.isBitField == true, "bitfield does not show up in type system for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.lsb == 4, "unexpected type system bitfield position for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.length == 2, "unexpected type system bitfield length for 'b'");
+    __VERIFY(fooTy.fields.c.offset == 0, "unexpected type system offset for 'c'");
+    __VERIFY(fooTy.fields.c.type.isBitField == true, "bitfield does not show up in type system for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.lsb == 6, "unexpected type system bitfield position for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.length == 1, "unexpected type system bitfield length for 'c'");
+    __VERIFY(fooTy.fields.d.offset == 1, "unexpected type system offset for 'd'");
+    __VERIFY(fooTy.fields.d.type.isBitField == true, "bitfield does not show up in type system for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.length == 4, "unexpected type system bitfield length for 'd'");
+    __VERIFY(fooTy.fields.e.offset == 4, "unexpected type system offset for 'e'");
+    __VERIFY(fooTy.fields.e.type.isBitField == true, "bitfield does not show up in type system for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.lsb == 20, "unexpected type system bitfield position for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.length == 5, "unexpected type system bitfield length for 'e'");
+    __VERIFY(fooTy.fields.f.offset == 8, "unexpected type system offset for 'f'");
+    __VERIFY(fooTy.fields.f.type.isBitField == true, "bitfield does not show up in type system for 'f'");
+    __VERIFY(fooTy.fields.f.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'f'");
+    __VERIFY(fooTy.fields.f.type.bitFieldPositions.length == 6, "unexpected type system bitfield length for 'f'");
+
+    foo.Delete();
+    return true;
+}
+
+// Test_BitfieldMoveField:
+//
+// Verify that we can create UDTs with bitfields having automatic layout, move fields around, and get
+// expected results.
+//
+function Test_BitfieldMoveField()
+{
+    var name = __getUniqueName("foo");
+    var foo = __symbolBuilderSymbols.Types.Create(name);
+
+    var fldA = foo.Fields.Add("a", "char:2");           // [0, 1) 0:1
+    var fldB = foo.Fields.Add("b", "char:3");           // [0, 1) 2:4
+    var fldC = foo.Fields.Add("c", "char:3");           // [0, 1) 5:7
+    var fldD = foo.Fields.Add("d", "char:5");           // [1, 2) 0:4
+    var fldE = foo.Fields.Add("e", "int:20");           // [4, 8) 0:19
+    var fldF = foo.Fields.Add("f", "int:5");            // [4, 8) 20:24
+
+    __VERIFY(fldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fldA.BitFieldPosition == 0, "unexpected bitfield position of 'a'");
+    __VERIFY(fldA.BitFieldLength == 2, "unexpected bitfield length of 'a'");
+    __VERIFY(fldB.Offset == 0, "unexpected offset of 'b'");
+    __VERIFY(fldB.BitFieldPosition == 2, "unexpected bitfield position of 'b'");
+    __VERIFY(fldB.BitFieldLength == 3, "unexpected bitfield length of 'b'");
+    __VERIFY(fldC.Offset == 0, "unexpected offset of 'c'");
+    __VERIFY(fldC.BitFieldPosition == 5, "unexpected bitfield position of 'c'");
+    __VERIFY(fldC.BitFieldLength == 3, "unexpected bitfield length of 'c'");
+    __VERIFY(fldD.Offset == 1, "unexpected offset of 'd'");
+    __VERIFY(fldD.BitFieldPosition == 0, "unexpected bitfield position of 'd'");
+    __VERIFY(fldD.BitFieldLength == 5, "unexpected bitfield length of 'd'");
+    __VERIFY(fldE.Offset == 4, "unexpected offset of 'e'");
+    __VERIFY(fldE.BitFieldPosition == 0, "unexpected bitfield position of 'e'");
+    __VERIFY(fldE.BitFieldLength == 20, "unexpected bitfield length of 'e'");
+    __VERIFY(fldF.Offset == 4, "unexpected offset of 'e'");
+    __VERIFY(fldF.BitFieldPosition == 20, "unexpected bitfield position of 'e'");
+    __VERIFY(fldF.BitFieldLength == 5, "unexpected bitfield length of 'e'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected type system offset for 'a'");
+    __VERIFY(fooTy.fields.a.type.isBitField == true, "bitfield does not show up in type system for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.length == 2, "unexpected type system bitfield length for 'a'");
+    __VERIFY(fooTy.fields.b.offset == 0, "unexpected type system offset for 'b'");
+    __VERIFY(fooTy.fields.b.type.isBitField == true, "bitfield does not show up in type system for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.lsb == 2, "unexpected type system bitfield position for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.length == 3, "unexpected type system bitfield length for 'b'");
+    __VERIFY(fooTy.fields.c.offset == 0, "unexpected type system offset for 'c'");
+    __VERIFY(fooTy.fields.c.type.isBitField == true, "bitfield does not show up in type system for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.lsb == 5, "unexpected type system bitfield position for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.length == 3, "unexpected type system bitfield length for 'c'");
+    __VERIFY(fooTy.fields.d.offset == 1, "unexpected type system offset for 'd'");
+    __VERIFY(fooTy.fields.d.type.isBitField == true, "bitfield does not show up in type system for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.length == 5, "unexpected type system bitfield length for 'd'");
+    __VERIFY(fooTy.fields.e.offset == 4, "unexpected type system offset for 'e'");
+    __VERIFY(fooTy.fields.e.type.isBitField == true, "bitfield does not show up in type system for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.length == 20, "unexpected type system bitfield length for 'e'");
+    __VERIFY(fooTy.fields.f.offset == 4, "unexpected type system offset for 'f'");
+    __VERIFY(fooTy.fields.f.type.isBitField == true, "bitfield does not show up in type system for 'f'");
+    __VERIFY(fooTy.fields.f.type.bitFieldPositions.lsb == 20, "unexpected type system bitfield position for 'f'");
+    __VERIFY(fooTy.fields.f.type.bitFieldPositions.length == 5, "unexpected type system bitfield length for 'f'");
+
+    //
+    // Now move D to before B so that we have:
+    //
+    //     a: char:2                [0, 1) 0:1
+    //     d: char:5                [0, 1) 2:6
+    //     b: char:3                [1, 2) 0:2
+    //     c: char:3                [1, 2) 3:5
+    //     e: int: 20               [4, 8) 0:19
+    //     f: int: 5                [4, 8) 20:24
+    //
+    // And reverify at both levels.
+    //
+    fldD.MoveBefore(fldB);
+
+    __VERIFY(fldA.Offset == 0, "unexpected offset of 'a'");
+    __VERIFY(fldA.BitFieldPosition == 0, "unexpected bitfield position of 'a'");
+    __VERIFY(fldA.BitFieldLength == 2, "unexpected bitfield length of 'a'");
+    __VERIFY(fldD.Offset == 0, "unexpected offset of 'd'");
+    __VERIFY(fldD.BitFieldPosition == 2, "unexpected bitfield position of 'd'");
+    __VERIFY(fldD.BitFieldLength == 5, "unexpected bitfield length of 'd'");
+    __VERIFY(fldB.Offset == 1, "unexpected offset of 'b'");
+    __VERIFY(fldB.BitFieldPosition == 0, "unexpected bitfield position of 'b'");
+    __VERIFY(fldB.BitFieldLength == 3, "unexpected bitfield length of 'b'");
+    __VERIFY(fldC.Offset == 1, "unexpected offset of 'c'");
+    __VERIFY(fldC.BitFieldPosition == 3, "unexpected bitfield position of 'c'");
+    __VERIFY(fldC.BitFieldLength == 3, "unexpected bitfield length of 'c'");
+    __VERIFY(fldE.Offset == 4, "unexpected offset of 'e'");
+    __VERIFY(fldE.BitFieldPosition == 0, "unexpected bitfield position of 'e'");
+    __VERIFY(fldE.BitFieldLength == 20, "unexpected bitfield length of 'e'");
+    __VERIFY(fldF.Offset == 4, "unexpected offset of 'e'");
+    __VERIFY(fldF.BitFieldPosition == 20, "unexpected bitfield position of 'e'");
+    __VERIFY(fldF.BitFieldLength == 5, "unexpected bitfield length of 'e'");
+
+    var fooTy = host.getModuleType("notepad.exe", name);
+    __VERIFY(fooTy.fields.a.offset == 0, "unexpected type system offset for 'a'");
+    __VERIFY(fooTy.fields.a.type.isBitField == true, "bitfield does not show up in type system for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'a'");
+    __VERIFY(fooTy.fields.a.type.bitFieldPositions.length == 2, "unexpected type system bitfield length for 'a'");
+    __VERIFY(fooTy.fields.d.offset == 0, "unexpected type system offset for 'd'");
+    __VERIFY(fooTy.fields.d.type.isBitField == true, "bitfield does not show up in type system for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.lsb == 2, "unexpected type system bitfield position for 'd'");
+    __VERIFY(fooTy.fields.d.type.bitFieldPositions.length == 5, "unexpected type system bitfield length for 'd'");
+    __VERIFY(fooTy.fields.b.offset == 1, "unexpected type system offset for 'b'");
+    __VERIFY(fooTy.fields.b.type.isBitField == true, "bitfield does not show up in type system for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'b'");
+    __VERIFY(fooTy.fields.b.type.bitFieldPositions.length == 3, "unexpected type system bitfield length for 'b'");
+    __VERIFY(fooTy.fields.c.offset == 1, "unexpected type system offset for 'c'");
+    __VERIFY(fooTy.fields.c.type.isBitField == true, "bitfield does not show up in type system for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.lsb == 3, "unexpected type system bitfield position for 'c'");
+    __VERIFY(fooTy.fields.c.type.bitFieldPositions.length == 3, "unexpected type system bitfield length for 'c'");
+    __VERIFY(fooTy.fields.e.offset == 4, "unexpected type system offset for 'e'");
+    __VERIFY(fooTy.fields.e.type.isBitField == true, "bitfield does not show up in type system for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.lsb == 0, "unexpected type system bitfield position for 'e'");
+    __VERIFY(fooTy.fields.e.type.bitFieldPositions.length == 20, "unexpected type system bitfield length for 'e'");
+    __VERIFY(fooTy.fields.f.offset == 4, "unexpected type system offset for 'f'");
+    __VERIFY(fooTy.fields.f.type.isBitField == true, "bitfield does not show up in type system for 'f'");
+    __VERIFY(fooTy.fields.f.type.bitFieldPositions.lsb == 20, "unexpected type system bitfield position for 'f'");
+    __VERIFY(fooTy.fields.f.type.bitFieldPositions.length == 5, "unexpected type system bitfield length for 'f'");
+
+    foo.Delete();
+    return true;
+}
+
 //**************************************************************************
 // Initialization:
 //
@@ -894,7 +1201,15 @@ var __testSuite =
     {Name: "EnumWithMixedLayout", Code: Test_EnumWithMixedLayout },
     {Name: "EnumDeleteEnumerants", Code: Test_EnumDeleteEnumerants },
     {Name: "EnumWithNonDefaultBaseType", Code: Test_EnumWithNonDefaultBaseType },
-    {Name: "EnumMoveEnumerant", Code: Test_EnumMoveEnumerant }
+    {Name: "EnumMoveEnumerant", Code: Test_EnumMoveEnumerant },
+
+    //
+    // Bitfield Tests:
+    //
+    {Name: "BitfieldWithAutoLayout", Code: Test_BitfieldWithAutoLayout },
+    {Name: "BitfieldWithManualLayout", Code: Test_BitfieldWithManualLayout },
+    {Name: "BitfieldWithMixedAutoManualLayout", Code: Test_BitfieldWithMixedAutoManualLayout },
+    {Name: "BitfieldMoveField", Code: Test_BitfieldMoveField }
 
 ];
 

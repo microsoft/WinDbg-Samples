@@ -203,6 +203,15 @@ HRESULT UdtTypeSymbol::LayoutType()
                     curBitFieldPosition += bitFieldLength;
                 }
             }
+            else if (isBitField)
+            {
+                //
+                // For a manual layout bitfield, make sure that the field position is reset to the end
+                // of the bitfield so that the next automatic layout bitfield picks up from that point
+                // if such a field exists.
+                //
+                curBitFieldPosition = bitFieldPosition + bitFieldLength;
+            }
 
             //
             // For bitfields, do *NOT* move the positional cursor forward until we run out of bits in the
