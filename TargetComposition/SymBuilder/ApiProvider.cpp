@@ -1069,20 +1069,6 @@ Object FieldsObject::Add(_In_ const Object& /*fieldsObject*/,
     SymbolSet *pSymbolSet = spUdtTypeSymbol->InternalGetSymbolSet();
 
     ULONG64 fieldOffsetToUse = fieldOffset.value_or(UdtPositionalSymbol::AutomaticAppendLayout);
-    ULONG64 fieldTypeId = 0;
-
-    UdtTypeObject& udtTypeFactory = ApiProvider::Get().GetUdtTypeFactory();
-    if (udtTypeFactory.IsObjectInstance(fieldType))
-    {
-        ComPtr<UdtTypeSymbol> spFieldType_Udt = udtTypeFactory.GetStoredInstance(fieldType);
-        fieldTypeId = spFieldType_Udt->InternalGetId();
-    }
-    else
-    {
-        std::wstring fieldTypeName = (std::wstring)fieldType;
-        fieldTypeId = pSymbolSet->InternalGetSymbolIdByName(fieldTypeName);
-    }
-
     BaseTypeSymbol *pFieldType = UnboxType(pSymbolSet, fieldType);
 
     ComPtr<FieldSymbol> spField;
@@ -1247,16 +1233,21 @@ void FieldObject::MoveBefore(_In_ const Object& /*fieldObject*/, _In_ ComPtr<Fie
     FieldObject& fieldFactory = ApiProvider::Get().GetFieldFactory();
     if (fieldFactory.IsObjectInstance(beforeObj))
     {
-        ComPtr<FieldSymbol> spFieldSymbol = fieldFactory.GetStoredInstance(beforeObj);
+        ComPtr<FieldSymbol> spFieldSymbolBefore = fieldFactory.GetStoredInstance(beforeObj);
 
-        SymbolSet *pSymbolSet = spFieldSymbol->InternalGetSymbolSet();
-        BaseSymbol *pParentSymbol = pSymbolSet->InternalGetSymbol(spFieldSymbol->InternalGetParentId());
-        if (pParentSymbol == nullptr)
+        if (spFieldSymbol->InternalGetParentId() != spFieldSymbolBefore->InternalGetParentId())
+        {
+            throw std::runtime_error("target position field reference cannot be in a differing type");
+        }
+
+        SymbolSet *pSymbolSet = spFieldSymbolBefore->InternalGetSymbolSet();
+        BaseSymbol *pParentSymbolBefore = pSymbolSet->InternalGetSymbol(spFieldSymbolBefore->InternalGetParentId());
+        if (pParentSymbolBefore == nullptr)
         {
             throw std::runtime_error("cannot rearrange an orphan field");
         }
 
-        CheckHr(pParentSymbol->GetChildPosition(spFieldSymbol->InternalGetId(), &pos));
+        CheckHr(pParentSymbolBefore->GetChildPosition(spFieldSymbolBefore->InternalGetId(), &pos));
     }
     else
     {

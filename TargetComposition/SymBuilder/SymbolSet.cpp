@@ -807,7 +807,15 @@ HRESULT SymbolSet::FindTypeByName(_In_ std::wstring const& typeName,
                     ++pDig;
                 }
 
-                std::wstring baseName(pStart, pb - pStart);
+                pb--;
+                while (pb > pStart && iswspace(*pb)) { --pb; }
+
+                if (pb == pStart)
+                {
+                    return E_INVALIDARG;
+                }
+
+                std::wstring baseName(pStart, pb - pStart + 1);
 
                 ULONG64 arrayOfId = 0;
                 IfFailedReturn(FindTypeByName(baseName, &arrayOfId, nullptr));

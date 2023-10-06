@@ -130,10 +130,14 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
     <TargetName>SymbolBuilderComposition</TargetName>
+    <OutDir>$(SolutionDir)\x86\$(Configuration)\</OutDir>
+    <IntDir>x86\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
     <TargetName>SymbolBuilderComposition</TargetName>
+    <OutDir>$(SolutionDir)\x86\$(Configuration)\</OutDir>
+    <IntDir>x86\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\native\inc;$(IncludePath)</IncludePath>
