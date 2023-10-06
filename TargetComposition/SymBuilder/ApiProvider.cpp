@@ -58,10 +58,13 @@ namespace SymbolBuilder
 std::string ToString(_In_ const std::wstring& str)
 {
     std::string newStr;
-    int sz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, nullptr, 0, nullptr, nullptr);
-    newStr.resize(sz);
-    int rsz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, const_cast<char *>(newStr.data()), sz, nullptr, nullptr);
-    if (sz != rsz) { throw std::runtime_error("failed string conversion"); }
+    if (!str.empty())
+    {
+        int sz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        newStr.resize(sz);
+        int rsz = WideCharToMultiByte(CP_ACP, 0, str.c_str(), -1, const_cast<char *>(newStr.data()), sz, nullptr, nullptr);
+        if (sz != rsz) { throw std::runtime_error("failed string conversion"); }
+    }
     return newStr;
 }
 
