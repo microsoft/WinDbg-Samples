@@ -582,6 +582,23 @@ HRESULT SymbolImporter_DbgHelp::ImportMemberData(_In_ ULONG symIndex, _Out_ ULON
         return ImportFailure(E_FAIL);
     }
 
+    //
+    // If the underlying field is a bitfield, get its position and field length and ensure that we import 
+    // it as such a bitfield.
+    //
+    ULONG64 bitFieldPosition = 0;
+    ULONG64 bitFieldLength = 0;
+
+    ULONG bitPos;
+    if (SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_BITPOSITION, &bitPos))
+    {
+        if (!SymGetTypeInfo(m_symHandle, m_moduleBase, symIndex, TI_GET_LENGTH, &bitFieldLength))
+        {
+            return ImportFailure(E_FAIL);
+        }
+        bitFieldPosition = bitPos;
+    }
+
     localstr_ptr spDataName(pDataName);
 
     ULONG64 memberBuilderType;
@@ -593,7 +610,9 @@ HRESULT SymbolImporter_DbgHelp::ImportMemberData(_In_ ULONG symIndex, _Out_ ULON
                                         parentId,
                                         offset,
                                         memberBuilderType,
-                                        pDataName);
+                                        pDataName,
+                                        bitFieldLength,
+                                        bitFieldPosition);
     if (FAILED(hr))
     {
         return ImportFailure(hr);
