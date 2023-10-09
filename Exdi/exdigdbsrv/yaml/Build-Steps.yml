@@ -10,6 +10,14 @@ steps:
   inputs:
     restoreSolution: 'Exdi/**/*.sln'
 
+- task: PowerShell@2
+  displayName: "Create sourcelink file for current commit"
+  timeoutInMinutes: 30
+  inputs:
+    filePath: $(Build.SourcesDirectory)\Exdi\exdigdbsrv\SourceLinkGeneration.ps1
+    arguments: "-GitRelativePath /Exdi/exdigdbsrv -OutputDir $(Build.SourcesDirectory)\\Exdi\\exdigdbsrv\\exdigdbsrv\\"
+    pwsh: true
+
 - task: VSBuild@1
   displayName: 'Build x64'
   inputs:
