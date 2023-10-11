@@ -1266,16 +1266,24 @@ HRESULT SymbolImporter_DbgHelp::ImportTypeSymbol(_In_ ULONG symIndex, _Out_ ULON
             // Make sure there is *NOT* a naming conflict on this particular type.  Maybe someone already created
             // this type explicitly before we tried to import anything...
             //
-            ULONG64 builderId;
-            HRESULT hrFind = m_pOwningSet->FindTypeByName(pSymName, &builderId, nullptr, false);
-            if (SUCCEEDED(hrFind))
+            // Note that we must *NOT* do this for "unnamed symbols" which were given an explicit "<unnamed-*>" by
+            // something else.  These are *NOT* unique and you cannot ever look up <unnamed-*> and expect to get
+            // something meaningful.
+            //
+            bool isUnnamedTag = (wcsncmp(pSymName, L"<unnamed-", 9) == 0 && pSymName[wcslen(pSymName) - 1] == L'>');
+            if (!isUnnamedTag)
             {
-                //
-                // At this point, we have a naming conflict.  We can either fail to import this or just point to the
-                // existing type.  Here, we choose the latter.
-                //
-                *pBuilderId = builderId;
-                return S_FALSE;
+                ULONG64 builderId;
+                HRESULT hrFind = m_pOwningSet->FindTypeByName(pSymName, &builderId, nullptr, false);
+                if (SUCCEEDED(hrFind))
+                {
+                    //
+                    // At this point, we have a naming conflict.  We can either fail to import this or just point to the
+                    // existing type.  Here, we choose the latter.
+                    //
+                    *pBuilderId = builderId;
+                    return S_FALSE;
+                }
             }
         }
     }
