@@ -98,26 +98,33 @@ int wmain(int argc, wchar_t const* const* argv)
     }
 
     // We need to run TTD.exe using ShellExecuteW, so we can request elevation.
-    // We need to do this from another thread because 
-//    std::thread(
-//        [=]()
-//        {
-            auto const arguments = std::format(LR"(-out {} -attach {} -onInitCompleteEvent {} -recordMode manual)",
-                binDir.native(),
-                GetCurrentProcessId(),
-                eventName
-            );
-            ShellExecuteW(
-                nullptr,
-                L"runas",
-                //L"TTD.exe",
-                (binDir / L"TTD" / L"TTD.exe").c_str(),
-                arguments.c_str(),
-                nullptr,
-                SW_SHOWNORMAL
-            );
-//        }
-//    ).detach();
+    auto const arguments = std::format(LR"(-out {} -attach {} -onInitCompleteEvent {} -recordMode manual)",
+        binDir.native(),
+        GetCurrentProcessId(),
+        eventName
+    );
+    auto ttdResult = reinterpret_cast<INT_PTR>(ShellExecuteW(
+        nullptr,
+        L"runas",
+        //L"TTD.exe",
+        (binDir / L"TTD" / L"TTD.exe").c_str(),
+        arguments.c_str(),
+        nullptr,
+        SW_SHOWNORMAL
+    ));
+    if (ttdResult <= 32)
+    {
+        DWORD extendedError = GetLastError();
+        if (ttdResult == SE_ERR_ACCESSDENIED && extendedError == ERROR_CANCELLED)
+        {
+            std::cerr << "Elevation request was denied by the user so we can't proceed.\n";
+        }
+        else
+        {
+            std::cerr << std::format("Couldn't run TTD.exe. Error: {}, extended error: {}\n", ttdResult, extendedError);
+        }
+        return 1;
+    }
 
     if (WaitForSingleObject(recordingStartedEvent, INFINITE) != WAIT_OBJECT_0)
     {
