@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <wrl.h>
 
 #include <thread>
 #include <future>
@@ -133,7 +134,7 @@ int wmain(int argc, wchar_t const* const* argv)
     }
 
     // TTD is now installed in the process and ready to record.
-    auto const pRecorder = TTD::MakeLiveRecorder(ClientGuid, "Hello, there!");
+    Microsoft::WRL::ComPtr<TTD::ILiveRecorder> const pRecorder{ TTD::MakeLiveRecorder(ClientGuid, "Hello, there!") };
     if (pRecorder == nullptr)
     {
         std::cerr << "Failed to get the recorder interface!\n";
@@ -166,7 +167,7 @@ int wmain(int argc, wchar_t const* const* argv)
     // as islands belonging to the same activity.
     auto multithreadedSortBuffer = randomSequence;
     pRecorder->StartRecordingCurrentThread(MultithreadedSortActivity, TTD::InstructionCount::Max);
-    MultithreadedSort(pRecorder, multithreadedSortBuffer);
+    MultithreadedSort(pRecorder.Get(), multithreadedSortBuffer);
     pRecorder->StopRecordingCurrentThread();
 
     // Verify that the multithreaded sort worked as expected while being recorded.
