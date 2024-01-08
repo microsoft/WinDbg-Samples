@@ -107,7 +107,6 @@ int wmain(int argc, wchar_t const* const* argv)
     auto ttdResult = reinterpret_cast<INT_PTR>(ShellExecuteW(
         nullptr,
         L"runas",
-        //L"TTD.exe",
         (binDir / L"TTD" / L"TTD.exe").c_str(),
         arguments.c_str(),
         nullptr,
@@ -184,7 +183,7 @@ int wmain(int argc, wchar_t const* const* argv)
     std::wcout << std::format(L"Trace file: {}\n", traceFilename);
 
     // Close the recorder API, supplying a user data (in this case, just a short string).
-    pRecorder->Close("Adios!");
+    pRecorder->Close("Done!");
 
     std::cout << "All done!\n";
 }
