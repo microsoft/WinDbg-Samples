@@ -344,6 +344,11 @@ class ConfigExdiGdbServerHelper::ConfigExdiGdbServerHelperImpl
         return m_ExdiGdbServerData.component.fPAMemoryAccess;
     }
 
+    inline bool ConfigExdiGdbServerHelperImpl::IsGdbMonitorCmdDoNotWaitOnOKEnable()
+    {
+        return m_ExdiGdbServerData.component.fgdbMonitorCmdDoNotWaitOnOK;
+    }
+
     private:
     CComPtr<IXmlReader> m_XmlLiteReader;
     CComPtr<IStream> m_IStream;
@@ -889,4 +894,10 @@ bool ConfigExdiGdbServerHelper::GetServerRequirePAMemoryAccess()
 {
     assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
     return m_pConfigExdiGdbServerHelperImpl->GetServerRequirePAMemoryAccess();
+}
+
+bool ConfigExdiGdbServerHelper::IsGdbMonitorCmdDoNotWaitOnOKEnable()
+{
+    assert(m_pConfigExdiGdbServerHelperImpl != nullptr);
+    return m_pConfigExdiGdbServerHelperImpl->IsGdbMonitorCmdDoNotWaitOnOKEnable();
 }

@@ -221,6 +221,7 @@ public:
             throw _com_error(E_FAIL);
         }
 
+        ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
         messageLength = min(messageLength, C_MAX_MONITOR_CMD_BUFFER);
         bool replyDone = false;
         do
@@ -247,15 +248,23 @@ public:
                     unsigned char highByte = ((AciiHexToNumber(reply[pos]) << 4) & 0xf0);
                     monitorResult[monitorResult.GetLength() - 1] = highByte | (AciiHexToNumber(reply[pos + 1]) & 0x0f);
                 }
-                //  Try to read more packets
-                bool IsPollingChannelMode = false;
-                if (m_pRspClient->ReceiveRspPacketEx(reply, core, true, IsPollingChannelMode, false))
+
+                if (cfgData.IsGdbMonitorCmdDoNotWaitOnOKEnable())
                 {
-                    messageLength = reply.length();
+                    replyDone = true;
                 }
                 else
                 {
-                    replyDone = true;
+                    //  Try to read more packets
+                    bool IsPollingChannelMode = false;
+                    if (m_pRspClient->ReceiveRspPacketEx(reply, core, true, IsPollingChannelMode, false))
+                    {
+                        messageLength = reply.length();
+                    }
+                    else
+                    {
+                        replyDone = true;
+                    }
                 }
             }
         }

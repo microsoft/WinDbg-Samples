@@ -57,7 +57,8 @@ namespace GdbSrvControllerLib
         std::wstring qSupportedPacket;  //  GDB server supported, if this empty then will send the default "qsupported" packet
         bool fTreatSwBpAsHwBp;          //  GDB server client will convert SW bp as HW bp.
         bool fForcedLegacyResumeStepCommands; //  Flag if set the GDB server will use the legacy resume/step command mode
-        bool fPAMemoryAccess;          //  GDB server reuires memory access via PA
+        bool fPAMemoryAccess;           //  GDB server reuires memory access via PA
+        bool fgdbMonitorCmdDoNotWaitOnOK; //  Flag if set then the GDB monitor response processing won't wait on the "OK" string
     } ConfigExdiData;
 
     //  This type indicates the Target data.

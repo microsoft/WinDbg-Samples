@@ -101,6 +101,7 @@ typedef struct
     WCHAR fTreatSwBpAsHwBp[C_MAX_ATTR_LENGTH];          //  Treat SW bp as a HW bp.
     WCHAR fForcedLegacyResumeStepCommands[C_MAX_ATTR_LENGTH]; //  Flag if set, then use the legacy step/resume command mode.
     WCHAR fServerRequirePAMemoryAccess[C_MAX_ATTR_LENGTH]; //  if set the server requires PAs for all memory access R/W.
+    WCHAR fGdbMonitorCmdDoNotWaitOnOK[C_MAX_ATTR_LENGTH]; //  if set the server requires PAs for all memory access R/W.
 } ConfigExdiDataEntry;
 
 typedef struct
@@ -177,6 +178,7 @@ const WCHAR gdbServerAgentNamePacket[] = L"agentNamePacket";
 const WCHAR gdbQSupportedPacket[] = L"qSupportedPacket";
 const WCHAR gdbTreatSwBpAsHwBp[] = L"enableTreatingSwBpAsHwBp";
 const WCHAR gdbRequirePAMemoryAccess[] = L"requirePAMemoryAccess";
+const WCHAR gdbMonitorCmdDoNotWaitOnOK[] = L"gdbMonitorCmdDoNotWaitOnOK";
 const WCHAR gdbServerUuid[] = L"uuid";
 const WCHAR displayCommPackets[] = L"displayCommPackets";
 const WCHAR debuggerSessionByCore[] = L"debuggerSessionByCore";
@@ -248,15 +250,16 @@ const XML_ATTRNAME_HANDLER_STRUCT attrExdiTargetHandlerMap[] =
 //  General debugger information - handler map
 const XML_ATTRNAME_HANDLER_STRUCT attrExdiServerHandlerMap[] =
 {
-    {exdiGdbServerConfigData, gdbServerAgentNamePacket, XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, agentNamePacket), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, gdbServerUuid,            XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, uuid), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, displayCommPackets,       XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fDisplayCommPackets), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, debuggerSessionByCore,    XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fDebuggerSessionByCore), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, enableThrowExceptions,    XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fExceptionThrowEnabled), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, gdbQSupportedPacket,      XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, qSupportedPacket), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, gdbTreatSwBpAsHwBp,       XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fTreatSwBpAsHwBp), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, forceLegacyResumeStepCmds,XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fForcedLegacyResumeStepCommands), C_MAX_ATTR_LENGTH},
-    {exdiGdbServerConfigData, gdbRequirePAMemoryAccess, XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fServerRequirePAMemoryAccess), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbServerAgentNamePacket,   XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, agentNamePacket), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbServerUuid,              XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, uuid), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, displayCommPackets,         XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fDisplayCommPackets), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, debuggerSessionByCore,      XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fDebuggerSessionByCore), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, enableThrowExceptions,      XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fExceptionThrowEnabled), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbQSupportedPacket,        XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, qSupportedPacket), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbTreatSwBpAsHwBp,         XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fTreatSwBpAsHwBp), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, forceLegacyResumeStepCmds,  XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fForcedLegacyResumeStepCommands), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbRequirePAMemoryAccess,   XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fServerRequirePAMemoryAccess), C_MAX_ATTR_LENGTH},
+    {exdiGdbServerConfigData, gdbMonitorCmdDoNotWaitOnOK, XmlDataHelpers::XmlGetStringValue, FIELD_OFFSET(ConfigExdiDataEntry, fGdbMonitorCmdDoNotWaitOnOK), C_MAX_ATTR_LENGTH},
 };
 
 //  Attribute name - handler map for the GdbServer server tag info
@@ -819,6 +822,7 @@ HRESULT XmlDataHelpers::HandleTagAttributeList(_In_ TAG_ATTR_LIST* const pTagAtt
                     pConfigTable->component.fTreatSwBpAsHwBp = (_wcsicmp(exdiData.fTreatSwBpAsHwBp, L"yes") == 0) ? true : false;
                     pConfigTable->component.fForcedLegacyResumeStepCommands = (_wcsicmp(exdiData.fForcedLegacyResumeStepCommands, L"yes") == 0) ? true : false;
                     pConfigTable->component.fPAMemoryAccess = (_wcsicmp(exdiData.fServerRequirePAMemoryAccess, L"yes") == 0) ? true : false;
+                    pConfigTable->component.fgdbMonitorCmdDoNotWaitOnOK = (_wcsicmp(exdiData.fGdbMonitorCmdDoNotWaitOnOK, L"yes") == 0) ? true : false;
                     isSet = true;
                 }
             }
