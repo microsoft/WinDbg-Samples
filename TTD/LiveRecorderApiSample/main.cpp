@@ -11,8 +11,6 @@
 
 #include <TTD/TTDLiveRecorder.h>
 
-#pragma comment(lib, "TTDLiveRecorder")
-
 // {6DA58208-3BF5-4B80-A711-781098BC4445}
 static constexpr GUID ClientGuid = { 0x6da58208, 0x3bf5, 0x4b80, { 0xa7, 0x11, 0x78, 0x10, 0x98, 0xbc, 0x44, 0x45 } };
 
