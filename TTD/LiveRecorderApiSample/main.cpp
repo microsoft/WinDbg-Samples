@@ -53,7 +53,7 @@ void MultithreadedSort(TTD::ILiveRecorder* pRecorder, std::span<int> span)
                 // Asynchronous sorting of the hi span half.
                 // This gets to run on a separate thread,
                 // so in order to record we need to do it explicitly.
-                pRecorder->StartRecordingCurrentThread(MultithreadedSortActivity, TTD::InstructionCount::Max);
+                pRecorder->StartRecordingCurrentThread(MultithreadedSortActivity, TTD::InstructionCount::Invalid);
                 MultithreadedSort(pRecorder, hiSpan);
                 pRecorder->StopRecordingCurrentThread();
             });
@@ -148,7 +148,7 @@ int wmain(int argc, wchar_t const* const* argv)
     // Record a simple single-threaded sort algorithm.
     // The sorting is recorded as a single island with its own activity ID.
     auto stdSortBuffer = randomSequence;
-    pRecorder->StartRecordingCurrentThread(StdSortActivity, TTD::InstructionCount::Max);
+    pRecorder->StartRecordingCurrentThread(StdSortActivity, TTD::InstructionCount::Invalid);
     std::ranges::sort(stdSortBuffer);
     pRecorder->StopRecordingCurrentThread();
 
@@ -163,7 +163,7 @@ int wmain(int argc, wchar_t const* const* argv)
     // The sorting of all the asynchronous pieces is recorded in the trace,
     // as islands belonging to the same activity.
     auto multithreadedSortBuffer = randomSequence;
-    pRecorder->StartRecordingCurrentThread(MultithreadedSortActivity, TTD::InstructionCount::Max);
+    pRecorder->StartRecordingCurrentThread(MultithreadedSortActivity, TTD::InstructionCount::Invalid);
     MultithreadedSort(pRecorder.Get(), multithreadedSortBuffer);
     pRecorder->StopRecordingCurrentThread();
 
