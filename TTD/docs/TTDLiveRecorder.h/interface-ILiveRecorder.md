@@ -13,7 +13,8 @@ A working sample that demonstrates the use of this interface can be found on
 [GitHub](https://github.com/microsoft/WinDbg-Samples/tree/master/TTD/LiveRecorderApiSample).
 
 This interface derives from the standard [IUnknown](https://learn.microsoft.com/en-us/windows/win32/api/unknwn/nn-unknwn-iunknown)
-interface to manage object lifetime and access any other interfaces supported by the object, but it doesn't conform to the full COM specification.
+interface to manage object lifetime and access any other interfaces supported by the object, but it doesn't participate
+in the COM registeration and activation infrastructure offered by Windows nor does it use HRESULT for error reporting.
 Smart pointer facilities like [`WRL::ComPtr`](https://learn.microsoft.com/en-us/cpp/cppcx/wrl/comptr-class),
 [`winrt::com_ptr`](https://learn.microsoft.com/en-us/uwp/cpp-ref-for-winrt/com-ptr) or
 [`wil::com_ptr`](https://github.com/microsoft/wil/wiki/WinRT-and-COM-wrappers)

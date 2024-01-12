@@ -25,7 +25,12 @@ This method has no use restrictions.
 
 Note that this method might record a large amount of data in the trace file.
 TTD doesn't perform any differential or incremental snapshotting,
-so the entirety of the process heaps will be recorded each time the mnethod is called.
+so the entirety of the process heaps will be recorded each time the method is called.
+
+Also note that in automatic mode [`TTD.exe -recordMode Automatic`](**TODO**: link), which is TTD's default,
+the recorder will already have recorded all the memory of the process as part of its initialization,
+so calling this method might be redundant and wasteful.
+Caution and common sense should be exercised to avoid bloating the trace file with large blocks of redundant data.
 
 ## Example of use
 

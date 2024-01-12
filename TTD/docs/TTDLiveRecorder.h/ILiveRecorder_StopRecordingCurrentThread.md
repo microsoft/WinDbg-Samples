@@ -30,7 +30,7 @@ This method has no use restrictions.
 ## Example of use
 
 ```C++
-// Record 100 more instructions and then stop.
+// Assuming that this thread is currently recording...
 TTD::InstructionCount instructionsRecorded = pRecorder->StopRecordingCurrentThread();
 if (instructionsRecorded > TTD::InstructionCount{ 1'000'000 })
 {

@@ -43,7 +43,7 @@ This allows the caller to know whether the recording will resume immediately whe
 {
     TTD::ILiveRecorder::ScopedPauseRecording const pause{ pRecorder };
 
-    // Recording is definitely paused now.
+    // Recording (if any) is definitely paused now.
     // We can do stuff that we don't want in the recording.
 }
 

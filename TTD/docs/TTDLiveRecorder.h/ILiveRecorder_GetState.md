@@ -2,7 +2,7 @@
 
 Method of the [`TTD::ILiveRecorder`](interface-ILiveRecorder.md) interface.
 
-Allows the caller to retrieve the full path to the trace file that is currently being recorded.
+Allows the caller to know the current state of TTD's recorder on the calling thread.
 
 ```C++
 TTD::ThreadRecordingState TTD::ILiveRecorder::GetState() const noexcept;
@@ -12,6 +12,11 @@ TTD::ThreadRecordingState TTD::ILiveRecorder::GetState() const noexcept;
 
 Returns the value of the [`TTD::ThreadRecordingState`](../TTDCommonTypes.h/enum-ThreadRecordingState.md) enumeration
 that best represents the current state of the recorder on the calling thread.
+
+Note that the returned state may become stale by the time this method returns or shortly thereafter.
+For instance, this method might return `TTD::ThreadRecordingState::Recording` and then
+immediately get throttled before the calling code has any time to react.
+Therefore this state should always be interpreted as "it was accurate recently".
 
 ## Correct use
 

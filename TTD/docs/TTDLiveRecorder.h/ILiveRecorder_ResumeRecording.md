@@ -4,7 +4,7 @@ Method of the [`TTD::ILiveRecorder`](interface-ILiveRecorder.md) interface.
 
 Resumes recording the current island after the recording was temporarily paused.
 
-If the recording is not paused (either because the current thread is recording or because it never started recording
+If the recording is not paused (either because the calling thread is recording or because it never started recording
 or because recording was stopped) this method does nothing.
 
 ```C++
@@ -13,7 +13,7 @@ bool TTD::ILiveRecorder::ResumeRecording() noexcept;
 
 ## Return value
 
-Returns `true` if the current thread is being recorded when the method returns.
+Returns `true` if the calling thread is being recorded when the method returns.
 
 ## Correct use
 
@@ -30,7 +30,7 @@ instead of calling this method directly.
 ```C++
 bool const wasRecording = pRecorder->TryPauseRecording();
 
-// Recording is definitely paused now.
+// Recording (if any) is definitely paused now.
 // We can do stuff that we don't want in the recording.
 
 if (wasRecording)
