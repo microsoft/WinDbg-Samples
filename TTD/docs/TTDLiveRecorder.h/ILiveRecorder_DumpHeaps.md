@@ -27,7 +27,7 @@ Note that this method might record a large amount of data in the trace file.
 TTD doesn't perform any differential or incremental snapshotting,
 so the entirety of the process heaps will be recorded each time the method is called.
 
-Also note that in automatic mode [`TTD.exe -recordMode Automatic`](**TODO**: link), which is TTD's default,
+Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://review.learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-live-recorder-api?branch=domars-ttd-live-recorder), which is TTD's default,
 the recorder will already have recorded all the memory of the process as part of its initialization,
 so calling this method might be redundant and wasteful.
 Caution and common sense should be exercised to avoid bloating the trace file with large blocks of redundant data.
