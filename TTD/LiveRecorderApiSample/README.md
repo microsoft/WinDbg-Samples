@@ -47,33 +47,3 @@ TTDRecordCPU!InitializeNirvanaClient+0x7c69:
 03 00000051`8031d660 00007ff6`3f902609     LiveRecorderApiSample!wmain+0x6c5 [X:\repos\Microsoft\WinDbg-Samples\TTD\LiveRecorderApiSample\main.cpp @ 147] 
 ...
 ```
-
-Metadata recorded from the API can be examined in the debugger using the data model. For instance:
-
-```
-0:000> dx -r1 @$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"]
-@$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"]                 : Record client with GUID 6DA58208-3BF5-4B80-A711-781098BC4445 and lifetime: [40:0, 12A90:0]
-    Lifetime         : [40:0, 12A90:0]
-    OpenUserData     : 14 bytes ( 48 65 6C 6C 6F 2C 20 74 68 65 72 65 21 00 )
-    CloseUserData    : 7 bytes ( 41 64 69 6F 73 21 00 )
-    Activities      
-0:000> dx -r1 @$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"].Activities
-@$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"].Activities                
-    [0x0]            : Activity 1 with lifetime: [41:0, 4FE:0]
-    [0x1]            : Activity 2 with lifetime: [4FF:0, FFFFFFFFFFFFFFFE:0]
-0:000> dx -r1 @$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"].Activities[1]
-@$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"].Activities[1]                 : Activity 2 with lifetime: [4FF:0, FFFFFFFFFFFFFFFE:0]
-    Id               : 0x2
-    Lifetime         : [4FF:0, FFFFFFFFFFFFFFFE:0]
-    Islands         
-0:000> dx -r1 @$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"].Activities[1].Islands
-@$curprocess.TTD.RecordClients["6DA58208-3BF5-4B80-A711-781098BC4445"].Activities[1].Islands                
-    [0x0]            : Island on activity 2 from client 6DA58208-3BF5-4B80-A711-781098BC4445 on thread 2 (0x16200) with lifetime: [4FF:0, FFFFFFFFFFFFFFFE:0]
-    [0x1]            : Island on activity 2 from client 6DA58208-3BF5-4B80-A711-781098BC4445 on thread 3 (0x150D4) with lifetime: [509:0, FFFFFFFFFFFFFFFE:0]
-    [0x2]            : Island on activity 2 from client 6DA58208-3BF5-4B80-A711-781098BC4445 on thread 4 (0x10DF0) with lifetime: [516:0, FFFFFFFFFFFFFFFE:0]
-...
-    [0x61]           : Island on activity 2 from client 6DA58208-3BF5-4B80-A711-781098BC4445 on thread 32 (0x10C3C) with lifetime: [C32A:0, C65E:0]
-    [0x62]           : Island on activity 2 from client 6DA58208-3BF5-4B80-A711-781098BC4445 on thread 6 (0xC910) with lifetime: [C6E7:0, CABE:0]
-    [0x63]           : Island on activity 2 from client 6DA58208-3BF5-4B80-A711-781098BC4445 on thread 52 (0xFB3C) with lifetime: [C788:0, C9C1:0]
-    [...]           
-```
