@@ -34,7 +34,7 @@ and may record "torn" data if it's simultaneously written. See [`DumpSnapshot`](
 
 This method has no use restrictions.
 
-Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://review.learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-live-recorder-api?branch=domars-ttd-live-recorder), which is TTD's default,
+Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#reducing-overhead-of-tracing), which is TTD's default,
 the recorder will already have recorded all the memory of the process as part of its initialization,
 and any additional modules as soon as they are loaded, so calling this method might be redundant and wasteful.
 Caution and common sense should be exercised to avoid bloating the trace file with large blocks of redundant data.
