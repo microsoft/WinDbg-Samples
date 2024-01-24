@@ -35,7 +35,6 @@
     <None Include="Get-Ttd.cmd" />
     <None Include="Get-Ttd.ps1" />
     <None Include="README.md" />
-    <None Include="packages.config" />
     <CopyFileToFolders Include="TTDDownload\ARM64\TTD.exe">
       <Filter>TTDDownload\ARM64</Filter>
     </CopyFileToFolders>
@@ -90,5 +89,6 @@
     <CopyFileToFolders Include="TTDDownload\x64\TTDRecordCPU.dll">
       <Filter>TTDDownload\x64</Filter>
     </CopyFileToFolders>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>

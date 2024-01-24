@@ -14,11 +14,11 @@ After that is done, open LiveRecorderApiSample.sln in Visual Studio 2022 16.8 or
 
 ## Dependencies
 
-Apart from TTD's binaries, this sample requires the `Microsoft.TimeTravelDebugging.Apis` NuGet package that provides the API.
+Apart from TTD's binaries, this sample requires the [`Microsoft.TimeTravelDebugging.Apis` NuGet package](https://www.nuget.org/packages/Microsoft.TimeTravelDebugging.Apis) that provides the API.
 This is downloaded automatically from the feed at https://nuget.org if it's configured in Visual Studio.
-(TODO: provide a link to the package's page)
 
-The API documentation can be found here (TODO: Provide link to documentation).
+
+The API documentation can be found here: https://github.com/microsoft/WinDbg-Samples/tree/master/TTD/docs
 
 ## Running the sample
 
