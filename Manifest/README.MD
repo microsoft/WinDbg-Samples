@@ -35,13 +35,13 @@ The `Components` tag contains a list of `ScriptComponent` tags that define each 
 * **File** - Path to the file relative to the manifest file location.
 * **FilePathKind** - Where the path is relative to. For this case it'll always be "RepositoryRelative". You may also use "Absolute" in which case you'd change File to be an absolute path.
 ### Load triggers
-The final requirement for each component is defining what will trigger the loading of the extension. Components can be loaded by either executing a [function alias](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-data-model-function-aliases) or retrieving the named extended by the component.
+The final requirement for each component is defining what will trigger the loading of the extension. Components can be loaded by either executing a [function alias](https://docs.microsoft.com/windows-hardware/drivers/debugger/debugger-data-model-function-aliases) or retrieving the named extended by the component.
 #### Function Aliases
 If your script uses function aliases, you'll need to define each of them, their syntax, and their description in a `FunctionAliases` tag.
 
 Each `FunctionAlias` in the `FunctionAliases` list has a `Name` property that is the name of the function alias and an `AliasItem` tag inside of it that contains `Syntax` and `Description` tags describing how to use the function alias.
 
-For more information, about function aliases see [Debugger Data Model Function Aliases](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-data-model-function-aliases)
+For more information, about function aliases see [Debugger Data Model Function Aliases](https://docs.microsoft.com/windows-hardware/drivers/debugger/debugger-data-model-function-aliases)
 
 #### Object Extensions
 If your script extends the debugger data model, you'll need to define the name of the objects it extends in an `ObjectExtensionList` tag , the namespace it adds, and what property it adds.

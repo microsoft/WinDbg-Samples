@@ -15,9 +15,9 @@ Download the following software in order to follow along:
 
 ## Prepare program to record
 
-This tutorial will use the program from [app-sample](https://github.com/Microsoft/WinDbg-Samples/tree/master/TTDQueries/app-sample).
+This tutorial will use the program from [app-sample](https://github.com/Microsoft/WinDbg-Samples/tree/HEAD/TTDQueries/app-sample).
 
-1. Open the [solution](https://github.com/Microsoft/WinDbg-Samples/tree/master/TTDQueries/app-sample/DShowPlayer.sln) in Visual Studio and build it.
+1. Open the [solution](https://github.com/Microsoft/WinDbg-Samples/tree/HEAD/TTDQueries/app-sample/DShowPlayer.sln) in Visual Studio and build it.
    * Note that this works with 32 bit or 64 bit built version of the tool. I use the 64 bit version here.
 2. Launch/Start the application to make sure it runs as expected.
 3. Reproduce the problem:
@@ -94,7 +94,7 @@ You should see something like:
 
 <img src="images/windbg-ttd-session.jpg" alt="Windbg Preview TTD Session" width="1100"/>
 
-For documentation about the dx command in Windbg Preview go [here](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-data-model-function-aliases).
+For documentation about the dx command in Windbg Preview go [here](https://docs.microsoft.com/windows-hardware/drivers/debugger/debugger-data-model-function-aliases).
 
 Finding out what caused your program to crash is like detective work, you
 need to figure out what happened and where. Think about what questions
@@ -186,7 +186,7 @@ size to 8 bytes max, with TTD Memory queries you can go as big as you would like
 
 For example, you could write a query than spans an entire binary, and you can build
 a code coverage check using the results.
-There is an example of a [code coverage from TTD](https://github.com/0vercl0k/windbg-scripts/tree/master/codecov).
+There is an example of a [code coverage from TTD](https://github.com/0vercl0k/windbg-scripts/tree/HEAD/codecov).
 
 In this sample program, we can arrive to the same conclusion as the previous investigation,
 but instead we'll use Memory queries to figure out where the error came from and
@@ -206,7 +206,7 @@ Result:
 ```
 
 In Windows programs each thread has a known structure that contains all the information
-regarding its state. It is called the Thread Environment Block ([TEB](https://docs.microsoft.com/en-us/windows/desktop/api/winternl/ns-winternl-_teb)). The result returned by `GetLastError()` is
+regarding its state. It is called the Thread Environment Block ([TEB](https://docs.microsoft.com/windows/desktop/api/winternl/ns-winternl-_teb)). The result returned by `GetLastError()` is
 stored in this data structure.
 Windbg Preview allows to query this data structure by running `dx @$teb`. If you
 look at the TEB's members you'll see there is a LastErrorValue variable, 4 bytes in size.
@@ -241,8 +241,8 @@ was trying to open.
 
 <img src="images/windbg-invalid-file.jpg" alt="Windbg Preview Invalid File" width="1200"/>
 
-[Time Travel Debugging]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-overview
-[Sample folder]: https://github.com/Microsoft/Windows-classic-samples/tree/master/Samples
+[Time Travel Debugging]: https://docs.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-overview
+[Sample folder]: https://github.com/Microsoft/Windows-classic-samples/tree/HEAD/Samples
 
 As you can see, the file that was opened is not a media file, and the video reader
 doesn't know how to open such file, causing the program to error.

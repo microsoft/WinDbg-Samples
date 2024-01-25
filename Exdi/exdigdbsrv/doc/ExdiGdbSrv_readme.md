@@ -59,7 +59,7 @@ e.g. c:\Program Files\qemu>qemu-img convert -c -p -O qcow2 Windowsfile.vhdx file
 
 3. Create a Linux script file to launch the Windows VM on QEMU.
 •	Once you prepared Windows VHDX image (and added the set of paravirtualized drivers and converted to qcow2 format) on the Ubuntu server.
-- - Get the QEMU VM UEFI from https://github.com/clearlinux/common/blob/master/OVMF.fd (ensure to get the correct architecture ARM64/x64 UEFI file)
+- - Get the QEMU VM UEFI from https://github.com/clearlinux/common/blob/HEAD/OVMF.fd (ensure to get the correct architecture ARM64/x64 UEFI file)
 •	Update the the launching VM script to point to the locations where the image and UEFI will be located.
 •	Please see below samples of Linux & Windows launching QEMU Windows VM scripts
 

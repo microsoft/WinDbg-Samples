@@ -48,6 +48,6 @@ Check out [TTD - Queries] to learn more.
 * [Defrag Tools - Time Travel Debugging - Advanced](https://channel9.msdn.com/Shows/Defrag-Tools/Defrag-Tools-186-Time-Travel-Debugging-Advanced)
 * [CppCon 2017 - Root Causing Bugs in Commercial Scale Software](https://www.youtube.com/watch?v=l1YJTg_A914)
 
-[Time Travel Debugging]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-overview
-[TTD - Troubleshoot]: https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/time-travel-debugging-troubleshooting
+[Time Travel Debugging]: https://docs.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-overview
+[TTD - Troubleshoot]: https://docs.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-troubleshooting
 [TTD - Queries]: https://blogs.msdn.microsoft.com/windbg/2018/02/01/time-travel-debugging-queries/

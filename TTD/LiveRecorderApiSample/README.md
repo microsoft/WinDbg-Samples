@@ -5,7 +5,7 @@ This is a sample demonstrating how a program can use TTD's live recording API to
 ## Getting Started
 
 A copy of TTD's recorder binaries is needed in order to build and run this sample.
-There are general instructions describing how to obtain the binaries documented in [How to download and install the TTD.exe command line utility (Offline method)](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#how-to-download-and-install-the-ttdexe-command-line-utility-offline-method)
+There are general instructions describing how to obtain the binaries documented in [How to download and install the TTD.exe command line utility (Offline method)](https://learn.microsoft.com/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#how-to-download-and-install-the-ttdexe-command-line-utility-offline-method)
 
 For the purposes of this sample, you can just run the provided script `.\Get-Ttd` from a command or powershell window.
 This script downloads the most current binaries into a TTDDownload subdirectory.
@@ -18,7 +18,7 @@ Apart from TTD's binaries, this sample requires the [`Microsoft.TimeTravelDebugg
 This is downloaded automatically from the feed at https://nuget.org if it's configured in Visual Studio.
 
 
-The API documentation can be found here: https://github.com/microsoft/WinDbg-Samples/tree/master/TTD/docs
+The API documentation can be found here: https://github.com/microsoft/WinDbg-Samples/tree/HEAD/TTD/docs
 
 ## Running the sample
 

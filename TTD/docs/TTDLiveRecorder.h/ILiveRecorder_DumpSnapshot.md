@@ -48,7 +48,7 @@ Note that if given a large buffer this method will record it in its entirety in 
 TTD doesn't perform any differential or incremental snapshotting,
 so the entirety of the buffer will be recorded each time the method is called.
 
-Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#reducing-overhead-of-tracing), which is TTD's default,
+Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://learn.microsoft.com/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#reducing-overhead-of-tracing), which is TTD's default,
 the recorder will already have recorded all the memory of the process as part of its initialization,
 so calling this method might be redundant and wasteful.
 Caution and common sense should be exercised to avoid bloating the trace file with large blocks of redundant data.
