@@ -954,9 +954,9 @@ will be displayed along with the line of code and which test case they occurred 
 The unit tests are presently structured such that they can be easily debugged in a normal debugger installation
 OUTSIDE of the harness.  A typical setup for debugging unit tests would be:
 
-    - Start the debugger which will load the plug-in and load/execute scripts (whether WinDbg Classic or WinDbg Preview)
+    - Start the debugger which will load the plug-in and load/execute scripts (whether WinDbg Classic or WinDbg)
     - Start an outer debugger which will debug the plug-in and attach it to the inner debugger
-        - NOTE: For WinDbg Classic, attach to "windbg.exe"; for WinDbg Preview, attach to "EngHost.exe"
+        - NOTE: For WinDbg Classic, attach to "windbg.exe"; for WinDbg, attach to "EngHost.exe"
     - In the inner debugger
         - .load SymbolBuilderComposition.dll
         - .scriptload <test> (e.g.: ".scriptload BasicTypeTests.js")

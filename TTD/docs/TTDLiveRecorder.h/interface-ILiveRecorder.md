@@ -32,7 +32,7 @@ These methods control the access and lifetime of the object that provides the in
 
 - [`AddRef`](https://learn.microsoft.com/windows/win32/api/unknwn/nf-unknwn-iunknown-addref) (IUnknown)
 - [`Release`](https://learn.microsoft.com/windows/win32/api/unknwn/nf-unknwn-iunknown-release) (IUnknown)
-- [`QueryInterface`](https://learn.microsoft.com/windows/win32/api/unknwn/nf-unknwn-iunknown-queryinterface(refiid_void)) (IUnknown)
+- [`QueryInterface`](https://learn.microsoft.com/windows/win32/api/unknwn/nf-unknwn-iunknown-queryinterface%28refiid_void%29) (IUnknown)
 
 ### Information
 

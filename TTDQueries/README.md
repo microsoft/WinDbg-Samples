@@ -11,7 +11,7 @@ problems faster and easier.
 In order to use Time Travel Debugging you must:
 
 * Have a Windows 10 environment
-* Download WindbgNext from the Windows Store
+* Download [Windbg](https://aka.ms/WinDbg)
 * Ability to run processes elevated, aka. with admin privileges
 
 ## Time Travel Debugging
@@ -44,10 +44,10 @@ Check out [TTD - Queries] to learn more.
 
 ## Video references
 
-* [Defrag Tools - Time Travel Debugging - Introduction](https://channel9.msdn.com/Shows/Defrag-Tools/Defrag-Tools-185-Time-Travel-Debugging-Introduction)
-* [Defrag Tools - Time Travel Debugging - Advanced](https://channel9.msdn.com/Shows/Defrag-Tools/Defrag-Tools-186-Time-Travel-Debugging-Advanced)
+* [Defrag Tools - Time Travel Debugging - Introduction](https://learn.microsoft.com/shows/defrag-tools/185-time-travel-debugging-introduction)
+* [Defrag Tools - Time Travel Debugging - Advanced](https://learn.microsoft.com/shows/defrag-tools/186-time-travel-debugging-advanced)
 * [CppCon 2017 - Root Causing Bugs in Commercial Scale Software](https://www.youtube.com/watch?v=l1YJTg_A914)
 
-[Time Travel Debugging]: https://docs.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-overview
-[TTD - Troubleshoot]: https://docs.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-troubleshooting
+[Time Travel Debugging]: https://learn.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-overview
+[TTD - Troubleshoot]: https://learn.microsoft.com/windows-hardware/drivers/debugger/time-travel-debugging-troubleshooting
 [TTD - Queries]: https://blogs.msdn.microsoft.com/windbg/2018/02/01/time-travel-debugging-queries/

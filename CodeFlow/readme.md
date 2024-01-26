@@ -1,5 +1,5 @@
 # CodeFlow.js
-CodeFlow is a [JavaScript](https://docs.microsoft.com/windows-hardware/drivers/debugger/javascript-debugger-scripting) debugger extension that adds the ability to trace data flow backwards through the control flow of a function.
+CodeFlow is a [JavaScript](https://learn.microsoft.com/windows-hardware/drivers/debugger/javascript-debugger-scripting) debugger extension that adds the ability to trace data flow backwards through the control flow of a function.
 
 This extension is still a work in progress.
 
