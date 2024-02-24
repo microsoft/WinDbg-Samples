@@ -598,7 +598,19 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadPhysicalMemoryOrPeriphIO(
 
         memoryAccessType memoryType = {0};
         memoryType.isPhysical = pController->GetPAMemoryMode() ? 0 : 1;
+
+        //
+        // Set the PA memory access configuration option for servers that
+        // support this feature
+
+        pController->HandleConfigPAMemAccessMode(memoryType, true);
         SimpleCharBuffer buffer = pController->ReadMemory(Address, dwBytesToRead, memoryType);
+
+        //
+        // Disable the PA memory access configuration option if it's enabled
+        //
+
+        pController->HandleConfigPAMemAccessMode(memoryType, false);
         return SafeArrayFromByteArray(buffer.GetInternalBuffer(), buffer.GetLength(), pReadBuffer);
     }
     CATCH_AND_RETURN_HRESULT;
