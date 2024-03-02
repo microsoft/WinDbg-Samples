@@ -330,6 +330,12 @@ namespace GdbSrvControllerLib
         //  GetPAMemoryMode
         bool GetPAMemoryMode();
 
+        // Handle dynamic configuration of the PA memory access mode
+        void HandleConfigPAMemAccessMode(_In_ memoryAccessType memType, _In_ bool setMode);
+
+        // Check if the GDB server support the GDB PA access mode command
+        bool GetDynConfPAGdbMemCmdMode();
+
     protected:
         bool IsReplyOK(_In_ const std::string & reply);
 
