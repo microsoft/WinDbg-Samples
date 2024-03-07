@@ -1374,6 +1374,10 @@ public:
         }
 
         PCSTR pFormat = GetReadMemoryCmd(memType);
+        if (pFormat == nullptr)
+        {
+            throw _com_error(E_UNEXPECTED);
+        }
         unique_ptr<wchar_t> pWideFormat(new (nothrow) wchar_t[strlen(pFormat) + 1]);
         if (pWideFormat == nullptr)
         {
@@ -1625,6 +1629,11 @@ public:
                 size_t recvLength = 0;
                 char memoryCmd[256] = { 0 };
                 PCSTR pFormat = GetReadMemoryCmd(memType);
+                if (pFormat == nullptr)
+                {
+                    throw _com_error(E_UNEXPECTED);
+                }
+
                 sprintf_s(memoryCmd, _countof(memoryCmd), pFormat, address, size);
                 std::string reply = ExecuteCommandEx(memoryCmd, true, maxReplyLength);
 
@@ -2512,6 +2521,26 @@ public:
         return m_pRspClient->IsFeatureEnabled(PACKET_CONFIG_PA_MEMORY_MODE);
     }
 
+    PCSTR GetSrvDynamicPAConfigModeCmd(_In_ bool mode)
+    {
+        PCSTR pFormat = nullptr;
+
+        if (GetDynConfigPAMemCommandMode())
+        {
+            // The QEMU server is the only GDB server that
+            // supports this mode to access PAs, other servers
+            // have customized commands to access PAs.
+            pFormat = QEMUDGdbServerMemoryHelpers::GetDynPAConfigModeCmd(mode);
+        }
+        else if (m_pRspClient->IsFeatureEnabled(PACKET_READ_BMC_SMM_PA_MEMORY))
+        {
+            // BMC-SMM server also support since this GDB server stub mimics
+            // QEMU GDB server.
+            pFormat = BmcSmmDGdbServerMemoryHelpers::GetDynPAConfigModeCmd(mode);
+        }
+        return pFormat;
+    }
+
     SimpleCharBuffer SetPhysicalReadMemoryModeEx(_In_ bool setMode)
     {
 
@@ -2538,16 +2567,10 @@ public:
         }
 
         // Set the memory command to access via PA memory
-        std::string commandMonitor;
-        if (setMode)
+        std::string commandMonitor(GetSrvDynamicPAConfigModeCmd(setMode));
+        if (commandMonitor.empty())
         {
-            // Set the PA memory command access mode
-            commandMonitor = "Qqemu.PhyMemMode:1";
-        }
-        else
-        {
-            // Clear the PA mode
-            commandMonitor = "Qqemu.PhyMemMode:0";
+            throw _com_error(E_UNEXPECTED);
         }
 
         std::string reply = ExecuteCommandOnProcessor(commandMonitor.c_str(), true, 0, 0);
