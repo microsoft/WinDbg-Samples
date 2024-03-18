@@ -1,0 +1,33 @@
+HKCR
+{
+	NoRemove CLSID
+	{
+		ForceRemove {53838F70-0936-44A9-AB4E-ABB568401508} = s 'StaticExdiSampleServer Class'
+		{
+			InprocServer32 = s '%MODULE%'
+			{
+				val ThreadingModel = s 'Apartment'
+			}
+			TypeLib = s '{FEA1B500-2641-4B1D-88A3-E795429C842B}'
+			Version = s '1.0'
+			val AppID = s '%APPID%'
+		}
+	}
+}
+
+HKLM
+{
+    NoRemove SOFTWARE
+    { 
+        NoRemove Microsoft
+        {
+            NoRemove eXdi
+            {
+                NoRemove DriverList
+                {
+                    val {53838F70-0936-44A9-AB4E-ABB568401508} = s 'exdikd'
+                }
+            }
+        }
+    }
+}
