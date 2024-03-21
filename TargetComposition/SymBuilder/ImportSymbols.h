@@ -472,7 +472,7 @@ private:
             {
                 //
                 // @TODO: Various diagnostic information from DbgHelp flows through this channel which will
-                //        end up in the WinDbg Preview logs window.  If the diagnostic services for target
+                //        end up in the WinDbg logs window.  If the diagnostic services for target
                 //        composition ever allow for funneling this information through, we should push
                 //        this through that channel so that any diagnostics from us trying to find and load
                 //        import sources end up in the logs as well.

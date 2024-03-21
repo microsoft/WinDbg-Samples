@@ -87,7 +87,7 @@ namespace GdbSrvControllerLib
              return m_pBuffer[index];
          }
 
-		 //C++11 move constructor. See http://msdn.microsoft.com/en-us/library/dd293665.aspx for explanation.
+		 //C++11 move constructor. See http://msdn.microsoft.com/library/dd293665.aspx for explanation.
          BufferWrapper(_Inout_ BufferWrapper &&anotherBuffer) 
          {
              m_pBuffer = anotherBuffer.m_pBuffer;

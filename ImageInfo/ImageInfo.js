@@ -390,7 +390,7 @@ function __defineSyntheticUnion(typeName, typeDescriptor)
 // Define the core PE data structures that we must have "type information" for in order for the rest of the
 // script to work properly.
 //
-// Documentation on these can be found on MSDN: https://msdn.microsoft.com/en-us/library/ms809762.aspx
+// Documentation on these can be found on MSDN: https://msdn.microsoft.com/library/ms809762.aspx
 // This is "Peering Inside the PE: A Tour of the Win32 Portable Executable File Format"
 //
 __defineSyntheticType("_IMAGE_DOS_HEADER",            [{fieldName: "e_magic", fieldType: "unsigned short"},

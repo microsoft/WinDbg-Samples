@@ -142,7 +142,7 @@ namespace TextDump
 // Sends a diagnostic log message given a diagnostic logging service.  If no diagnostic logging service
 // is provided, S_FALSE is returned.
 //
-// NOTE: Anything logged through this mechanism will go to the WinDbg Preview logs window assuming that the logging
+// NOTE: Anything logged through this mechanism will go to the WinDbg logs window assuming that the logging
 //       level is set appropriately.  Most of our services will default to logging anything of "info" category
 //       or higher.  "verbose info" is not normally logged.  This can be changed with the .targetloglevel command
 //       or a configuration file.
