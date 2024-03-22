@@ -631,7 +631,7 @@
 
   <!-- UEFI Gdb Server -->
   <ExdiTarget Name = "UEFI">
-    <ExdiGdbServerConfigData agentNamePacket = "" uuid = "9F7AA64A-55AF-476E-AABA-87518C04F979" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386">
+    <ExdiGdbServerConfigData agentNamePacket = "" uuid = "9F7AA64A-55AF-476E-AABA-87518C04F979" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386" gdbMonitorCmdDoNotWaitOnOK = "yes">
       <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0" targetDescriptionFile = "target.xml" />
       <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
         <Value HostNameAndPort="LocalHost:5555" />
@@ -700,12 +700,12 @@
         <Entry Name ="eflags" Order = "11" Size ="8" />
 
         <!-- Segment registers -->
-        <Entry Name ="cs" Order = "12" Size ="8" />
-        <Entry Name ="ss" Order = "13" Size ="8" />
-        <Entry Name ="ds" Order = "14" Size ="8" />
-        <Entry Name ="es" Order = "15" Size ="8" />
-        <Entry Name ="fs" Order = "16" Size ="8" />
-        <Entry Name ="gs" Order = "17" Size ="8" />
+        <Entry Name ="cs" Order = "12" Size ="4" />
+        <Entry Name ="ss" Order = "13" Size ="4" />
+        <Entry Name ="ds" Order = "14" Size ="4" />
+        <Entry Name ="es" Order = "15" Size ="4" />
+        <Entry Name ="fs" Order = "16" Size ="4" />
+        <Entry Name ="gs" Order = "17" Size ="4" />
         <Entry Name ="cr0" Order = "18" Size ="8" />
         <Entry Name ="cr2" Order = "19" Size ="8" />
         <Entry Name ="cr3" Order = "1a" Size ="8" />
