@@ -94,7 +94,7 @@
       <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0xfffe" targetDescriptionFile = "target.xml" />
       <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
         <Value HostNameAndPort="LocalHost:3333" />
-      </GdbServerConnectionParameters> 
+      </GdbServerConnectionParameters>
       <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "yes" SystemRegisterDecoding = "yes">
       </ExdiGdbServerMemoryCommands>
       <!-- The below arrays array will be used for processing CPU context (Set/GetContext) related RSP packets. -->
@@ -495,7 +495,7 @@
          <field name="ID" start="21" end="21"/>
          </flags>
         </flags> -->
-  
+
       <Entry Name ="eflags" Order = "11" Size ="4" />
         <!-- Segment registers -->
         <Entry Name ="cs" Order = "12" Size ="4" />
@@ -627,6 +627,92 @@
 
         </ExdiGdbServerRegisters>
      </ExdiGdbServerConfigData>
+  </ExdiTarget>
+
+  <!-- UEFI Gdb Server -->
+  <ExdiTarget Name = "UEFI">
+    <ExdiGdbServerConfigData agentNamePacket = "" uuid = "9F7AA64A-55AF-476E-AABA-87518C04F979" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386" gdbMonitorCmdDoNotWaitOnOK = "yes">
+      <ExdiGdbServerTargetData targetArchitecture = "ARM64" targetFamily = "ProcessorFamilyARM64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0" targetDescriptionFile = "target.xml" />
+      <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
+        <Value HostNameAndPort="LocalHost:5555" />
+      </GdbServerConnectionParameters>
+      <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "no" SystemRegisterDecoding = "no">
+      </ExdiGdbServerMemoryCommands>
+
+      <!-- ARM64 GDB server core resgisters -->
+      <ExdiGdbServerRegisters Architecture = "ARM64" FeatureNameSupported = "sys">
+        <Entry Name ="X0"  Order = "0" Size = "8" />
+        <Entry Name ="X1"  Order = "1" Size = "8" />
+        <Entry Name ="X2"  Order = "2" Size = "8" />
+        <Entry Name ="X3"  Order = "3" Size = "8" />
+        <Entry Name ="X4"  Order = "4" Size = "8" />
+        <Entry Name ="X5"  Order = "5" Size = "8" />
+        <Entry Name ="X6"  Order = "6" Size = "8" />
+        <Entry Name ="X7"  Order = "7" Size = "8" />
+        <Entry Name ="X8"  Order = "8" Size = "8" />
+        <Entry Name ="X9"  Order = "9" Size = "8" />
+        <Entry Name ="X10" Order = "a"  Size = "8" />
+        <Entry Name ="X11" Order = "b"  Size = "8" />
+        <Entry Name ="X12" Order = "c"  Size = "8" />
+        <Entry Name ="X13" Order = "d"  Size = "8" />
+        <Entry Name ="X14" Order = "e"  Size = "8" />
+        <Entry Name ="X15" Order = "f"  Size = "8" />
+        <Entry Name ="X16" Order = "10" Size = "8" />
+        <Entry Name ="X17" Order = "11" Size = "8" />
+        <Entry Name ="X18" Order = "12" Size = "8" />
+        <Entry Name ="X19" Order = "13" Size = "8" />
+        <Entry Name ="X20" Order = "14" Size = "8" />
+        <Entry Name ="X21" Order = "15" Size = "8" />
+        <Entry Name ="X22" Order = "16" Size = "8" />
+        <Entry Name ="X23" Order = "17" Size = "8" />
+        <Entry Name ="X24" Order = "18" Size = "8" />
+        <Entry Name ="X25" Order = "19" Size = "8" />
+        <Entry Name ="X26" Order = "1a" Size = "8" />
+        <Entry Name ="X27" Order = "1b" Size = "8" />
+        <Entry Name ="X28" Order = "1c" Size = "8" />
+        <Entry Name ="fp"  Order = "1d" Size = "8" />
+        <Entry Name ="lr"  Order = "1e" Size = "8" />
+        <Entry Name ="sp"  Order = "1f" Size = "8" />
+        <Entry Name ="pc"  Order = "20" Size = "8" />
+        <Entry Name ="fpsr" Order = "21" Size = "8" />
+        <Entry Name ="cpsr" Order = "22" Size = "4" />
+      </ExdiGdbServerRegisters>
+
+      <!-- x64 GDB server core registers -->
+      <ExdiGdbServerRegisters Architecture = "X64" FeatureNameSupported = "sys" >
+        <Entry Name ="rax" Order = "0" Size ="8" />
+        <Entry Name ="rbx" Order = "1" Size ="8" />
+        <Entry Name ="rcx" Order = "2" Size ="8" />
+        <Entry Name ="rdx" Order = "3" Size ="8" />
+        <Entry Name ="rsi" Order = "4" Size ="8" />
+        <Entry Name ="rdi" Order = "5" Size ="8" />
+        <Entry Name ="rbp" Order = "6" Size ="8" />
+        <Entry Name ="rsp" Order = "7" Size ="8" />
+        <Entry Name ="r8"  Order = "8" Size ="8" />
+        <Entry Name ="r9"  Order = "9" Size ="8" />
+        <Entry Name ="r10" Order = "a" Size ="8" />
+        <Entry Name ="r11" Order = "b" Size ="8" />
+        <Entry Name ="r12" Order = "c" Size ="8" />
+        <Entry Name ="r13" Order = "d" Size ="8" />
+        <Entry Name ="r14" Order = "e" Size ="8" />
+        <Entry Name ="r15" Order = "f" Size ="8" />
+        <Entry Name ="rip" Order = "10" Size ="8" />
+        <Entry Name ="eflags" Order = "11" Size ="8" />
+
+        <!-- Segment registers -->
+        <Entry Name ="cs" Order = "12" Size ="4" />
+        <Entry Name ="ss" Order = "13" Size ="4" />
+        <Entry Name ="ds" Order = "14" Size ="4" />
+        <Entry Name ="es" Order = "15" Size ="4" />
+        <Entry Name ="fs" Order = "16" Size ="4" />
+        <Entry Name ="gs" Order = "17" Size ="4" />
+        <Entry Name ="cr0" Order = "18" Size ="8" />
+        <Entry Name ="cr2" Order = "19" Size ="8" />
+        <Entry Name ="cr3" Order = "1a" Size ="8" />
+        <Entry Name ="cr4" Order = "1b" Size ="8" />
+        <Entry Name ="cr8" Order = "1c" Size ="8" />
+      </ExdiGdbServerRegisters>
+    </ExdiGdbServerConfigData>
   </ExdiTarget>
 
 </ExdiTargets>
