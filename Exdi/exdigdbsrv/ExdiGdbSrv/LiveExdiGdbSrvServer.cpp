@@ -7,7 +7,7 @@
 //      interface IeXdiX86_64Context3;
 //		interface IeXdiX86ExContext3;
 //      interface IAsynchronousCommandNotificationReceiver;
-//  
+//
 // Copyright (c) Microsoft. All rights reserved.
 //----------------------------------------------------------------------------
 
@@ -55,7 +55,7 @@ using namespace GdbSrvControllerLib;
 
 //=============================================================================
 // Global data definitions
-//=============================================================================    
+//=============================================================================
 //  Connection server string
 const DWORD s_ConnectionCookie = 'SMPL';
 
@@ -81,7 +81,7 @@ const int s_numberFPRegList = (ARRAYSIZE(s_fpRegList));
 
 // CLiveExdiGdbSrvServer
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetTargetInfo( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetTargetInfo(
     /* [out] */ PGLOBAL_TARGET_INFO_STRUCT pgti)
 {
     CheckAndZeroOutArgs(pgti);
@@ -102,7 +102,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetTargetInfo(
     return S_OK;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetRunStatus( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetRunStatus(
     /* [out] */ PRUN_STATUS_TYPE persCurrent,
     /* [out] */ PHALT_REASON_TYPE pehrCurrent,
     /* [out] */ ADDRESS_TYPE *pCurrentExecAddress,
@@ -139,7 +139,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetRunStatus(
     CATCH_AND_RETURN_HRESULT;
 }
 
-        
+
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Run(void)
 {
     try
@@ -166,7 +166,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Run(void)
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
+
 //
 //  Halt                Interrupt the target
 //
@@ -175,15 +175,15 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Run(void)
 //      ?              -> Query target halt reason if we don't receive a stop reply packet
 //
 //  Response:
-//      
+//
 //      T02.....       -> stop reply packet with a signal SIGINT.
 //
 //  Note:
-//  GDB is almost entirely non-preemptive, which is reflected in the sequence of packet exchanges of RSP. 
-//  The exception is when GDB wishes to interrupt an executing program (via ctrl-break). 
-//  A single byte, 0x03, is sent (no packet structure). If the target is prepared to handle such interrupts 
-//  it should recognize such byte. However not all servers are capable of handling such request. 
-//  The server is free to ignore such out-of-band characters. 
+//  GDB is almost entirely non-preemptive, which is reflected in the sequence of packet exchanges of RSP.
+//  The exception is when GDB wishes to interrupt an executing program (via ctrl-break).
+//  A single byte, 0x03, is sent (no packet structure). If the target is prepared to handle such interrupts
+//  it should recognize such byte. However not all servers are capable of handling such request.
+//  The server is free to ignore such out-of-band characters.
 //
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Halt(void)
 {
@@ -205,7 +205,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Halt(void)
             {
                 if (currentAddress != 0)
                 {
-                    m_lastPcAddress = currentAddress; 
+                    m_lastPcAddress = currentAddress;
                 }
                 if (eventNotification)
                 {
@@ -224,7 +224,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Halt(void)
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
+
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DoSingleStep(DWORD dwProcessorNumber)
 {
     try
@@ -262,7 +262,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DoSingleStep(DWORD dwProcessorN
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
+
 HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Reboot(void)
 {
     try
@@ -281,8 +281,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Reboot(void)
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNbCodeBpAvail( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNbCodeBpAvail(
     /* [out] */ DWORD *pdwNbHwCodeBpAvail,
     /* [out] */ DWORD *pdwNbSwCodeBpAvail)
 {
@@ -295,7 +295,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNbCodeBpAvail(
     return S_OK;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNbDataBpAvail( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNbDataBpAvail(
     /* [out] */ DWORD *pdwNbDataBpAvail)
 {
     if (pdwNbDataBpAvail == nullptr)
@@ -307,8 +307,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNbDataBpAvail(
     *pdwNbDataBpAvail = 1;
     return S_OK;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddCodeBreakpoint( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddCodeBreakpoint(
     /* [in] */ ADDRESS_TYPE Address,
     /* [in] */ CBP_KIND cbpk,
     /* [in] */ MEM_TYPE mt,
@@ -340,7 +340,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddCodeBreakpoint(
             return E_POINTER;
         }
         unsigned breakpointNumber = pController->CreateCodeBreakpoint(Address);
-        
+
         BasicExdiBreakpoint *pBreakpoint = new CComObject<BasicExdiBreakpoint>();
         pBreakpoint->Initialize(Address, breakpointNumber);
         pBreakpoint->AddRef();
@@ -349,8 +349,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddCodeBreakpoint(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DelCodeBreakpoint( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DelCodeBreakpoint(
     /* [in] */ IeXdiCodeBreakpoint3 *pieXdiCodeBreakpoint)
 {
     if (pieXdiCodeBreakpoint == nullptr)
@@ -381,8 +381,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DelCodeBreakpoint(
     }
     return result;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddDataBreakpoint( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddDataBreakpoint(
     /* [in] */ ADDRESS_TYPE Address,
     /* [in] */ ADDRESS_TYPE AddressMask,
     /* [in] */ DWORD dwData,
@@ -422,7 +422,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddDataBreakpoint(
             return E_POINTER;
         }
         unsigned breakpointNumber = pController->CreateDataBreakpoint(Address, bAccessWidth, da);
-        
+
         BasicExdiDataBreakpoint * pBreakpoint = new CComObject<BasicExdiDataBreakpoint>();
         pBreakpoint->Initialize(Address, breakpointNumber, da, bAccessWidth);
         pBreakpoint->AddRef();
@@ -431,8 +431,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::AddDataBreakpoint(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DelDataBreakpoint( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DelDataBreakpoint(
     /* [in] */ IeXdiDataBreakpoint3 * pieXdiDataBreakpoint)
 {
     if (pieXdiDataBreakpoint == nullptr)
@@ -467,7 +467,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::DelDataBreakpoint(
 }
 
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::StartNotifyingRunChg( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::StartNotifyingRunChg(
     /* [in] */ IeXdiClientNotifyRunChg3 *pieXdiClientNotifyRunChg,
     /* [out] */ DWORD *pdwConnectionCookie)
 {
@@ -491,7 +491,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::StartNotifyingRunChg(
     return S_OK;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::StopNotifyingRunChg( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::StopNotifyingRunChg(
     /* [in] */ DWORD dwConnectionCookie)
 {
     if (dwConnectionCookie != s_ConnectionCookie)
@@ -518,8 +518,8 @@ static HRESULT SafeArrayFromByteArray(_In_reads_bytes_(arraySize) const char *pB
 
     return S_OK;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadVirtualMemory( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadVirtualMemory(
     /* [in] */ ADDRESS_TYPE Address,
     /* [in] */ DWORD dwBytesToRead,
     SAFEARRAY * *pbReadBuffer)
@@ -539,8 +539,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadVirtualMemory(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteVirtualMemory( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteVirtualMemory(
         /* [in] */ ADDRESS_TYPE Address,
         /* [in] */ SAFEARRAY * pBuffer,
         /* [out] */ DWORD *pdwBytesWritten)
@@ -563,7 +563,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteVirtualMemory(
         {
             return E_INVALIDARG;
         }
-    
+
         ULONG bufferSize = pBuffer->rgsabound[0].cElements;
         PVOID pRawBuffer = pBuffer->pvData;
 
@@ -579,8 +579,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteVirtualMemory(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadPhysicalMemoryOrPeriphIO( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadPhysicalMemoryOrPeriphIO(
         /* [in] */ ADDRESS_TYPE Address,
         /* [in] */ ADDRESS_SPACE_TYPE AddressSpace,
         /* [in] */ DWORD dwBytesToRead,
@@ -615,9 +615,9 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadPhysicalMemoryOrPeriphIO(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WritePhysicalMemoryOrPeriphIO( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WritePhysicalMemoryOrPeriphIO(
         /* [in] */ ADDRESS_TYPE Address,
         /* [in] */ ADDRESS_SPACE_TYPE AddressSpace,
         /* [in] */ SAFEARRAY * pBuffer,
@@ -642,7 +642,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WritePhysicalMemoryOrPeriphIO(
         {
             return E_INVALIDARG;
         }
-    
+
         ULONG bufferSize = pBuffer->rgsabound[0].cElements;
         PVOID pRawBuffer = pBuffer->pvData;
 
@@ -658,7 +658,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WritePhysicalMemoryOrPeriphIO(
     CATCH_AND_RETURN_HRESULT;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Ioctl( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Ioctl(
         /* [in] */ SAFEARRAY * pInputBuffer,
         /* [in] */ DWORD dwBuffOutSize,
         /* [out] */ SAFEARRAY * *pOutputBuffer)
@@ -788,7 +788,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::Ioctl(
     CATCH_AND_RETURN_HRESULT;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetLastHitBreakpoint( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetLastHitBreakpoint(
     /* [out] */ DBGENG_EXDI3_GET_BREAKPOINT_HIT_OUT *pBreakpointInformation)
 {
     UNREFERENCED_PARAMETER(pBreakpointInformation);
@@ -796,8 +796,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetLastHitBreakpoint(
     //  Also, there is no a debugger command that calls this function.
     return E_NOTIMPL;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetKPCRForProcessor( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetKPCRForProcessor(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out] */ ULONG64 *pKPCRPointer)
 {
@@ -827,8 +827,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetKPCRForProcessor(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadKdVersionBlock( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadKdVersionBlock(
         /* [in] */ DWORD dwBufferSize,
         /* [out] */ SAFEARRAY * *pKdVersionBlockBuffer)
 {
@@ -837,7 +837,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadKdVersionBlock(
     return E_NOTIMPL;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadMSR( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadMSR(
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ DWORD dwRegisterIndex,
     /* [out] */ ULONG64 *pValue)
@@ -854,8 +854,8 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ReadMSR(
     }
     CATCH_AND_RETURN_HRESULT;
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteMSR( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteMSR(
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ DWORD dwRegisterIndex,
     /* [in] */ ULONG64 value)
@@ -877,14 +877,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::WriteMSR(
 // ------------------------------------------------------------------------------
 
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_ARM4 pContext)
 {
     return GetContextEx(dwProcessorNumber, pContext);
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_ARM4 Context)
 {
@@ -893,14 +893,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
 
 // ------------------------------------------------------------------------------
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_X86_64 pContext)
 {
     return GetContextEx(dwProcessorNumber, pContext);
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_X86_64 Context)
 {
@@ -909,14 +909,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
 
 // ------------------------------------------------------------------------------
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_X86_EX pContext)
 {
     return GetContextEx(dwProcessorNumber, pContext);
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_X86_EX Context)
 {
@@ -925,14 +925,14 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
 
 // ------------------------------------------------------------------------------
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [out][in] */ PCONTEXT_ARMV8ARCH64 pContext)
 {
     return GetContextEx(dwProcessorNumber, pContext);
 }
-        
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext( 
+
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContext(
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ CONTEXT_ARMV8ARCH64 context)
 {
@@ -958,7 +958,7 @@ HRESULT CLiveExdiGdbSrvServer::FinalConstruct()
     {
         return E_FAIL;
     }
-    m_pSelfReferenceForNotificationThread = 
+    m_pSelfReferenceForNotificationThread =
         new InterfaceMarshalHelper<IAsynchronousCommandNotificationReceiver>(this, MSHLFLAGS_TABLEWEAK);
 
     m_notificationSemaphore = CreateSemaphore(nullptr, 0, LONG_MAX, nullptr);
@@ -1015,10 +1015,10 @@ void CLiveExdiGdbSrvServer::FinalRelease()
     WaitForSingleObjectWhileDispatchingMessages(m_notificationThread, INFINITE);
 
     delete m_pGdbSrvController;
-    m_pGdbSrvController = nullptr;	
+    m_pGdbSrvController = nullptr;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNumberOfProcessors( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetNumberOfProcessors(
     /* [out] */ DWORD *pdwNumberOfProcessors)
 {
     if (pdwNumberOfProcessors == nullptr)
@@ -1077,7 +1077,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         pContext->Psr = GdbSrvController::ParseRegisterValue32(registers["Cpsr"]);
         pContext->RegGroupSelection.fControlRegs = TRUE;
         pContext->RegGroupSelection.fIntegerRegs = TRUE;
-        // Store the last 'pc' value in order to notify the engine with the last obtained 'pc' value, 
+        // Store the last 'pc' value in order to notify the engine with the last obtained 'pc' value,
         // This is required for cases when the GdbServer responds with target unvailable packet.
         m_lastPcAddress = pContext->Pc;
         m_lastPSRvalue = pContext->Psr;
@@ -1198,7 +1198,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         pContext->Rsi = GdbSrvController::ParseRegisterValue(registers["rsi"]);
         pContext->Rdi = GdbSrvController::ParseRegisterValue(registers["rdi"]);
         pContext->Rip = GdbSrvController::ParseRegisterValue(registers["rip"]);
-        // Store the last 'pc' value in order to notify the engine with the last obtained 'pc' value, 
+        // Store the last 'pc' value in order to notify the engine with the last obtained 'pc' value,
         // This is required for cases when the GdbServer responds with target unvailable packet.
         m_lastPcAddress = pContext->Rip;
         pContext->Rsp = GdbSrvController::ParseRegisterValue(registers["rsp"]);
@@ -1221,7 +1221,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::GetContextEx(_In_ DWORD process
         }
         pContext->RegGroupSelection.fIntegerRegs = TRUE;
 
-        pContext->ModeFlags = AMD64_CONTEXT_AMD64 | AMD64_CONTEXT_CONTROL | 
+        pContext->ModeFlags = AMD64_CONTEXT_AMD64 | AMD64_CONTEXT_CONTROL |
                               AMD64_CONTEXT_INTEGER | AMD64_CONTEXT_SEGMENTS;
 
         //  Segment registers
@@ -1375,6 +1375,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContextEx(_In_ DWORD process
             registers["cr8"] = pContext->RegCr8;
         }
         pController->SetRegisters(processorNumber, registers, false);
+        registers.clear();
 
         //  Floating point registers
         if (pContext->RegGroupSelection.fFloatingPointRegs)
@@ -1385,6 +1386,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContextEx(_In_ DWORD process
                 registers[regName] = reinterpret_cast<ULONGLONG>(&pContext->RegisterArea[index * s_numberOfBytesCoprocessorRegister]);
             }
             pController->SetRegisters(processorNumber, registers, true);
+            registers.clear();
         }
 
         //  SSE x64 registers
@@ -1396,6 +1398,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::SetContextEx(_In_ DWORD process
                 registers[regName] = reinterpret_cast<ULONGLONG>(&pContext->RegSSE[index]);
             }
             pController->SetRegisters(processorNumber, registers, true);
+            registers.clear();
         }
 
         return S_OK;
@@ -1614,7 +1617,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::OnAsynchronousCommandCompleted(
         if (currentAddress != 0)
         {
             m_pRunNotificationListener->NotifyRunStateChange(rsHalted, haltReason, currentAddress, 0, eventProcessor);
-            return S_OK; 
+            return S_OK;
         }
     }
     return E_FAIL;
@@ -1650,7 +1653,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::PerformKeepaliveChecks(void)
     if (FAILED(result) || isGdbServerDown)
     {
         TCHAR fileName[MAX_PATH];
-        bool lostConnection = ((gdbServerError == ERROR_OPERATION_ABORTED) || HRESULT_FACILITY(result) == FACILITY_WIN32 && 
+        bool lostConnection = ((gdbServerError == ERROR_OPERATION_ABORTED) || HRESULT_FACILITY(result) == FACILITY_WIN32 &&
                               ((HRESULT_CODE(result) == RPC_S_CALL_FAILED) || (HRESULT_CODE(result) == RPC_S_SERVER_UNAVAILABLE)));
 
         if (lostConnection && GetModuleFileName(GetModuleHandle(0), fileName, _countof(fileName)))
@@ -1670,7 +1673,7 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerParameters()
     try
     {
         TCHAR configXmlFile[MAX_PATH + 1];
-        DWORD fileNameLength = GetEnvironmentVariable(_T("EXDI_GDBSRV_XML_CONFIG_FILE"), 
+        DWORD fileNameLength = GetEnvironmentVariable(_T("EXDI_GDBSRV_XML_CONFIG_FILE"),
                                                       configXmlFile, _countof(configXmlFile));
         if (fileNameLength == 0)
         {
@@ -1858,7 +1861,7 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
             if (isParsed)
             {
                 attempts = 0;
-                //  Is it a OXX console packet? 
+                //  Is it a OXX console packet?
                 if (stopReply.status.isOXXPacket)
                 {
                     //  Try to display the GDB server ouput message if there is an attached text console.
@@ -1902,25 +1905,25 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
                     //  There is a no any processor number or pc adddress in the response
                     if (stopReply.status.isPowerDown)
                     {
-                        MessageBox(0, _T("The Target is running or it is in a power down state."),nullptr, MB_ICONERROR);                    
+                        MessageBox(0, _T("The Target is running or it is in a power down state."),nullptr, MB_ICONERROR);
                     }
                     stopReply.currentAddress = m_lastPcAddress;
                     *pProcessorNumberOfLastEvent = pController->GetLastKnownActiveCpu();
                     isWaitingOnStopReply = false;
-                } 
+                }
                 // Is it an "OK" response w/o any other field (e.g. OpenOCD can send "OK" after 's'/'g')?
                 else if (stopReply.status.isCoreRunning)
                 {
                     //  Post another receive request on the packet buffer, since there is still no
                     //  trace of the current thread-core/Pc address packet.
                     pController->ContinueWaitingOnStopReplyPacket();
-                    isWaitingOnStopReply = true;                
+                    isWaitingOnStopReply = true;
                 }
 
                 if (!isWaitingOnStopReply)
                 {
                     //  Convert the stop reason code
-                    switch (stopReply.stopReason) 
+                    switch (stopReply.stopReason)
                     {
                     case TARGET_BREAK_SIGINT:
                        *pHaltReason = hrUser;
@@ -1951,7 +1954,7 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
     return currentPcAddress;
 }
 
-void CLiveExdiGdbSrvServer::GetX86CoreRegisters(_In_ std::map<std::string, std::string> &registers, 
+void CLiveExdiGdbSrvServer::GetX86CoreRegisters(_In_ std::map<std::string, std::string> &registers,
                                                       _Out_ CONTEXT_X86_EX * pContext)
 {
     assert(pContext != nullptr);
@@ -1981,7 +1984,7 @@ void CLiveExdiGdbSrvServer::GetX86CoreRegisters(_In_ std::map<std::string, std::
 }
 
 void CLiveExdiGdbSrvServer::GetFPCoprocessorRegisters(_In_ std::map<std::string, std::string> &registers,
-                                                            _In_ DWORD processorNumber, 
+                                                            _In_ DWORD processorNumber,
                                                             _In_ AsynchronousGdbSrvController * const pController,
                                                             _Out_ PVOID pContext)
 {
@@ -2000,8 +2003,8 @@ void CLiveExdiGdbSrvServer::GetFPCoprocessorRegisters(_In_ std::map<std::string,
     for (int index = 0; index < s_numberFPRegList; ++index)
     {
         std::string regName(s_fpRegList[index]);
-        GdbSrvController::ParseRegisterVariableSize(registers[regName], 
-                                                    reinterpret_cast<BYTE *>(&pContextFP->RegisterArea[index * s_numberOfBytesCoprocessorRegister]), 
+        GdbSrvController::ParseRegisterVariableSize(registers[regName],
+                                                    reinterpret_cast<BYTE *>(&pContextFP->RegisterArea[index * s_numberOfBytesCoprocessorRegister]),
                                                     s_numberOfBytesCoprocessorRegister);
     }
 
@@ -2013,11 +2016,11 @@ void CLiveExdiGdbSrvServer::GetFPCoprocessorRegisters(_In_ std::map<std::string,
 }
 
 void CLiveExdiGdbSrvServer::GetSSERegisters(_In_ DWORD processorNumber,
-                                                  _In_ AsynchronousGdbSrvController * const pController, 
+                                                  _In_ AsynchronousGdbSrvController * const pController,
                                                   _Out_ PVOID pContext)
 {
     assert(pController != nullptr && pContext != nullptr);
-    
+
     std::map<std::string, std::string> registers = pController->QueryRegisters(processorNumber, s_sseRegList, s_numberOfSseRegisters);
 
     PCONTEXT_X86_EX pContextSSE = reinterpret_cast<PCONTEXT_X86_EX>(pContext);
@@ -2026,8 +2029,8 @@ void CLiveExdiGdbSrvServer::GetSSERegisters(_In_ DWORD processorNumber,
     for (int index = 0; index < s_numberOfSseRegisters; ++index)
     {
         std::string regName(s_sseRegList[index]);
-        GdbSrvController::ParseRegisterVariableSize(registers[regName], 
-                                                    reinterpret_cast<BYTE *>(&pContextSSE->Sse[index]), 
+        GdbSrvController::ParseRegisterVariableSize(registers[regName],
+                                                    reinterpret_cast<BYTE *>(&pContextSSE->Sse[index]),
                                                     numberOfBytesSseRegisters);
     }
     pContextSSE->RegGroupSelection.fSSERegisters = TRUE;
@@ -2122,8 +2125,8 @@ void CLiveExdiGdbSrvServer::GetNeonRegisters(_In_ AsynchronousGdbSrvController *
                                                    _Out_ PVOID pContext)
 {
     assert(pController != nullptr && pContext != nullptr);
-    
-    std::unique_ptr<char> neonNameRegArray[EXDI_ARM_MAX_NEON_FP_REGISTERS];    
+
+    std::unique_ptr<char> neonNameRegArray[EXDI_ARM_MAX_NEON_FP_REGISTERS];
     std::string firstNeonRegister("d0");
     pController->CreateNeonRegisterNameArray(firstNeonRegister, neonNameRegArray, EXDI_ARM_MAX_NEON_FP_REGISTERS);
 
@@ -2132,8 +2135,8 @@ void CLiveExdiGdbSrvServer::GetNeonRegisters(_In_ AsynchronousGdbSrvController *
     for (size_t index = 0; index < EXDI_ARM_MAX_NEON_FP_REGISTERS; ++index)
     {
         std::string regName(neonNameRegArray[index].get());
-        GdbSrvController::ParseRegisterVariableSize(registers[regName], 
-                                                    reinterpret_cast<BYTE *>(&pContextArm->D[index]), 
+        GdbSrvController::ParseRegisterVariableSize(registers[regName],
+                                                    reinterpret_cast<BYTE *>(&pContextArm->D[index]),
                                                     numberOfBytesNeonRegisters);
     }
     pContextArm->RegGroupSelection.fFloatingPointRegs = TRUE;
@@ -2144,7 +2147,7 @@ void CLiveExdiGdbSrvServer::SetNeonRegisters(_In_ DWORD processorNumber, _In_ co
 {
     assert(pContext != nullptr && pController != nullptr);
 
-    std::unique_ptr<char> neonNameRegArray[EXDI_ARM_MAX_NEON_FP_REGISTERS];    
+    std::unique_ptr<char> neonNameRegArray[EXDI_ARM_MAX_NEON_FP_REGISTERS];
     std::string firstNeonRegister("d0");
     pController->CreateNeonRegisterNameArray(firstNeonRegister, neonNameRegArray, EXDI_ARM_MAX_NEON_FP_REGISTERS);
 
@@ -2190,7 +2193,7 @@ HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ExecuteExdiComponentFunction(
     CATCH_AND_RETURN_HRESULT;
 }
 
-HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ExecuteTargetEntityFunction( 
+HRESULT STDMETHODCALLTYPE CLiveExdiGdbSrvServer::ExecuteTargetEntityFunction(
     /* [in] */ ExdiComponentFunctionType type,
     /* [in] */ DWORD dwProcessorNumber,
     /* [in] */ LPCWSTR pFunctionToExecute,

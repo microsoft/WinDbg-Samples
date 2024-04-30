@@ -711,6 +711,23 @@
         <Entry Name ="cr3" Order = "1a" Size ="8" />
         <Entry Name ="cr4" Order = "1b" Size ="8" />
         <Entry Name ="cr8" Order = "1c" Size ="8" />
+
+        <Entry Name ="fctrl" Order = "1d" Size ="4" />
+        <Entry Name ="fstat" Order = "1e" Size ="4" />
+        <Entry Name ="ftag" Order = "1f" Size ="4" />
+        <Entry Name ="fiseg" Order = "20" Size ="4" />
+        <Entry Name ="fioff" Order = "21" Size ="4" />
+        <Entry Name ="foseg" Order = "22" Size ="4" />
+        <Entry Name ="fooff" Order = "23" Size ="4" />
+        <Entry Name ="fop" Order = "24" Size ="10" />
+        <Entry Name ="st0" Order = "25" Size ="10" />
+        <Entry Name ="st1" Order = "26" Size ="10" />
+        <Entry Name ="st2" Order = "27" Size ="10" />
+        <Entry Name ="st3" Order = "28" Size ="10" />
+        <Entry Name ="st4" Order = "29" Size ="10" />
+        <Entry Name ="st5" Order = "2a" Size ="10" />
+        <Entry Name ="st6" Order = "2b" Size ="10" />
+        <Entry Name ="st7" Order = "2c" Size ="10" />
       </ExdiGdbServerRegisters>
     </ExdiGdbServerConfigData>
   </ExdiTarget>
