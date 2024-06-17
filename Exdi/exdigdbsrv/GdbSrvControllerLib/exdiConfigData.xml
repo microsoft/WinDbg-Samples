@@ -575,7 +575,7 @@
   <ExdiTarget Name = "BMC-SMM">
      <ExdiGdbServerConfigData agentNamePacket = "" uuid = "72d4aeda-9723-4972-b89a-679ac79810ef" displayCommPackets = "yes" debuggerSessionByCore = "no" enableThrowExceptionOnMemoryErrors = "yes" qSupportedPacket="qSupported:xmlRegisters=aarch64,i386" requirePAMemoryAccess ="yes">
         <ExdiGdbServerTargetData targetArchitecture = "X64" targetFamily = "ProcessorFamilyX64" numberOfCores = "1" EnableSseContext = "no" heuristicScanSize = "0" targetDescriptionFile = "target.xml" />
-        <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "1024" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
+        <GdbServerConnectionParameters MultiCoreGdbServerSessions = "no" MaximumGdbServerPacketLength = "4096" MaximumConnectAttempts = "3" SendPacketTimeout = "100" ReceivePacketTimeout = "3000">
              <Value HostNameAndPort="localhost:1234" />
         </GdbServerConnectionParameters>
         <ExdiGdbServerMemoryCommands GdbSpecialMemoryCommand = "no" PhysicalMemory = "no" SupervisorMemory = "no" HypervisorMemory = "no" SpecialMemoryRegister = "no" SystemRegistersGdbMonitor = "no" SystemRegisterDecoding = "no">

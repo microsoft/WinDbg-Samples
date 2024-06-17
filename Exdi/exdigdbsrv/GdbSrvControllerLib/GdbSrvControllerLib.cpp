@@ -2631,7 +2631,8 @@ public:
 
     void HandleConfigPAMemAccessMode(_In_ memoryAccessType memType, _In_ bool setMode)
     {
-        if (memType.isPhysical && GetDynConfigPAMemCommandMode())
+        if (memType.isPhysical && GetDynConfigPAMemCommandMode() &&
+            !m_pRspClient->IsFeatureEnabled(PACKET_READ_BMC_SMM_PA_MEMORY))
         {
             if (setMode && GetConfigPAMemoryMode())
             {
