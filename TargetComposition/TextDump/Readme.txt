@@ -165,7 +165,7 @@ Implementation of services:
 // STARTING OUT: MANIFEST TO ACTIVATION
 //*************************************************
 
-Once the plug-in has been installed, you can open ".txt" files from WinDbg Preview and they will cause the
+Once the plug-in has been installed, you can open ".txt" files from WinDbg and they will cause the
 "text dump" plug-in to load.  Assuming the file is the proper format and parses, you should be able to debug
 a "text dump" much like you'd debug a standard Windows minidump (with some minor differences).
 

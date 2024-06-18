@@ -5,7 +5,7 @@ that is being recorded by TTD, to interface with the recorder, control what is b
 pieces of data to the trace file that contains the recording.
 
 It resides in the [Microsoft.TimeTravelDebugging.Apis](../Microsoft.TimeTravelDebugging.Apis.md) NuGet package
-and interfaces with the TTDLiveRecorder.dll component found in [TTD recorder's binary distribution](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#how-to-download-and-install-the-ttdexe-command-line-utility-offline-method).
+and interfaces with the TTDLiveRecorder.dll component found in [TTD recorder's binary distribution](https://learn.microsoft.com/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#how-to-download-and-install-the-ttdexe-command-line-utility-offline-method).
 
 ## Definitions
 

@@ -5,11 +5,11 @@ Method of the [`TTD::ILiveRecorder`](interface-ILiveRecorder.md) interface.
 Adds to the trace file all the data of the process heaps.
 This includes all data allocated with C/C++ functions like `malloc` and `operator new`.
 It also includes data allocated with Windows APIs like
-[`HeapAlloc`](https://learn.microsoft.com/en-us/windows/win32/api/heapapi/nf-heapapi-heapalloc)
+[`HeapAlloc`](https://learn.microsoft.com/windows/win32/api/heapapi/nf-heapapi-heapalloc)
 but it excludes data allocated with Windows APIs like
-[`LoadLibrary`](https://learn.microsoft.com/en-us/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya),
-[`VirtualAlloc`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc) and
-[`MapViewOfFile`](https://learn.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile).
+[`LoadLibrary`](https://learn.microsoft.com/windows/win32/api/libloaderapi/nf-libloaderapi-loadlibrarya),
+[`VirtualAlloc`](https://learn.microsoft.com/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc) and
+[`MapViewOfFile`](https://learn.microsoft.com/windows/win32/api/memoryapi/nf-memoryapi-mapviewoffile).
 
 ```C++
 void TTD::ILiveRecorder::DumpHeaps() noexcept;
@@ -27,7 +27,7 @@ Note that this method might record a large amount of data in the trace file.
 TTD doesn't perform any differential or incremental snapshotting,
 so the entirety of the process heaps will be recorded each time the method is called.
 
-Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://learn.microsoft.com/en-us/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#reducing-overhead-of-tracing), which is TTD's default,
+Also note that in automatic mode [`TTD.exe -recordMode Automatic`](https://learn.microsoft.com/windows-hardware/drivers/debuggercmds/time-travel-debugging-ttd-exe-command-line-util#reducing-overhead-of-tracing), which is TTD's default,
 the recorder will already have recorded all the memory of the process as part of its initialization,
 so calling this method might be redundant and wasteful.
 Caution and common sense should be exercised to avoid bloating the trace file with large blocks of redundant data.

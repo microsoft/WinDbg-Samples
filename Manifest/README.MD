@@ -1,9 +1,9 @@
 # Extension Gallery
-*To use these feature, you need to be running WinDbg Preview 1.0.1902 or newer* 
+*To use these feature, you need to be running WinDbg 1.0.1902 or newer* 
 
 Many people find themselves with quite a few scripts and extensions to help out with debugging specific issues. Keeping track of where they all are, what's loaded, and how to invoke them can be a bit of a tedious process. A while back we added the concept of what we call an extension gallery or repository to enable seamless loading of scripts and extensions.
 
-There's an extension gallery included in recent versions of WinDbg and WinDbg Preview with some of the extensions that are included with the debugger, but we're also adding one here to make it easy for people who clone this repo to load the extensions.
+There's an extension gallery included in recent versions of WinDbg and WinDbg with some of the extensions that are included with the debugger, but we're also adding one here to make it easy for people who clone this repo to load the extensions.
 
 *The process here seems a bit more complicated than it could be and there are some properties and fields that are required but only have a single option. These are for future use as we grow what can be contained in the gallery.*
 
@@ -35,13 +35,13 @@ The `Components` tag contains a list of `ScriptComponent` tags that define each 
 * **File** - Path to the file relative to the manifest file location.
 * **FilePathKind** - Where the path is relative to. For this case it'll always be "RepositoryRelative". You may also use "Absolute" in which case you'd change File to be an absolute path.
 ### Load triggers
-The final requirement for each component is defining what will trigger the loading of the extension. Components can be loaded by either executing a [function alias](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-data-model-function-aliases) or retrieving the named extended by the component.
+The final requirement for each component is defining what will trigger the loading of the extension. Components can be loaded by either executing a [function alias](https://learn.microsoft.com/windows-hardware/drivers/debugger/debugger-data-model-function-aliases) or retrieving the named extended by the component.
 #### Function Aliases
 If your script uses function aliases, you'll need to define each of them, their syntax, and their description in a `FunctionAliases` tag.
 
 Each `FunctionAlias` in the `FunctionAliases` list has a `Name` property that is the name of the function alias and an `AliasItem` tag inside of it that contains `Syntax` and `Description` tags describing how to use the function alias.
 
-For more information, about function aliases see [Debugger Data Model Function Aliases](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-data-model-function-aliases)
+For more information, about function aliases see [Debugger Data Model Function Aliases](https://learn.microsoft.com/windows-hardware/drivers/debugger/debugger-data-model-function-aliases)
 
 #### Object Extensions
 If your script extends the debugger data model, you'll need to define the name of the objects it extends in an `ObjectExtensionList` tag , the namespace it adds, and what property it adds.
