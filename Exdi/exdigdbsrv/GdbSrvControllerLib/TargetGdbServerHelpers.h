@@ -68,6 +68,10 @@ public:
                 assert(false);
             }
         }
+        else
+        {
+            pFormat = (is64BitArchitecture) ? "m%I64x,%x" : "m%x,%x";
+        }
         return pFormat;
     }
 
@@ -104,6 +108,10 @@ public:
             {
                 assert(false);
             }
+        }
+        else
+        {
+            pFormat = (is64BitArchitecture) ? "M%I64x," : "M%x,";
         }
 
         return pFormat;
@@ -186,6 +194,37 @@ public:
     {
 
         return is64BitArchitecture ? "M%I64x," : "M%x,";
+    }
+
+    static inline PCSTR GetDynPAConfigModeCmd(_In_ bool mode)
+    {
+        return (mode) ? "Qqemu.PhyMemMode:1" : "Qqemu.PhyMemMode:0";
+    }
+};
+
+class QEMUDGdbServerMemoryHelpers
+{
+public:
+
+    static inline PCSTR GetGdbSrvReadMemoryCmd(
+        _In_ memoryAccessType memType,
+        _In_ bool is64BitArchitecture)
+    {
+
+        return is64BitArchitecture ? "m%I64x,%x" : "m%x,%x";
+    }
+
+    static inline PCSTR GetGdbSrvWriteMemoryCmd(
+        _In_ memoryAccessType memType,
+        _In_ bool is64BitArchitecture)
+    {
+
+        return is64BitArchitecture ? "M%I64x," : "M%x,";
+    }
+
+    static inline PCSTR GetDynPAConfigModeCmd(_In_ bool mode)
+    {
+        return (mode) ? "Qqemu.PhyMemMode:1" : "Qqemu.PhyMemMode:0";
     }
 };
 
