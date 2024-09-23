@@ -1,0 +1,10 @@
+HKCR
+{
+	NoRemove AppID
+	{
+		ForceRemove %APPID% = s 'ExdiTestServer1'
+		{
+			val DllSurrogate = s ''
+		}
+	}
+}
