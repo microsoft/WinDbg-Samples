@@ -232,6 +232,7 @@
     <Import Project="packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets" Condition="Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" />
     <Import Project="packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets" Condition="Exists('packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" />
     <Import Project="packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets" Condition="Exists('packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" />
+    <Import Project="packages\boost.1.87.0\build\boost.targets" Condition="Exists('packages\boost.1.87.0\build\boost.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -240,5 +241,6 @@
     <Error Condition="!Exists('packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.DataModel.CppLib.1.0.3\build\native\Microsoft.Debugging.DataModel.CppLib.targets'))" />
     <Error Condition="!Exists('packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.Platform.DbgEng.20230328.919.0\build\Microsoft.Debugging.Platform.DbgEng.targets'))" />
     <Error Condition="!Exists('packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Debugging.TargetModel.SDK.20230328.919.0\build\native\Microsoft.Debugging.TargetModel.SDK.targets'))" />
+    <Error Condition="!Exists('packages\boost.1.87.0\build\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\boost.1.87.0\build\boost.targets'))" />
   </Target>
 </Project>

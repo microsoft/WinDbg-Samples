@@ -366,6 +366,7 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
     ModelObjectKind moduleArgKind = moduleArg.GetKind();
 
     bool autoImportSymbols = false;
+    bool synthesizeFunctionsFromUnwinderData = false;
     ULONG64 moduleBase = 0;
     Object moduleObject;
     switch(moduleArgKind)
@@ -416,6 +417,15 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
         {
             autoImportSymbols = (bool)autoImportSymbolsKey.value();
         }
+
+        if (autoImportSymbols)
+        {
+            std::optional<Object> synthesizeFunctionsFromUnwinderDataKey = optionsObj.TryGetKeyValue(L"SynthesizeFunctionsFromUnwinderData");
+            if (synthesizeFunctionsFromUnwinderDataKey.has_value())
+            {
+                synthesizeFunctionsFromUnwinderData = (bool)synthesizeFunctionsFromUnwinderDataKey.value();
+            }
+        }
     }
 
     ComPtr<ISvcSymbolBuilderManager> spSymbolManager;
@@ -464,7 +474,9 @@ Object SymbolBuilderNamespace::CreateSymbols(_In_ const Object& /*contextObject*
                                                                     .KeyValue(L"Symbols")
                                                                     .KeyValue(L"Sympath");
 
-        spImporter.reset(new SymbolImporter_DbgHelp(spSymbolSet.Get(), symPath.c_str()));
+        spImporter.reset(new SymbolImporter_DbgHelp(spSymbolSet.Get(), 
+                                                    symPath.c_str(),
+                                                    synthesizeFunctionsFromUnwinderData));
         if (SUCCEEDED(spImporter->ConnectToSource()))
         {
             spSymbolSet->SetImporter(std::move(spImporter));

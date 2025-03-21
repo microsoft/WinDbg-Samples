@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <functional>
 #include <experimental/generator>
+#include <boost/icl/interval_map.hpp>
 
 #include <DbgServices.h>
 #include <DbgServicesBridgeClient.h>

@@ -207,11 +207,14 @@ public:
     // Constructs a new importer for DbgHelp.
     //
     SymbolImporter_DbgHelp(_In_ SymbolSet *pOwningSet,
-                           _In_opt_ PCWSTR pwszSearchPath) :
+                           _In_opt_ PCWSTR pwszSearchPath,
+                           _In_ bool synthesizeFromFunctionEntries = false) :
         SymbolImporter(pOwningSet),
         m_searchPath(pwszSearchPath),
+        m_synthesizeFromFunctionEntries(synthesizeFromFunctionEntries),
         m_symHandle(NULL),
-        m_fullGlobalImport(false)
+        m_fullGlobalImport(false),
+        m_moduleMachine(IMAGE_FILE_MACHINE_UNKNOWN)
     {
     }
 
@@ -317,6 +320,29 @@ private:
     // A helper for ConnectToSource.  If this fails, the outer routine will immediately call DisconnectFromSource.
     //
     HRESULT InternalConnectToSource();
+
+    //********************
+    // Specialized Data Import:
+    //
+
+    // GetFunctionBoundsFromExceptionData():
+    // 
+    // Get the function bounds of the block at "offset" given the platform exception/unwinder data for the
+    // image in question.
+    // 
+    HRESULT GetFunctionBoundsFromExceptionData(_In_ ULONG64 offset,
+                                               _Out_ ULONG64 *pStart,
+                                               _Out_ ULONG64 *pEnd);
+
+    // ImportFromFeData():
+    //
+    // Performs an import by synthesizing a function name given the bounds determined by function entry
+    // (platform exception/unwinder) data for the location in question.
+    // 
+    HRESULT ImportFromFeData(_In_ ULONG64 feStart,
+                             _In_ ULONG64 feEnd,
+                             _Out_ ULONG64 *pBuilderId,
+                             _In_ ULONG64 parentId = 0);
 
     //********************
     // General Symbol Import:
@@ -436,6 +462,13 @@ private:
     // Other Related:
     //
 
+    // HashBytes():
+    //
+    // Return a 32-bit hash (FNV) of the bytes of data in the given array
+    // 
+    ULONG HashBytes(_In_reads_(dataSize) unsigned char *pData,
+                    _In_ size_t dataSize);
+
     // TagMatchesSearchCriteria():
     //
     // Check whether a symbol tag returned from DbgHelp matches the kind of symbol(s) we are looking for.
@@ -553,6 +586,11 @@ private:
     // Information about our module
     ULONG64 m_moduleBase;
     ULONG64 m_moduleSize;
+    DWORD m_moduleMachine;
+
+    // Do we auto-synthesize function names and split based on the image's
+    // unwinder data for symbols which don't already have another entry.
+    bool m_synthesizeFromFunctionEntries;
 
     static constexpr size_t MaxNameLen = 16384;
     static constexpr size_t SymInfoBufSize = sizeof(SYMBOL_INFOW) + MaxNameLen * sizeof(wchar_t);
@@ -565,6 +603,7 @@ private:
     std::unordered_set<std::wstring> m_nameQueries;
     std::unordered_set<ULONG64> m_addressQueries;
     std::unordered_map<ULONG, ULONG64> m_importedIndexMap;
+    boost::icl::interval_map<ULONG64, ULONG64> m_importRanges;
 
 };
 

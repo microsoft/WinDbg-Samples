@@ -207,6 +207,8 @@ HRESULT SymbolImporter_DbgHelp::InternalConnectToSource()
         return E_FAIL;
     }
 
+    m_moduleMachine = modInfo.MachineType;
+
     auto fn = [&]()
     {
         std::wstring info;
@@ -1489,6 +1491,146 @@ bool SymbolImporter_DbgHelp::LegacySymbolEnumerate(_In_ SymbolQueryInformation *
     return TRUE;
 }
 
+HRESULT SymbolImporter_DbgHelp::GetFunctionBoundsFromExceptionData(_In_ ULONG64 offset,
+                                                                   _Out_ ULONG64 *pStart,
+                                                                   _Out_ ULONG64 *pEnd)
+{
+    if (m_moduleMachine == IMAGE_FILE_MACHINE_UNKNOWN)
+    {
+        return E_FAIL;
+    }
+ 
+    LPVOID pFeData = SymFunctionTableAccess64(m_symHandle, offset);
+    if (pFeData == nullptr)
+    {
+        return E_FAIL;
+    }
+
+    //
+    // x86 does not have function entries.  If we have anything, we have FPO_DATA.  All other platforms
+    // have function entries...  The unwinder data is machine specific but the entry is not.
+    //
+    if (m_moduleMachine != IMAGE_FILE_MACHINE_I386)
+    {
+        IMAGE_RUNTIME_FUNCTION_ENTRY *pFe = reinterpret_cast<IMAGE_RUNTIME_FUNCTION_ENTRY *>(pFeData);
+        *pStart = m_moduleBase + pFe->BeginAddress;
+        *pEnd = m_moduleBase + pFe->EndAddress;
+    }
+    else
+    {
+        FPO_DATA *pFpo = reinterpret_cast<FPO_DATA *>(pFeData);
+        *pStart = m_moduleBase + pFpo->ulOffStart;
+        *pEnd = *pStart + pFpo->cbProcSize;
+    }
+
+    return S_OK;
+}
+
+ULONG SymbolImporter_DbgHelp::HashBytes(_In_reads_(dataSize) unsigned char *pData,
+                                        _In_ size_t dataSize)
+{
+    size_t hash = 2166136261u; // FNV offset basis
+    for (size_t i = 0; i < dataSize; ++i)
+    {
+        hash ^= pData[i];
+        hash = hash * 16777619u; // FNV Prime
+    }
+    return static_cast<ULONG>(hash);
+}
+
+HRESULT SymbolImporter_DbgHelp::ImportFromFeData(_In_ ULONG64 feStart,
+                                                 _In_ ULONG64 feEnd,
+                                                 _Out_ ULONG64 *pBuilderId,
+                                                 _In_ ULONG64 parentId)
+{
+    HRESULT hr = S_OK;
+
+    ULONG byteHash32 = 0;
+    bool hasByteHash32 = false;
+
+    std::unique_ptr<unsigned char[]> spfData;
+    unsigned char fData[256];
+    size_t fDataSize = 256;
+    unsigned char *pfData = fData;
+
+    //
+    // It would be awfully nice if the name we generate is somewhat stable from
+    // build-to-build if things move around but the function itself doesn't change.
+    // If we have enough access to the binary, we will hash the bytes of the function
+    // to generate a name; otherwise, we will use the offset into the function to generate
+    // one.
+    // 
+    if (feEnd - feStart > fDataSize &&
+        feEnd - feStart < std::numeric_limits<size_t>::max())
+    {
+        fDataSize = static_cast<size_t>(feEnd - feStart);
+        spfData.reset(new(std::nothrow) unsigned char[fDataSize]);
+        if (spfData.get() == nullptr)
+        {
+            return E_OUTOFMEMORY;
+        }
+
+        pfData = spfData.get();
+    }
+
+    DWORD bytesRead = 0;
+    if (feEnd - feStart < std::numeric_limits<DWORD>::max())
+    {
+        IMAGEHLP_CBA_READ_MEMORY readMemory;
+        readMemory.addr = feStart;
+        readMemory.buf = pfData;
+        readMemory.bytes = static_cast<DWORD>(feEnd - feStart);
+        readMemory.bytesread = &bytesRead;
+
+        if (SUCCEEDED(LegacyReadMemory(&readMemory)) && bytesRead == static_cast<DWORD>(feEnd - feStart))
+        {
+            byteHash32 = HashBytes(pfData, static_cast<size_t>(feEnd - feStart));
+            hasByteHash32 = true;
+        }
+    }
+
+    wchar_t buf[128];
+
+    if (hasByteHash32)
+    {
+        swprintf_s(buf, ARRAYSIZE(buf), L"Function_%08I64x", (ULONG64)byteHash32);
+    }
+    else
+    {
+        swprintf_s(buf, ARRAYSIZE(buf), L"Function_At_%I64x", feStart - m_moduleBase);
+    }
+
+    ULONG64 voidId;
+    IfFailedReturn(m_pOwningSet->FindTypeByName(L"void", &voidId, nullptr, false));
+
+    ComPtr<FunctionSymbol> spFunction;
+    hr = MakeAndInitialize<FunctionSymbol>(&spFunction,
+                                           m_pOwningSet,
+                                           parentId,
+                                           voidId,
+                                           feStart - m_moduleBase,
+                                           feEnd - feStart,
+                                           buf,
+                                           nullptr);
+
+    if (FAILED(hr))
+    {
+        return ImportFailure(hr);
+    }
+
+    auto fn = [&]()
+    {
+        m_importRanges.add(std::make_pair(boost::icl::interval<ULONG64>::right_open(feStart - m_moduleBase,
+                                                                                    feEnd - m_moduleBase),
+                                          spFunction->InternalGetId()));
+        return S_OK;
+    };
+    hr = ConvertException(fn);
+
+    *pBuilderId = spFunction->InternalGetId();
+    return S_OK;
+}
+
 HRESULT SymbolImporter_DbgHelp::ImportForOffsetQuery(_In_ SvcSymbolKind searchKind,
                                                      _In_ ULONG64 offset)
 {
@@ -1518,17 +1660,43 @@ HRESULT SymbolImporter_DbgHelp::ImportForOffsetQuery(_In_ SvcSymbolKind searchKi
             return S_FALSE;
         }
 
+        //
+        // If we have an imported symbol from anything at this particular range, don't reimport
+        // the same thing.
+        //
+        auto its = m_importRanges.find(offset);
+        if (its != m_importRanges.end())
+        {
+            return S_FALSE;
+        }
+
+        ULONG64 feStart, feEnd;
+        bool hasFeData = SUCCEEDED(GetFunctionBoundsFromExceptionData(m_moduleBase + offset, &feStart, &feEnd));
+
         ULONG64 displacement;
-        if (!SymFromAddrW(m_symHandle,
-                          m_moduleBase + offset,
-                          &displacement,
-                          m_pSymInfo))
+        bool hasSymbol = (bool)SymFromAddrW(m_symHandle,
+                                            m_moduleBase + offset,
+                                            &displacement,
+                                            m_pSymInfo);
+
+        if (!hasSymbol && !hasFeData)
         {
             return S_FALSE;
         }
 
         ULONG64 importedId;
-        (void)ImportSymbol(m_pSymInfo, &importedId);
+        if (hasSymbol && (!hasFeData || feStart == m_pSymInfo->Address))
+        {
+            (void)ImportSymbol(m_pSymInfo, &importedId);
+        }
+        else if (hasFeData)
+        {
+            (void)ImportFromFeData(feStart, feEnd, &importedId);
+        }
+        else
+        {
+            return S_FALSE;
+        }
 
         m_addressQueries.insert(offset);
 
