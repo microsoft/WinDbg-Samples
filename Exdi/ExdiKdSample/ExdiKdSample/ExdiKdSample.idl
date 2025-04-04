@@ -1,0 +1,50 @@
+//----------------------------------------------------------------------------
+//
+// ExdiKdSample.idl
+//
+// Copyright (c) Microsoft. All rights reserved.
+//
+//----------------------------------------------------------------------------
+
+import "oaidl.idl";
+import "ocidl.idl";
+#include "exdi3.idl"
+
+//Used for internal synchronization
+[object, oleautomation, uuid(650FE759-CC39-49A8-8BBA-13DE47107B98)]
+interface IAsynchronousCommandNotificationReceiver : IUnknown
+{
+    HRESULT OnAsynchronousCommandCompleted();
+    HRESULT PerformKeepaliveChecks();
+}
+
+[
+	uuid(FEA1B500-2641-4B1D-88A3-E795429C842B),
+	version(1.0),
+]
+library ExdiKdSampleLib
+{
+	importlib("stdole2.tlb");
+	[
+		uuid(53838F70-0936-44A9-AB4E-ABB568401508)		
+	]
+	coclass StaticExdiSampleServer
+	{
+		[default] interface IeXdiServer3;
+        interface IeXdiARM4Context3;
+        interface IeXdiX86_64Context3;
+        interface IeXdiArmV8Arch64Context3;
+	};
+
+	[
+		uuid(67030926-1754-4FDA-9788-7F731CBDAE42)		
+	]
+	coclass LiveExdiSampleServer
+	{
+		[default] interface IeXdiServer3;
+        interface IeXdiARM4Context3;
+        interface IeXdiX86_64Context3;
+        interface IeXdiArmV8Arch64Context3;
+        interface IAsynchronousCommandNotificationReceiver;
+	};
+};
