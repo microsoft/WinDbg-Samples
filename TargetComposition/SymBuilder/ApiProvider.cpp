@@ -52,6 +52,27 @@ namespace SymbolBuilder
 {
 
 //*************************************************
+// SymbolBuilder Global Data
+//
+
+EnumMapping g_IntrinsicKindMappings[] = 
+{
+    { L"void", SvcSymbolIntrinsicVoid },
+    { L"bool", SvcSymbolIntrinsicBool },
+    { L"char", SvcSymbolIntrinsicChar },
+    { L"wchar", SvcSymbolIntrinsicWChar },
+    { L"int", SvcSymbolIntrinsicInt },
+    { L"uint", SvcSymbolIntrinsicUInt },
+    { L"long", SvcSymbolIntrinsicLong },
+    { L"ulong", SvcSymbolIntrinsicULong },
+    { L"float", SvcSymbolIntrinsicFloat },
+    { L"hresult", SvcSymbolIntrinsicHRESULT },
+    { L"char16", SvcSymbolIntrinsicChar16 },
+    { L"char32", SvcSymbolIntrinsicChar32 },
+    { L"uchar", SvcSymbolIntrinsicUChar }
+};
+
+//*************************************************
 // Standard Helpers:
 //
 
@@ -134,6 +155,66 @@ std::wstring ValueToString(_In_ VARIANT const& val)
     }
 
     return (std::wstring)buf;
+}
+
+unsigned int GetEnumValue(_In_ size_t mappingCount,
+                          _In_reads_(mappingCount) EnumMapping *pMappings,
+                          _In_ const Object& object)
+{
+    unsigned int value = 0;
+    bool found = false;
+
+    VARIANT vtVal;
+    CheckHr(object->GetIntrinsicValue(&vtVal));
+    if (vtVal.vt == VT_BSTR)
+    {
+        for (size_t i = 0; i < mappingCount; ++i)
+        {
+            if (wcscmp(vtVal.bstrVal, pMappings[i].Enumerant) == 0)
+            {
+                value = pMappings[i].Value;
+                found = true;
+                break;
+            }
+
+        }
+        VariantClear(&vtVal);
+
+    }
+    else
+    {
+        VariantClear(&vtVal);
+        value = (unsigned int)object;
+
+        for (size_t i = 0; i < mappingCount; ++i)
+        {
+            if (value == pMappings[i].Value)
+            {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    if (!found)
+    {
+        throw std::invalid_argument("Invalid value specified for enumeration");
+    }
+    return value;
+}
+
+PCWSTR GetEnumString(_In_ size_t mappingCount,
+                     _In_reads_(mappingCount) EnumMapping *pMappings,
+                     _In_ unsigned int value)
+{
+    for(size_t i = 0; i < mappingCount; ++i)
+    {
+        if (pMappings[i].Value == value)
+        {
+            return pMappings[i].Enumerant;
+        }
+    }
+    throw std::invalid_argument("Invalid value specified for enumeration");
 }
 
 //*************************************************
@@ -823,6 +904,19 @@ Object TypesObject::Create(_In_ const Object& /*typesObject*/,
 
     UdtTypeObject& udtTypeFactory = ApiProvider::Get().GetUdtTypeFactory();
     return udtTypeFactory.CreateInstance(spUdt);
+}
+
+Object TypesObject::CreateBasic(_In_ const Object& /*typesObject*/,
+                                _In_ ComPtr<SymbolSet>& spSymbolSet,
+                                _In_ std::wstring typeName,
+                                _In_ SvcSymbolIntrinsicKind intrinsicKind,
+                                _In_ ULONG basicSize)
+{
+    ComPtr<BasicTypeSymbol> spBasicType;
+    CheckHr(MakeAndInitialize<BasicTypeSymbol>(&spBasicType, spSymbolSet.Get(), intrinsicKind, basicSize, typeName.c_str()));
+
+    BasicTypeObject& basicTypeFactory = ApiProvider::Get().GetBasicTypeFactory();
+    return basicTypeFactory.CreateInstance(spBasicType);
 }
 
 Object TypesObject::CreatePointer(_In_ const Object& /*typesObject*/,
@@ -2945,6 +3039,10 @@ TypesObject::TypesObject() :
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_CREATEARRAY },
                        L"PreferShow", true));
 
+    AddMethod(L"CreateBasic", this, &TypesObject::CreateBasic,
+              Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_CREATEBASIC },
+                       L"PreferShow", true));
+
     AddMethod(L"CreateEnum", this, &TypesObject::CreateEnum,
               Metadata(L"Help", DeferredResourceString { SYMBOLBUILDER_IDS_TYPES_CREATEENUM },
                        L"PreferShow", true));
@@ -3318,6 +3416,31 @@ PublicObject::PublicObject()
 } // Libraries
 } // DataModel
 } // Debugger
+
+//*************************************************
+// Custom Boxing:
+//
+
+namespace Debugger::DataModel::ClientEx::Boxing
+{
+
+using namespace Debugger::DataModel::Libraries::SymbolBuilder;
+
+Object BoxObject<SvcSymbolIntrinsicKind>::Box(_In_ const SvcSymbolIntrinsicKind& ik)
+{
+    return GetEnumString(ARRAYSIZE(g_IntrinsicKindMappings),
+        g_IntrinsicKindMappings,
+        static_cast<unsigned int>(ik));
+}
+
+SvcSymbolIntrinsicKind BoxObject<SvcSymbolIntrinsicKind>::Unbox(_In_ const Object& object)
+{
+    return static_cast<SvcSymbolIntrinsicKind>(GetEnumValue(ARRAYSIZE(g_IntrinsicKindMappings),
+        g_IntrinsicKindMappings,
+        object));
+}
+
+}
 
 //*************************************************
 // Core Initialization:

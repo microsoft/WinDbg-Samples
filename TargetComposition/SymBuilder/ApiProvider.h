@@ -122,6 +122,25 @@ private:
 };
 
 //*************************************************
+// Custom Boxing:
+//
+
+struct EnumMapping
+{
+    PCWSTR Enumerant;
+    unsigned int Value;
+};
+
+// GetEnumValue():
+//
+// For an object which holds either a string or numeric representation of an enumerant
+// mapped by an EnumMapping array, return the given EnumMapping.
+//
+unsigned int GetEnumValue(_In_ size_t mappingCount,
+                          _In_reads_(mappingCount) EnumMapping *pMappings,
+                          _In_ const Object& object);
+
+//*************************************************
 // Base Symbols:
 //
 
@@ -237,6 +256,16 @@ private:
                   _In_ ComPtr<SymbolSet>& spSymbolSet,
                   _In_ std::optional<std::wstring> typeName,
                   _In_ std::optional<std::wstring> qualifiedTypeName);
+
+    // CreateBasic():
+    //
+    // Bound API which will create a new basic type and return an object representing it.
+    // 
+    Object CreateBasic(_In_ const Object& /*typesObject*/,
+                       _In_ ComPtr<SymbolSet>& spSymbolSet,
+                       _In_ std::wstring typeName,
+                       _In_ SvcSymbolIntrinsicKind intrinsicKind,
+                       _In_ ULONG basicSize);
 
     // CreatePointer():
     //
@@ -1460,5 +1489,19 @@ private:
 } // Libraries
 } // DataModel
 } // Debugger
+
+//*************************************************
+// Custom Box Mappings:
+//
+
+namespace Debugger::DataModel::ClientEx::Boxing
+{
+    template<>
+    struct BoxObject<SvcSymbolIntrinsicKind>
+    {
+        static Object Box(_In_ const SvcSymbolIntrinsicKind& ik);
+        static SvcSymbolIntrinsicKind Unbox(_In_ const Object& object);
+    };
+}
 
 #endif // __APIPROVIDER_H__
