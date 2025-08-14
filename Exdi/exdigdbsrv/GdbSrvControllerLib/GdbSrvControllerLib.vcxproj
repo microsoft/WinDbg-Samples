@@ -125,6 +125,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\ExdiGdbSrv\;..\ExdiGdbSrv\GeneratedSources</AdditionalIncludeDirectories>
       <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -140,6 +141,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\ExdiGdbSrv\;..\ExdiGdbSrv\GeneratedSources</AdditionalIncludeDirectories>
       <ControlFlowGuard>Guard</ControlFlowGuard>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
