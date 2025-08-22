@@ -133,7 +133,6 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
-      <AdditionalOptions>/sourcelink .\sourcelink.json %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -169,7 +168,6 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
-      <AdditionalOptions>/sourcelink .\sourcelink.json %(AdditionalOptions)</AdditionalOptions>
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
@@ -210,7 +208,6 @@
       <PreprocessorDefinitions>WIN32;WIN32_LEAN_AND_MEAN;_WINDOWS;_DEBUG;_USRDLL;%(PreprocessorDefinitions);MIDL_OUTPUT=$(OutputPath)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
-      <AdditionalOptions>/sourcelink .\sourcelink.json %(AdditionalOptions)</AdditionalOptions>
       <ControlFlowGuard>Guard</ControlFlowGuard>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
@@ -236,7 +233,7 @@
     </ResourceCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <ModuleDefinitionFile>.\ExdiGdbSrvSample.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>.\ExdiGdbSrv.def</ModuleDefinitionFile>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <RegisterOutput>false</RegisterOutput>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -252,7 +249,6 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>..\GdbSrvControllerLib;GeneratedSources</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalOptions>/sourcelink .\sourcelink.json %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -297,7 +293,7 @@
       <RuntimeTypeInfo>
       </RuntimeTypeInfo>
       <DiagnosticsFormat>Classic</DiagnosticsFormat>
-      <AdditionalOptions>/sourcelink .\sourcelink.json %(AdditionalOptions)</AdditionalOptions>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -321,6 +317,7 @@
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <RegisterOutput>false</RegisterOutput>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions>/GUARD:CF %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <CustomBuildStep>
       <Command>
@@ -346,6 +343,7 @@
       <RuntimeTypeInfo>
       </RuntimeTypeInfo>
       <DiagnosticsFormat>Classic</DiagnosticsFormat>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Midl>
       <MkTypLibCompatible>false</MkTypLibCompatible>
@@ -370,6 +368,7 @@
       <RegisterOutput>false</RegisterOutput>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;xmllite.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IncrementalLinkDatabaseFile />
+      <AdditionalOptions>/GUARD:CF %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <CustomBuildStep>
       <Command>
