@@ -1,6 +1,6 @@
 # TTD/TTDCommonTypes.h
 
-This header is included by other TTD headers to reference types and other definitions that are used by one or more interface.
+This header is included by other TTD headers to reference types and other definitions that are used by one or more interfaces.
 
 It resides in the [Microsoft.TimeTravelDebugging.Apis](../Microsoft.TimeTravelDebugging.Apis.md) NuGet package.
 

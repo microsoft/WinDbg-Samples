@@ -1,0 +1,10 @@
+LIBRARY         TtdExtension
+
+EXPORTS
+    ; Extension commands.
+    help
+    info
+
+    ; Extension infrastructure.
+    DebugExtensionInitialize
+    DebugExtensionUninitialize

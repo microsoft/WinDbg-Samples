@@ -1,3 +1,9 @@
+// Copyright (c) Microsoft Corporation.
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+// LiveRecorderApiSample - demonstrates how to control TTD recording programmatically within
+//                         a process using the TTD Live Recorder API.
+
 #include <Windows.h>
 #include <wrl.h>
 
@@ -73,7 +79,7 @@ void MultithreadedSort(TTD::ILiveRecorder* pRecorder, std::span<int> span)
 int wmain(int argc, wchar_t const* const* argv)
 {
     std::default_random_engine rand{ std::random_device{}() };
-    std::uniform_int randInt{};
+    std::uniform_int_distribution randInt{};
 
     std::vector<int> randomSequence;
     randomSequence.reserve(10000);

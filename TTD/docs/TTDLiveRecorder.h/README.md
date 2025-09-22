@@ -27,7 +27,7 @@ and interfaces with the TTDLiveRecorder.dll component found in [TTD recorder's b
 
 In order to interact with the recorder, a recording client application or component needs to:
 
-1. Be built using C++14 or later.
+1. Be built using C++20 or later.
 2. Include the TTD/TTDLiveRecorder.h header.
 3. Either link to the TTDLiveRecorder.lib static library or dynamically load the TTDLiveRecorder.dll component.
 4. Generate a new GUID to identify the particular client that's being developed.
