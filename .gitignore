@@ -20,6 +20,7 @@
 x64/
 x86/
 bld/
+out/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
@@ -331,3 +332,13 @@ ASALocalRun/
 
 # Specific to ExdiGdbSrv
 GeneratedSources/
+
+# Private batch files
+DevBootstrapping.cmd
+
+# Downloaded TTD bits
+TTDDownload/
+
+# vcpkg download
+vcpkg_installed/
+
