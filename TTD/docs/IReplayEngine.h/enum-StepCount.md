@@ -18,7 +18,7 @@ enum class StepCount : uint64_t
 
 - `StepCount::Zero` - No steps (starting point)
 - `StepCount::Min` - Minimum valid step count (same as Zero)
-- `StepCount::Max` - Maximum valid step count  
+- `StepCount::Max` - Maximum valid step count
 - `StepCount::Invalid` - Invalid step count marker
 
 ## Arithmetic Operations

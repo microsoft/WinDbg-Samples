@@ -22,7 +22,7 @@ The byte offset immediately following the specified field within the structure.
 This macro is particularly useful for determining whether it's safe to read a field from a buffer, or for calculating structure sizes up to a certain field:
 
 ```cpp
-struct MyStruct 
+struct MyStruct
 {
     int32_t a;      // offset 0, size 4
     double b;       // offset 8, size 8 (due to alignment)
@@ -32,7 +32,7 @@ struct MyStruct
 // Get offsets
 size_t offset_a = offsetof(MyStruct, a);        // Returns 0
 size_t after_a = offsetafter(MyStruct, a);      // Returns 4
-size_t offset_b = offsetof(MyStruct, b);        // Returns 8  
+size_t offset_b = offsetof(MyStruct, b);        // Returns 8
 size_t after_b = offsetafter(MyStruct, b);      // Returns 16
 size_t after_c = offsetafter(MyStruct, c);      // Returns 17
 

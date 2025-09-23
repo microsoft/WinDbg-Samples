@@ -62,7 +62,7 @@ Private method called by `Deleter<IReplayEngine>` to properly clean up engine re
 
 - System and trace information queries
 - Thread and module enumeration
-- Event and exception access  
+- Event and exception access
 - Cursor creation
 - Index building and management
 - Debug logging configuration
@@ -106,10 +106,10 @@ void AnalyzeMultipleTraces(std::vector<std::wstring> const& traceFiles)
         // Create new engine for each trace
         auto [engine, result] = TTD::Replay::MakeReplayEngine();
         if (result == S_OK && engine->Initialize(filename.c_str())) {
-            
+
             // Analyze this trace
             AnalyseSingleTrace(engine.get());
-            
+
             // engine automatically destroyed at end of loop iteration
         }
     }
@@ -132,7 +132,7 @@ TTD::Replay::UniqueReplayEngine LoadTrace(wchar_t const* filename)
     } else {
         printf("Failed to create replay engine: 0x%X\n", result);
     }
-    
+
     return nullptr;
 }
 ```
@@ -147,23 +147,23 @@ enum class TraceLoadResult
     FileNotFound
 };
 
-std::pair<TTD::Replay::UniqueReplayEngine, TraceLoadResult> 
+std::pair<TTD::Replay::UniqueReplayEngine, TraceLoadResult>
 LoadTraceWithDetailedErrors(wchar_t const* filename)
 {
     // Check file existence first
     if (_waccess(filename, 0) != 0) {
         return {nullptr, TraceLoadResult::FileNotFound};
     }
-    
+
     auto [engine, result] = TTD::Replay::MakeReplayEngine();
     if (result != S_OK) {
         return {nullptr, TraceLoadResult::EngineCreationFailed};
     }
-    
+
     if (!engine->Initialize(filename)) {
         return {nullptr, TraceLoadResult::InitializationFailed};
     }
-    
+
     return {std::move(engine), TraceLoadResult::Success};
 }
 ```
@@ -171,7 +171,7 @@ LoadTraceWithDetailedErrors(wchar_t const* filename)
 ## Important Notes
 
 - **Single Initialization**: Each engine instance can only be initialized once
-- **File Format**: Supports `.ttd`, `.run`, and index files  
+- **File Format**: Supports `.ttd`, `.run`, and index files
 - **Thread Safety**: Engine operations are not inherently thread-safe
 - **Resource Management**: Always use smart pointers (`UniqueReplayEngine`) for automatic cleanup
 - **Initialization Order**: Must initialize before calling other engine methods

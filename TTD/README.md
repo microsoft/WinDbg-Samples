@@ -7,7 +7,7 @@ Welcome to the Time Travel Debugging (TTD) SDK! This toolkit provides everything
 Time Travel Debugging (TTD) is a powerful debugging technology that records the complete execution of a program, allowing you to replay and analyze it deterministically. TTD enables developers and researchers to:
 
 - **Navigate backwards and forwards** through program execution with precision
-- **Capture complete execution traces** including memory accesses, register states, and API calls  
+- **Capture complete execution traces** including memory accesses, register states, and API calls
 - **Debug intermittent and hard-to-reproduce issues** with perfect reproducibility
 - **Perform post-mortem analysis** on crashes and complex failures
 - **Analyze malware and security vulnerabilities** in a safe, controlled environment
@@ -28,7 +28,7 @@ The core of the SDK, containing samples for programmatic analysis of TTD trace f
 
 Perfect for developers who want to build custom analysis tools, extract specific insights from traces, or integrate TTD capabilities into existing debugging pipelines. This is the same API the Windows debugger (WinDbg) uses for TTD support, now we are making it available for everyone.
 
-### [LiveRecorderApiSample/](LiveRecorderApiSample/README.md)  
+### [LiveRecorderApiSample/](LiveRecorderApiSample/README.md)
 **Live Recording API Sample**
 
 Demonstrates how applications can use TTD's live recording capabilities to record portions of their own execution in real-time. This sample shows:
@@ -43,7 +43,7 @@ Ideal for developers who want to add TTD recording capabilities directly into th
 
 Documentation for all TTD programming interfaces, including:
 - **API reference documentation** for all TTD interfaces and types
-- **Programming concepts** and TTD-specific terminology  
+- **Programming concepts** and TTD-specific terminology
 - **Best practices** for performance and reliability
 
 Essential reading for anyone developing with TTD APIs, whether using the Replay Engine or Live Recorder interfaces.
@@ -53,7 +53,7 @@ Essential reading for anyone developing with TTD APIs, whether using the Replay 
 ### 1. **Explore the Documentation**
 Start with the [docs/](docs/README.md) directory to understand TTD concepts, terminology, and available APIs.
 
-### 2. **Try the Samples**  
+### 2. **Try the Samples**
 - For **trace analysis**: Explore [ReplayApi/](ReplayApi/README.md) samples
 - For **live recording**: Check out [LiveRecorderApiSample/](LiveRecorderApiSample/README.md)
 
@@ -94,7 +94,7 @@ To set expectations, this is considered an experimental API (which is why its ma
 
 ### Resources
 - **Official Documentation**: [Microsoft TTD Documentation](https://aka.ms/ttd)
-- **WinDbg Download**: [WinDbg](https://aka.ms/windbg/download)  
+- **WinDbg Download**: [WinDbg](https://aka.ms/windbg/download)
 - **Sample Repository**: [WinDbg-Samples on GitHub](https://github.com/microsoft/WinDbg-Samples)
 - **Debugging Documentation**: [Windows Debugging Tools](https://aka.ms/windbg)
 - **Feedback and Issues**: Use the GitHub repository issues page for reporting bugs or requesting features.

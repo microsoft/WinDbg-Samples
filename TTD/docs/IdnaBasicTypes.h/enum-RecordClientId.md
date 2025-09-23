@@ -43,44 +43,44 @@ class ClientManager
 {
     std::unordered_set<uint32_t> activeClients_;
     RecordClientId nextClientId_{RecordClientId::Min};
-    
+
 public:
     RecordClientId AllocateClientId()
     {
         // Find next available client ID
-        while (nextClientId_ != RecordClientId::System && 
+        while (nextClientId_ != RecordClientId::System &&
                activeClients_.count(static_cast<uint32_t>(nextClientId_)) > 0)
         {
             nextClientId_ = static_cast<RecordClientId>(
                 static_cast<uint32_t>(nextClientId_) + 1);
         }
-        
+
         if (nextClientId_ == RecordClientId::System) {
             return RecordClientId::Invalid; // No more IDs available
         }
-        
+
         RecordClientId clientId = nextClientId_;
         activeClients_.insert(static_cast<uint32_t>(clientId));
         nextClientId_ = static_cast<RecordClientId>(
             static_cast<uint32_t>(nextClientId_) + 1);
-        
+
         return clientId;
     }
-    
+
     bool IsValidClient(RecordClientId clientId) const
     {
         return clientId != RecordClientId::Invalid &&
                (activeClients_.count(static_cast<uint32_t>(clientId)) > 0 ||
                 clientId == RecordClientId::System);
     }
-    
+
     void ReleaseClientId(RecordClientId clientId)
     {
         if (clientId != RecordClientId::Invalid && clientId != RecordClientId::System) {
             activeClients_.erase(static_cast<uint32_t>(clientId));
         }
     }
-    
+
     size_t GetActiveClientCount() const { return activeClients_.size(); }
 };
 ```
@@ -103,29 +103,29 @@ struct ClientInfo
 class ClientRegistry
 {
     std::unordered_map<uint32_t, ClientInfo> clientInfo_;
-    
+
 public:
     bool RegisterClient(RecordClientId clientId, ClientInfo const& info)
     {
         if (clientId == RecordClientId::Invalid) {
             return false;
         }
-        
+
         ClientInfo clientData = info;
         clientData.isSystemClient = (clientId == RecordClientId::System);
         clientData.startTime = std::chrono::steady_clock::now();
         clientData.recordingCount = 0;
-        
+
         clientInfo_[static_cast<uint32_t>(clientId)] = std::move(clientData);
         return true;
     }
-    
+
     ClientInfo const* GetClientInfo(RecordClientId clientId) const
     {
         auto it = clientInfo_.find(static_cast<uint32_t>(clientId));
         return (it != clientInfo_.end()) ? &it->second : nullptr;
     }
-    
+
     void IncrementRecordingCount(RecordClientId clientId)
     {
         auto it = clientInfo_.find(static_cast<uint32_t>(clientId));
@@ -133,29 +133,29 @@ public:
             ++it->second.recordingCount;
         }
     }
-    
+
     std::vector<RecordClientId> GetActiveClients() const
     {
         std::vector<RecordClientId> clients;
         clients.reserve(clientInfo_.size());
-        
+
         for (auto const& pair : clientInfo_) {
             clients.push_back(static_cast<RecordClientId>(pair.first));
         }
-        
+
         return clients;
     }
-    
+
     std::vector<RecordClientId> GetSystemClients() const
     {
         std::vector<RecordClientId> systemClients;
-        
+
         for (auto const& pair : clientInfo_) {
             if (pair.second.isSystemClient) {
                 systemClients.push_back(static_cast<RecordClientId>(pair.first));
             }
         }
-        
+
         return systemClients;
     }
 };
@@ -169,7 +169,7 @@ class RecordingSession
     RecordClientId clientId_;
     std::string sessionName_;
     bool isActive_;
-    
+
 public:
     RecordingSession(RecordClientId clientId, std::string const& sessionName)
         : clientId_(clientId), sessionName_(sessionName), isActive_(false)
@@ -178,15 +178,15 @@ public:
             throw std::invalid_argument("Invalid client ID for recording session");
         }
     }
-    
+
     RecordClientId GetClientId() const { return clientId_; }
-    
+
     bool StartRecording()
     {
         if (clientId_ == RecordClientId::Invalid || isActive_) {
             return false;
         }
-        
+
         // Different behavior for system vs user clients
         if (clientId_ == RecordClientId::System) {
             return StartSystemRecording();
@@ -194,12 +194,12 @@ public:
             return StartUserRecording();
         }
     }
-    
+
     void StopRecording()
     {
         if (isActive_) {
             isActive_ = false;
-            
+
             if (clientId_ == RecordClientId::System) {
                 StopSystemRecording();
             } else {
@@ -207,28 +207,28 @@ public:
             }
         }
     }
-    
+
     bool IsSystemClient() const { return clientId_ == RecordClientId::System; }
-    
+
 private:
     bool StartSystemRecording()
     {
         // System-level recording initialization
-        printf("Starting system recording for client %u\n", 
+        printf("Starting system recording for client %u\n",
                static_cast<uint32_t>(clientId_));
         isActive_ = true;
         return true;
     }
-    
+
     bool StartUserRecording()
     {
         // User-level recording initialization
-        printf("Starting user recording '%s' for client %u\n", 
+        printf("Starting user recording '%s' for client %u\n",
                sessionName_.c_str(), static_cast<uint32_t>(clientId_));
         isActive_ = true;
         return true;
     }
-    
+
     void StopSystemRecording() { /* System cleanup */ }
     void StopUserRecording() { /* User cleanup */ }
 };
@@ -248,7 +248,7 @@ enum class ClientPermission
 class ClientAccessControl
 {
     std::unordered_map<uint32_t, uint32_t> clientPermissions_;
-    
+
 public:
     void SetClientPermissions(RecordClientId clientId, uint32_t permissions)
     {
@@ -257,30 +257,30 @@ public:
             permissions |= static_cast<uint32_t>(ClientPermission::System);
             permissions |= static_cast<uint32_t>(ClientPermission::Admin);
         }
-        
+
         clientPermissions_[static_cast<uint32_t>(clientId)] = permissions;
     }
-    
+
     bool HasPermission(RecordClientId clientId, ClientPermission permission) const
     {
         if (clientId == RecordClientId::Invalid) {
             return false;
         }
-        
+
         auto it = clientPermissions_.find(static_cast<uint32_t>(clientId));
         if (it == clientPermissions_.end()) {
             return false;
         }
-        
+
         return (it->second & static_cast<uint32_t>(permission)) != 0;
     }
-    
+
     bool CanAccessSystemResources(RecordClientId clientId) const
     {
-        return HasPermission(clientId, ClientPermission::System) || 
+        return HasPermission(clientId, ClientPermission::System) ||
                clientId == RecordClientId::System;
     }
-    
+
     bool IsAdminClient(RecordClientId clientId) const
     {
         return HasPermission(clientId, ClientPermission::Admin) ||
@@ -307,7 +307,7 @@ class ClientMonitor
 {
     std::unordered_map<uint32_t, std::unique_ptr<ClientStats>> clientStats_;
     mutable std::mutex statsMutex_;
-    
+
 public:
     void InitializeClientStats(RecordClientId clientId)
     {
@@ -315,7 +315,7 @@ public:
         uint32_t id = static_cast<uint32_t>(clientId);
         clientStats_[id] = std::make_unique<ClientStats>();
     }
-    
+
     void RecordStarted(RecordClientId clientId)
     {
         auto stats = GetClientStats(clientId);
@@ -323,7 +323,7 @@ public:
             stats->recordingsStarted.fetch_add(1, std::memory_order_relaxed);
         }
     }
-    
+
     void RecordCompleted(RecordClientId clientId, uint64_t bytesRecorded, uint64_t eventsRecorded)
     {
         auto stats = GetClientStats(clientId);
@@ -333,7 +333,7 @@ public:
             stats->eventsRecorded.fetch_add(eventsRecorded, std::memory_order_relaxed);
         }
     }
-    
+
     void RecordFailed(RecordClientId clientId)
     {
         auto stats = GetClientStats(clientId);
@@ -341,7 +341,7 @@ public:
             stats->recordingsFailed.fetch_add(1, std::memory_order_relaxed);
         }
     }
-    
+
     ClientStats GetSnapshot(RecordClientId clientId) const
     {
         auto stats = GetClientStats(clientId);
@@ -350,7 +350,7 @@ public:
         }
         return ClientStats{};
     }
-    
+
 private:
     ClientStats* GetClientStats(RecordClientId clientId) const
     {
@@ -393,11 +393,11 @@ inline RecordClientId StringToClientId(std::string const& str)
 {
     if (str == "Invalid") return RecordClientId::Invalid;
     if (str == "System") return RecordClientId::System;
-    
+
     if (str.starts_with("Client-")) {
         try {
             uint32_t id = std::stoul(str.substr(7));
-            if (id >= static_cast<uint32_t>(RecordClientId::Min) && 
+            if (id >= static_cast<uint32_t>(RecordClientId::Min) &&
                 id <= static_cast<uint32_t>(RecordClientId::Max)) {
                 return static_cast<RecordClientId>(id);
             }
@@ -405,7 +405,7 @@ inline RecordClientId StringToClientId(std::string const& str)
             // Invalid conversion
         }
     }
-    
+
     return RecordClientId::Invalid;
 }
 ```

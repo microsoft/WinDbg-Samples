@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // TraceDebugger - A simple mini debugger for analyzing TTD trace files.
-// 
+//
 // This sample demonstrates how to use the TTD Replay Engine to:
 // * Inspect and display register values
 // * Inspect and display memory contents
@@ -114,7 +114,7 @@ static bool DbgRegisters(ICursorView& cursor, std::string_view line = {})
         std::cout << std::format("UTID = {}\n", cursor.GetThreadInfo().UniqueId);
         std::cout << std::format("RIP = 0x{:X}\n", cursor.GetProgramCounter());
         std::cout << std::format("RSP = 0x{:X}\n", cursor.GetStackPointer());
-        
+
         // Print flags based on the architecture
         std::visit(overload{
             [](AMD64_CONTEXT const* registers) {
@@ -127,7 +127,7 @@ static bool DbgRegisters(ICursorView& cursor, std::string_view line = {})
                 std::cout << std::format("CPSR = 0x{:X}\n", registers->Cpsr);
             }
             }, unifiedContext);
-        
+
         return true;
     }
 
@@ -336,7 +336,7 @@ static bool DbgMemoryWatchpointImpl(ICursorView& cursor, std::string_view line, 
         bool Progress(Position, double positionPercent) const
         {
             std::cout << std::format("Replaying ({:<6.2f}%)\r", positionPercent);
-            
+
             // Do not stop replay
             return false;
         }

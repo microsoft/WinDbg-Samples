@@ -43,7 +43,7 @@ TTDRecordCPU!InitializeNirvanaClient+0x7c69:
  # Child-SP          RetAddr               Call Site
 00 00000051`8031d490 00007ffe`f8981404     TTDRecordCPU!InitializeNirvanaClient+0x7c69
 01 00000051`8031d500 00007ff6`3f8c9923     TTDLiveRecorder+0x1404
-02 00000051`8031d540 00007ff6`3f8eae95     LiveRecorderApiSample!TTD::ILiveRecorder::StartRecordingCurrentThread+0x63 [X:\repos\Microsoft\WinDbg-Samples\TTD\LiveRecorderApiSample\packages\Microsoft.TimeTravelDebugging.Apis.0.8.0-TTDLiveRecordingBringup.1\include\TTD\TTDLiveRecorder.h @ 184] 
-03 00000051`8031d660 00007ff6`3f902609     LiveRecorderApiSample!wmain+0x6c5 [X:\repos\Microsoft\WinDbg-Samples\TTD\LiveRecorderApiSample\main.cpp @ 147] 
+02 00000051`8031d540 00007ff6`3f8eae95     LiveRecorderApiSample!TTD::ILiveRecorder::StartRecordingCurrentThread+0x63 [X:\repos\Microsoft\WinDbg-Samples\TTD\LiveRecorderApiSample\packages\Microsoft.TimeTravelDebugging.Apis.0.8.0-TTDLiveRecordingBringup.1\include\TTD\TTDLiveRecorder.h @ 184]
+03 00000051`8031d660 00007ff6`3f902609     LiveRecorderApiSample!wmain+0x6c5 [X:\repos\Microsoft\WinDbg-Samples\TTD\LiveRecorderApiSample\main.cpp @ 147]
 ...
 ```

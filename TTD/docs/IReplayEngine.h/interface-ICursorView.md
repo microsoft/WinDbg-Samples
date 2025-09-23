@@ -62,7 +62,7 @@ public:
     virtual bool ExecuteBackward() noexcept = 0;
 
     // Replay engine access
-    template<typename Interface = IReplayEngineView> 
+    template<typename Interface = IReplayEngineView>
     Interface* GetReplayEngine() const noexcept;
 
 protected:
@@ -124,7 +124,7 @@ MemoryRange range = cursor->QueryMemoryRange(addr);
 if (range.Size > 0) {
     // Access memory data
     uint8_t const* data = static_cast<uint8_t const*>(range.BaseAddress);
-    printf("Memory at 0x%llX: %02X %02X %02X...\n", 
+    printf("Memory at 0x%llX: %02X %02X %02X...\n",
            addr, data[0], data[1], data[2]);
 }
 ```
@@ -142,7 +142,7 @@ GuestAddress startAddr = GetTargetAddress();
 
 MemoryBuffer result = cursor->QueryMemoryBuffer(startAddr, bufferView);
 
-printf("Read %zu bytes starting at 0x%llX\n", 
+printf("Read %zu bytes starting at 0x%llX\n",
        result.ValidSize, startAddr);
 ```
 
@@ -192,7 +192,7 @@ ActiveThreadInfo const* threads = cursor->GetThreadList();
 
 for (size_t i = 0; i < threadCount; ++i) {
     auto& thread = threads[i];
-    printf("Thread %u at position %s\n", 
+    printf("Thread %u at position %s\n",
            thread.pThreadInfo->ThreadId,
            PositionToString(thread.Position).c_str());
 }
@@ -211,8 +211,8 @@ ModuleInstance const* modules = cursor->GetModuleList();
 
 for (size_t i = 0; i < moduleCount; ++i) {
     auto& mod = modules[i];
-    printf("Module: %S at 0x%llX\n", 
-           mod.pModule->pName, 
+    printf("Module: %S at 0x%llX\n",
+           mod.pModule->pName,
            mod.pModule->Address);
 }
 ```
@@ -265,7 +265,7 @@ if (cursor->SetPosition(target)) {
     // Query execution state
     GuestAddress pc = cursor->GetProgramCounter();
     RegisterContext regs = cursor->GetCrossPlatformContext();
-    
+
     // Read memory at PC
     MemoryRange code = cursor->QueryMemoryRange(pc);
     if (code.Size >= 16) {
@@ -284,11 +284,11 @@ cursor->SetEventMask(EventMask::MemoryWatchpoint);
 while (cursor->ExecuteForward()) {
     // Check what caused the break
     Position currentPos = cursor->GetPosition();
-    
+
     // Query the memory access that triggered the break
     // (Implementation would need to query event details)
-    
-    printf("Memory access at position %s\n", 
+
+    printf("Memory access at position %s\n",
            PositionToString(currentPos).c_str());
 }
 ```

@@ -79,7 +79,7 @@ struct SystemInfo
 
 ### Log Information
 - `MajorVersion` - TTD log format major version number
-- `MinorVersion` - TTD log format minor version number  
+- `MinorVersion` - TTD log format minor version number
 - `BuildNumber` - TTD log format build number
 - `ProcessId` - System process identifier for the recorded process
 
@@ -119,16 +119,16 @@ struct SystemInfo
 ### System Information Extraction
 ```cpp
 static void ProcessTrace(IReplayEngineView const& replayEngineView) {
-    SystemInfo const& sysInfo = replayEngineView.GetSystemInfo();  
+    SystemInfo const& sysInfo = replayEngineView.GetSystemInfo();
 
     // Log version information
-    printf("TTD Log Version: %u.%u.%u\n", 
-           sysInfo.MajorVersion, 
-           sysInfo.MinorVersion, 
+    printf("TTD Log Version: %u.%u.%u\n",
+           sysInfo.MajorVersion,
+           sysInfo.MinorVersion,
            sysInfo.BuildNumber);
-    
+
     printf("Process ID: %u\n", sysInfo.ProcessId);
-    
+
     // Operating system information
     printf("OS Version: %u.%u.%u (Platform: %u)\n",
            sysInfo.System.MajorVersion,

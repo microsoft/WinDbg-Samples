@@ -28,7 +28,7 @@ struct Position
 - **Default**: `SequenceId::Invalid`
 
 ### Steps
-- **Type**: `StepCount`  
+- **Type**: `StepCount`
 - **Description**: Number of execution steps within the sequence
 - **Default**: `StepCount::Zero`
 

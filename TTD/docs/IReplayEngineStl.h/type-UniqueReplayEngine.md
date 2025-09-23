@@ -27,7 +27,7 @@ if (result == S_OK)
     // Use the engine
     result = engine->OpenTraceFile(traceFile);
     // ... other operations ...
-    
+
     // Create cursor from engine
     TTD::Replay::UniqueCursor cursor;
     result = engine->NewCursor(cursor.GetAddressOf());

@@ -22,9 +22,9 @@ struct M128BIT {
 ```cpp
 void DisplayM128BIT(M128BIT const& value)
 {
-    printf("M128BIT: Low=0x%016llX, High=0x%016llX\n", 
+    printf("M128BIT: Low=0x%016llX, High=0x%016llX\n",
            value.Low, static_cast<uint64_t>(value.High));
-    
+
     // Access as bytes
     uint8_t const* bytes = reinterpret_cast<uint8_t const*>(&value);
     printf("Bytes: ");
@@ -49,10 +49,10 @@ void ProcessAsFloatingPoint(M128BIT const& simdReg)
     // As double precision (2 x 64-bit)
     double const* doubles = reinterpret_cast<double const*>(&simdReg);
     printf("Doubles: %f, %f\n", doubles[0], doubles[1]);
-    
+
     // As single precision (4 x 32-bit)
     float const* floats = reinterpret_cast<float const*>(&simdReg);
-    printf("Floats: %f, %f, %f, %f\n", 
+    printf("Floats: %f, %f, %f, %f\n",
            floats[0], floats[1], floats[2], floats[3]);
 }
 ```
@@ -95,20 +95,20 @@ void ProcessAsIntegers(M128BIT const& simdReg)
 {
     M128BitView view;
     view.raw = simdReg;
-    
+
     printf("As unsigned integers:\n");
     printf("  QWords: 0x%016llX, 0x%016llX\n", view.qwords[0], view.qwords[1]);
-    printf("  DWords: 0x%08X, 0x%08X, 0x%08X, 0x%08X\n", 
+    printf("  DWords: 0x%08X, 0x%08X, 0x%08X, 0x%08X\n",
            view.dwords[0], view.dwords[1], view.dwords[2], view.dwords[3]);
     printf("  Words: ");
     for (int i = 0; i < 8; ++i) {
         printf("0x%04X ", view.words[i]);
     }
     printf("\n");
-    
+
     printf("As signed integers:\n");
     printf("  SQWords: %lld, %lld\n", view.sqwords[0], view.sqwords[1]);
-    printf("  SDWords: %d, %d, %d, %d\n", 
+    printf("  SDWords: %d, %d, %d, %d\n",
            view.sdwords[0], view.sdwords[1], view.sdwords[2], view.sdwords[3]);
 }
 ```
@@ -121,12 +121,12 @@ M128BIT AddM128BIT(M128BIT const& a, M128BIT const& b)
     M128BIT result;
     result.Low = a.Low + b.Low;
     result.High = a.High + b.High;
-    
+
     // Handle overflow from low to high
     if (result.Low < a.Low) {  // Overflow occurred
         result.High++;
     }
-    
+
     return result;
 }
 
@@ -134,14 +134,14 @@ M128BIT SubtractM128BIT(M128BIT const& a, M128BIT const& b)
 {
     M128BIT result;
     result.High = a.High - b.High;
-    
+
     if (a.Low < b.Low) {  // Borrow required
         result.High--;
         result.Low = (UINT64_MAX - b.Low) + a.Low + 1;
     } else {
         result.Low = a.Low - b.Low;
     }
-    
+
     return result;
 }
 
@@ -195,14 +195,14 @@ void SetXMMRegister(void* xmmRegPtr, M128BIT const& value)
 void ProcessXMMRegisters(AMD64_CONTEXT const& context)
 {
     printf("XMM Registers:\n");
-    
+
     M128BIT const* xmmRegs[] = {
         &context.Xmm0, &context.Xmm1, &context.Xmm2, &context.Xmm3,
         &context.Xmm4, &context.Xmm5, &context.Xmm6, &context.Xmm7,
         &context.Xmm8, &context.Xmm9, &context.Xmm10, &context.Xmm11,
         &context.Xmm12, &context.Xmm13, &context.Xmm14, &context.Xmm15
     };
-    
+
     for (int i = 0; i < 16; ++i) {
         printf("XMM%d: ", i);
         DisplayM128BIT(*xmmRegs[i]);
@@ -228,14 +228,14 @@ bool ParseM128BitFromHex(std::string const& hexStr, M128BIT& result)
     if (hexStr.length() != 32) {
         return false;
     }
-    
+
     try {
         std::string highStr = hexStr.substr(0, 16);
         std::string lowStr = hexStr.substr(16, 16);
-        
+
         result.High = static_cast<int64_t>(std::stoull(highStr, nullptr, 16));
         result.Low = std::stoull(lowStr, nullptr, 16);
-        
+
         return true;
     } catch (...) {
         return false;
@@ -282,46 +282,46 @@ struct SIMDOperations
     {
         float const* aFloats = reinterpret_cast<float const*>(&a);
         float const* bFloats = reinterpret_cast<float const*>(&b);
-        
+
         M128BIT result;
         float* resultFloats = reinterpret_cast<float*>(&result);
-        
+
         for (int i = 0; i < 4; ++i) {
             resultFloats[i] = aFloats[i] + bFloats[i];
         }
-        
+
         return result;
     }
-    
+
     // Packed double-precision multiply
     static M128BIT MulPD(M128BIT const& a, M128BIT const& b)
     {
         double const* aDoubles = reinterpret_cast<double const*>(&a);
         double const* bDoubles = reinterpret_cast<double const*>(&b);
-        
+
         M128BIT result;
         double* resultDoubles = reinterpret_cast<double*>(&result);
-        
+
         resultDoubles[0] = aDoubles[0] * bDoubles[0];
         resultDoubles[1] = aDoubles[1] * bDoubles[1];
-        
+
         return result;
     }
-    
+
     // Shuffle (simplified version)
     static M128BIT Shuffle(M128BIT const& a, M128BIT const& b, uint8_t imm)
     {
         uint32_t const* aDwords = reinterpret_cast<uint32_t const*>(&a);
         uint32_t const* bDwords = reinterpret_cast<uint32_t const*>(&b);
-        
+
         M128BIT result;
         uint32_t* resultDwords = reinterpret_cast<uint32_t*>(&result);
-        
+
         resultDwords[0] = aDwords[imm & 0x3];
         resultDwords[1] = aDwords[(imm >> 2) & 0x3];
         resultDwords[2] = bDwords[(imm >> 4) & 0x3];
         resultDwords[3] = bDwords[(imm >> 6) & 0x3];
-        
+
         return result;
     }
 };
@@ -343,13 +343,13 @@ struct M128BitAnalysis
 M128BitAnalysis AnalyzeM128Bit(M128BIT const& value)
 {
     M128BitAnalysis analysis{};
-    
+
     uint8_t const* bytes = reinterpret_cast<uint8_t const*>(&value);
-    
+
     // Check for all zeros/ones
     analysis.isAllZeros = IsZeroM128BIT(value);
     analysis.isAllOnes = (value.Low == UINT64_MAX) && (value.High == -1);
-    
+
     // Count non-zero bytes
     analysis.nonZeroBytes = 0;
     for (int i = 0; i < 16; ++i) {
@@ -357,7 +357,7 @@ M128BitAnalysis AnalyzeM128Bit(M128BIT const& value)
             analysis.nonZeroBytes++;
         }
     }
-    
+
     // Basic pattern detection
     float const* floats = reinterpret_cast<float const*>(&value);
     bool validFloats = true;
@@ -368,13 +368,13 @@ M128BitAnalysis AnalyzeM128Bit(M128BIT const& value)
         }
     }
     analysis.hasFloatingPointPattern = validFloats;
-    
+
     // Simple entropy calculation (simplified)
     std::map<uint8_t, int> byteFreq;
     for (int i = 0; i < 16; ++i) {
         byteFreq[bytes[i]]++;
     }
-    
+
     analysis.entropyScore = 0.0;
     for (auto const& pair : byteFreq) {
         double prob = static_cast<double>(pair.second) / 16.0;
@@ -382,20 +382,20 @@ M128BitAnalysis AnalyzeM128Bit(M128BIT const& value)
             analysis.entropyScore -= prob * log2(prob);
         }
     }
-    
+
     return analysis;
 }
 
 void DisplayM128BitAnalysis(M128BIT const& value)
 {
     auto analysis = AnalyzeM128Bit(value);
-    
+
     printf("M128BIT Analysis:\n");
     printf("  All zeros: %s\n", analysis.isAllZeros ? "Yes" : "No");
     printf("  All ones: %s\n", analysis.isAllOnes ? "Yes" : "No");
     printf("  Non-zero bytes: %zu/16\n", analysis.nonZeroBytes);
     printf("  Entropy: %.2f bits\n", analysis.entropyScore);
-    printf("  Likely floating-point: %s\n", 
+    printf("  Likely floating-point: %s\n",
            analysis.hasFloatingPointPattern ? "Yes" : "No");
 }
 ```
@@ -433,9 +433,9 @@ M128BIT ShiftLeft(M128BIT const& value, int bits)
     if (bits >= 128) {
         return ZeroM128BIT();
     }
-    
+
     M128BIT result = value;
-    
+
     if (bits >= 64) {
         result.High = static_cast<int64_t>(result.Low) << (bits - 64);
         result.Low = 0;
@@ -444,7 +444,7 @@ M128BIT ShiftLeft(M128BIT const& value, int bits)
         result.Low <<= bits;
         result.High = (result.High << bits) | static_cast<int64_t>(carry);
     }
-    
+
     return result;
 }
 
@@ -453,9 +453,9 @@ M128BIT ShiftRight(M128BIT const& value, int bits)
     if (bits >= 128) {
         return ZeroM128BIT();
     }
-    
+
     M128BIT result = value;
-    
+
     if (bits >= 64) {
         result.Low = static_cast<uint64_t>(result.High) >> (bits - 64);
         result.High = 0;
@@ -464,7 +464,7 @@ M128BIT ShiftRight(M128BIT const& value, int bits)
         result.High >>= bits;
         result.Low = (result.Low >> bits) | carry;
     }
-    
+
     return result;
 }
 ```

@@ -58,14 +58,14 @@ struct X86_FXSAVE_FORMAT {
 void DisplayFXSAVEFormat(X86_FXSAVE_FORMAT const& fxsave)
 {
     printf("X86 FXSAVE Format:\n");
-    
+
     // Control and status
     printf("  Control Word: 0x%04X\n", fxsave.ControlWord);
     printf("  Status Word:  0x%04X\n", fxsave.StatusWord);
     printf("  Tag Word:     0x%02X\n", fxsave.TagWord);
     printf("  MXCSR:        0x%08X\n", fxsave.MxCsr);
     printf("  MXCSR Mask:   0x%08X\n", fxsave.MxCsr_Mask);
-    
+
     // Error information
     if (fxsave.ErrorOpcode != 0) {
         printf("  Last Error:\n");
@@ -80,14 +80,14 @@ void DisplayFXSAVEFormat(X86_FXSAVE_FORMAT const& fxsave)
 void InitializeFXSAVE(X86_FXSAVE_FORMAT& fxsave)
 {
     memset(&fxsave, 0, sizeof(X86_FXSAVE_FORMAT));
-    
+
     // Set default control word (mask all exceptions, double precision, round to nearest)
     fxsave.ControlWord = 0x037F;
-    
+
     // Set default MXCSR (mask all exceptions, round to nearest, flush to zero off)
     fxsave.MxCsr = 0x1F80;
     fxsave.MxCsr_Mask = 0xFFBF;  // All bits writable except reserved
-    
+
     // Initialize tag word (all registers empty)
     fxsave.TagWord = 0xFF;
 }
@@ -120,7 +120,7 @@ void AnalyzeFPUControlWord(USHORT controlWord)
 {
     FPUControlWord cw;
     cw.raw = controlWord;
-    
+
     printf("FPU Control Word Analysis (0x%04X):\n", controlWord);
     printf("  Exception Masks:\n");
     printf("    Invalid Operation: %s\n", cw.InvalidOperation ? "Masked" : "Unmasked");
@@ -129,7 +129,7 @@ void AnalyzeFPUControlWord(USHORT controlWord)
     printf("    Overflow:          %s\n", cw.Overflow ? "Masked" : "Unmasked");
     printf("    Underflow:         %s\n", cw.Underflow ? "Masked" : "Unmasked");
     printf("    Precision:         %s\n", cw.Precision ? "Masked" : "Unmasked");
-    
+
     printf("  Precision Control: ");
     switch (cw.PrecisionControl) {
         case 0: printf("Single (24-bit)\n"); break;
@@ -137,7 +137,7 @@ void AnalyzeFPUControlWord(USHORT controlWord)
         case 2: printf("Double (53-bit)\n"); break;
         case 3: printf("Extended (64-bit)\n"); break;
     }
-    
+
     printf("  Rounding Control: ");
     switch (cw.RoundingControl) {
         case 0: printf("Round to nearest\n"); break;
@@ -175,7 +175,7 @@ void AnalyzeFPUStatusWord(USHORT statusWord)
 {
     FPUStatusWord sw;
     sw.raw = statusWord;
-    
+
     printf("FPU Status Word Analysis (0x%04X):\n", statusWord);
     printf("  Exception Flags:\n");
     printf("    Invalid Operation: %s\n", sw.InvalidOperation ? "Set" : "Clear");
@@ -186,9 +186,9 @@ void AnalyzeFPUStatusWord(USHORT statusWord)
     printf("    Precision:         %s\n", sw.Precision ? "Set" : "Clear");
     printf("    Stack Fault:       %s\n", sw.StackFault ? "Set" : "Clear");
     printf("    Error Summary:     %s\n", sw.ErrorSummary ? "Set" : "Clear");
-    
+
     printf("  Stack Pointer (TOP): %d (ST%d is top)\n", sw.StackPointer, sw.StackPointer);
-    printf("  Condition Codes: C3=%d C2=%d C1=%d C0=%d\n", 
+    printf("  Condition Codes: C3=%d C2=%d C1=%d C0=%d\n",
            sw.ConditionC3, sw.ConditionC2, sw.ConditionC1, sw.ConditionC0);
     printf("  Busy: %s\n", sw.Busy ? "Yes" : "No");
 }
@@ -226,7 +226,7 @@ void AnalyzeMXCSR(ULONG mxcsr)
 {
     MXCSRRegister mx;
     mx.raw = mxcsr;
-    
+
     printf("MXCSR Analysis (0x%08X):\n", mxcsr);
     printf("  Exception Flags:\n");
     printf("    Invalid Operation: %s\n", mx.InvalidOperation ? "Set" : "Clear");
@@ -235,7 +235,7 @@ void AnalyzeMXCSR(ULONG mxcsr)
     printf("    Overflow:          %s\n", mx.Overflow ? "Set" : "Clear");
     printf("    Underflow:         %s\n", mx.Underflow ? "Set" : "Clear");
     printf("    Precision:         %s\n", mx.Precision ? "Set" : "Clear");
-    
+
     printf("  Exception Masks:\n");
     printf("    Invalid:    %s\n", mx.InvalidMask ? "Masked" : "Unmasked");
     printf("    Denormal:   %s\n", mx.DenormalMask ? "Masked" : "Unmasked");
@@ -243,11 +243,11 @@ void AnalyzeMXCSR(ULONG mxcsr)
     printf("    Overflow:   %s\n", mx.OverflowMask ? "Masked" : "Unmasked");
     printf("    Underflow:  %s\n", mx.UnderflowMask ? "Masked" : "Unmasked");
     printf("    Precision:  %s\n", mx.PrecisionMask ? "Masked" : "Unmasked");
-    
+
     printf("  Control Flags:\n");
     printf("    Denormals Are Zero: %s\n", mx.DenormalsAreZero ? "Enabled" : "Disabled");
     printf("    Flush To Zero:      %s\n", mx.FlushToZero ? "Enabled" : "Disabled");
-    
+
     printf("  Rounding Control: ");
     switch (mx.RoundingControl) {
         case 0: printf("Round to nearest\n"); break;
@@ -264,17 +264,17 @@ void AnalyzeMXCSR(ULONG mxcsr)
 void ProcessFPURegisters(X86_FXSAVE_FORMAT const& fxsave)
 {
     printf("x87 FPU Registers:\n");
-    
+
     FPUStatusWord sw;
     sw.raw = fxsave.StatusWord;
     int top = sw.StackPointer;
-    
+
     for (int i = 0; i < 8; ++i) {
         int physicalReg = i;
         int logicalReg = (i + top) % 8;
-        
+
         printf("  ST(%d) [R%d]: ", logicalReg, physicalReg);
-        
+
         // Check tag for register state
         int tagBits = (fxsave.TagWord >> (physicalReg * 2)) & 3;
         switch (tagBits) {
@@ -283,19 +283,19 @@ void ProcessFPURegisters(X86_FXSAVE_FORMAT const& fxsave)
             case 2: printf("Special - "); break;
             case 3: printf("Empty\n"); continue;
         }
-        
+
         // Display as 80-bit extended precision
         M128BIT const& reg = fxsave.FloatingPointRegisters[physicalReg];
-        
+
         // Extract 80-bit format: 64-bit mantissa + 16-bit sign/exponent
         uint64_t mantissa = reg.Low;
         uint16_t signExp = static_cast<uint16_t>(reg.High);
-        
+
         bool sign = (signExp & 0x8000) != 0;
         uint16_t exponent = signExp & 0x7FFF;
-        
+
         printf("%s", sign ? "-" : "+");
-        
+
         if (exponent == 0) {
             if (mantissa == 0) {
                 printf("0.0");
@@ -321,7 +321,7 @@ void ProcessFPURegisters(X86_FXSAVE_FORMAT const& fxsave)
 void ProcessXMMRegisters(X86_FXSAVE_FORMAT const& fxsave)
 {
     printf("SSE XMM Registers:\n");
-    
+
     for (int i = 0; i < 8; ++i) {
         printf("  XMM%d: ", i);
         DisplayM128BIT(fxsave.XmmRegisters[i]);
@@ -334,14 +334,14 @@ double ConvertFrom80Bit(uint16_t signExp, uint64_t mantissa)
     // Simplified conversion - real implementation would handle all edge cases
     bool sign = (signExp & 0x8000) != 0;
     int exponent = (signExp & 0x7FFF) - 16383;  // Remove bias
-    
+
     if (exponent < -1022) return sign ? -0.0 : 0.0;  // Underflow
     if (exponent > 1023) return sign ? -INFINITY : INFINITY;  // Overflow
-    
+
     // Extract mantissa (assume normalized)
     double mantissaDouble = static_cast<double>(mantissa >> 11) / (1ULL << 53);
     double result = ldexp(mantissaDouble, exponent);
-    
+
     return sign ? -result : result;
 }
 ```
@@ -364,26 +364,26 @@ FXSAVEValidation ValidateFXSAVE(X86_FXSAVE_FORMAT const& fxsave)
 {
     FXSAVEValidation result{};
     result.isValid = true;
-    
+
     // Check for reserved field violations
     if (fxsave.Reserved1 != 0) {
         result.warnings.push_back("Reserved1 field is non-zero");
     }
-    
+
     if (fxsave.Reserved2 != 0) {
         result.warnings.push_back("Reserved2 field is non-zero");
     }
-    
+
     if (fxsave.Reserved3 != 0) {
         result.warnings.push_back("Reserved3 field is non-zero");
     }
-    
+
     // Check MXCSR validity
     if ((fxsave.MxCsr & ~fxsave.MxCsr_Mask) != 0) {
         result.errors.push_back("MXCSR has bits set that are masked as unwritable");
         result.isValid = false;
     }
-    
+
     // Check for exception flags
     FPUStatusWord sw;
     sw.raw = fxsave.StatusWord;
@@ -391,7 +391,7 @@ FXSAVEValidation ValidateFXSAVE(X86_FXSAVE_FORMAT const& fxsave)
                           sw.InvalidOperation || sw.DenormalOperand ||
                           sw.ZeroDivide || sw.Overflow ||
                           sw.Underflow || sw.Precision;
-    
+
     MXCSRRegister mx;
     mx.raw = fxsave.MxCsr;
     if (!result.hasExceptions) {
@@ -399,24 +399,24 @@ FXSAVEValidation ValidateFXSAVE(X86_FXSAVE_FORMAT const& fxsave)
                               mx.ZeroDivide || mx.Overflow ||
                               mx.Underflow || mx.Precision;
     }
-    
+
     // Check FPU stack consistency
     int top = sw.StackPointer;
     int emptyCount = 0;
     int validCount = 0;
-    
+
     for (int i = 0; i < 8; ++i) {
         int tagBits = (fxsave.TagWord >> (i * 2)) & 3;
         if (tagBits == 3) {
             emptyCount++;
         } else {
             validCount++;
-            
+
             // Check for special values in valid registers
             M128BIT const& reg = fxsave.FloatingPointRegisters[i];
             uint16_t signExp = static_cast<uint16_t>(reg.High);
             uint64_t mantissa = reg.Low;
-            
+
             if ((signExp & 0x7FFF) == 0x7FFF) {
                 if (mantissa == 0x8000000000000000ULL) {
                     result.hasInfinities = true;
@@ -426,12 +426,12 @@ FXSAVEValidation ValidateFXSAVE(X86_FXSAVE_FORMAT const& fxsave)
             }
         }
     }
-    
+
     result.stackConsistent = (emptyCount + validCount == 8);
     if (!result.stackConsistent) {
         result.warnings.push_back("FPU stack tag consistency issue");
     }
-    
+
     // Check XMM registers for special values
     for (int i = 0; i < 8; ++i) {
         float const* floats = reinterpret_cast<float const*>(&fxsave.XmmRegisters[i]);
@@ -443,28 +443,28 @@ FXSAVEValidation ValidateFXSAVE(X86_FXSAVE_FORMAT const& fxsave)
             }
         }
     }
-    
+
     return result;
 }
 
 void DisplayFXSAVEValidation(X86_FXSAVE_FORMAT const& fxsave)
 {
     auto validation = ValidateFXSAVE(fxsave);
-    
+
     printf("FXSAVE Validation:\n");
     printf("  Overall Valid: %s\n", validation.isValid ? "Yes" : "No");
     printf("  Has Exceptions: %s\n", validation.hasExceptions ? "Yes" : "No");
     printf("  Has NaNs: %s\n", validation.hasNaNs ? "Yes" : "No");
     printf("  Has Infinities: %s\n", validation.hasInfinities ? "Yes" : "No");
     printf("  Stack Consistent: %s\n", validation.stackConsistent ? "Yes" : "No");
-    
+
     if (!validation.warnings.empty()) {
         printf("  Warnings:\n");
         for (auto const& warning : validation.warnings) {
             printf("    - %s\n", warning.c_str());
         }
     }
-    
+
     if (!validation.errors.empty()) {
         printf("  Errors:\n");
         for (auto const& error : validation.errors) {
@@ -483,7 +483,7 @@ void SaveFXSAVEState(X86_FXSAVE_FORMAT const& source, void* buffer)
     if (reinterpret_cast<uintptr_t>(buffer) % 16 != 0) {
         throw std::invalid_argument("Buffer must be 16-byte aligned for FXSAVE format");
     }
-    
+
     memcpy(buffer, &source, sizeof(X86_FXSAVE_FORMAT));
 }
 
@@ -492,54 +492,54 @@ bool RestoreFXSAVEState(void const* buffer, X86_FXSAVE_FORMAT& target)
     if (reinterpret_cast<uintptr_t>(buffer) % 16 != 0) {
         return false;
     }
-    
+
     memcpy(&target, buffer, sizeof(X86_FXSAVE_FORMAT));
-    
+
     // Validate restored state
     auto validation = ValidateFXSAVE(target);
     return validation.isValid;
 }
 
 // Compare states for debugging
-bool CompareFXSAVEStates(X86_FXSAVE_FORMAT const& a, X86_FXSAVE_FORMAT const& b, 
+bool CompareFXSAVEStates(X86_FXSAVE_FORMAT const& a, X86_FXSAVE_FORMAT const& b,
                         bool ignoreReservedFields = true)
 {
     // Component-wise comparison for better debugging
     bool identical = true;
-    
+
     if (a.ControlWord != b.ControlWord) {
         printf("Control Word differs: 0x%04X vs 0x%04X\n", a.ControlWord, b.ControlWord);
         identical = false;
     }
-    
+
     if (a.StatusWord != b.StatusWord) {
         printf("Status Word differs: 0x%04X vs 0x%04X\n", a.StatusWord, b.StatusWord);
         identical = false;
     }
-    
+
     if (a.TagWord != b.TagWord) {
         printf("Tag Word differs: 0x%02X vs 0x%02X\n", a.TagWord, b.TagWord);
         identical = false;
     }
-    
+
     if (a.MxCsr != b.MxCsr) {
         printf("MXCSR differs: 0x%08X vs 0x%08X\n", a.MxCsr, b.MxCsr);
         identical = false;
     }
-    
+
     // Compare register arrays
     for (int i = 0; i < 8; ++i) {
         if (!CompareM128BIT(a.FloatingPointRegisters[i], b.FloatingPointRegisters[i])) {
             printf("FPU Register %d differs\n", i);
             identical = false;
         }
-        
+
         if (!CompareM128BIT(a.XmmRegisters[i], b.XmmRegisters[i])) {
             printf("XMM Register %d differs\n", i);
             identical = false;
         }
     }
-    
+
     return identical;
 }
 ```

@@ -17,8 +17,8 @@ void TTD::ILiveRecorder::AddCustomEvent(
 
 | Name                  | Type                                                                    | Semantic    | Description
 |-                      |-                                                                        |-            |-
-| `type`                | [`TTD::CustomEventType`](../TTDCommonTypes.h/enum-CustomEventType.md)   | In          | 
-| `flags`               | [`TTD::CustomEventFlags`](../TTDCommonTypes.h/type-CustomEventFlags.md) | In          | 
+| `type`                | [`TTD::CustomEventType`](../TTDCommonTypes.h/enum-CustomEventType.md)   | In          |
+| `flags`               | [`TTD::CustomEventFlags`](../TTDCommonTypes.h/type-CustomEventFlags.md) | In          |
 | `pUserData`           | `void const*`                                                           | In optional | Pointer to a buffer containing `userDataSizeInBytes` bytes of data to include as "custom event" user data for the client.
 | `userDataSizeInBytes` | `size_t`                                                                | In          | Size in bytes of the `pUserData` buffer. Use `0` if the buffer is not provided.
 

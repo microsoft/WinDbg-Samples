@@ -64,7 +64,7 @@ The deleter is designed to work seamlessly with STL smart pointers:
 auto [engine, result] = TTD::Replay::MakeReplayEngine();
 // engine is of type UniqueReplayEngine = std::unique_ptr<IReplayEngine, Deleter<IReplayEngine>>
 
-auto [traceList, result2] = TTD::Replay::MakeTraceList();  
+auto [traceList, result2] = TTD::Replay::MakeTraceList();
 // traceList is of type UniqueTraceList = std::unique_ptr<ITraceList, Deleter<ITraceList>>
 ```
 
@@ -77,16 +77,16 @@ void AnalyzeTrace(wchar_t const* filename)
     // Create engine - automatic cleanup on scope exit
     auto [engine, result] = TTD::Replay::MakeReplayEngine();
     if (result != S_OK) return;
-    
+
     if (!engine->Initialize(filename)) return;
-    
+
     // Create cursor - automatic cleanup on scope exit
     TTD::Replay::UniqueCursor cursor(engine->NewCursor());
     if (!cursor) return;
-    
+
     // Use engine and cursor...
     cursor->SetPosition(somePosition);
-    
+
     // Automatic cleanup occurs here when function exits
     // cursor->Destroy() called automatically
     // engine->Destroy() called automatically
@@ -100,10 +100,10 @@ void ProcessTrace()
     auto [engine, result] = TTD::Replay::MakeReplayEngine();
     if (result == S_OK && engine->Initialize(L"trace.ttd")) {
         TTD::Replay::UniqueCursor cursor(engine->NewCursor());
-        
+
         // Even if this throws an exception, cleanup is guaranteed
         ThrowingOperation();
-        
+
         // Normal cleanup also guaranteed
     }
     // Resources automatically cleaned up regardless of how function exits
@@ -118,11 +118,11 @@ TTD::Replay::UniqueReplayEngine CreateConfiguredEngine(wchar_t const* filename)
     if (result == S_OK && engine->Initialize(filename)) {
         // Configure engine...
         engine->BuildIndex(nullptr, nullptr);
-        
+
         // Return ownership to caller
         return std::move(engine);
     }
-    
+
     return nullptr; // Automatic cleanup of failed engine
 }
 
@@ -165,6 +165,6 @@ The `Deleter` template itself is thread-safe (it's stateless), but:
 ## See Also
 
 - [`TTD::Replay::Unique`](../IReplayEngineStl.h/type-Unique.md) - Base template for TTD smart pointers
-- [`TTD::Replay::UniqueReplayEngine`](../IReplayEngineStl.h/type-UniqueReplayEngine.md) - Smart pointer for replay engines  
+- [`TTD::Replay::UniqueReplayEngine`](../IReplayEngineStl.h/type-UniqueReplayEngine.md) - Smart pointer for replay engines
 - [`TTD::Replay::UniqueCursor`](../IReplayEngineStl.h/type-UniqueCursor.md) - Smart pointer for cursors
 - [`TTD::Replay::MakeReplayEngine`](../IReplayEngineStl.h/function-MakeReplayEngine.md) - Factory function returning smart pointer

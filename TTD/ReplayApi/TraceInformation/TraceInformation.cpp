@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
 // TraceInformation - A simple tool to print information about a Time Travel Debugging (TTD) trace file.
-// 
+//
 // This tool uses the TTD Replay Engine to read a trace file and print information about the trace, such as the system
 // information, thread information, module loading activity, and exceptions that occurred during the trace.
 
@@ -82,17 +82,17 @@ static void PrintException(ExceptionEvent const& exception)
 // This function presents information about the loaded trace file, to give a sense of
 // how to use the replay API and the types of information contained in a trace file.
 static void ProcessTrace(IReplayEngineView const& replayEngineView) {
-    SystemInfo const& systemInfo = replayEngineView.GetSystemInfo();  
+    SystemInfo const& systemInfo = replayEngineView.GetSystemInfo();
 
-    std::cout << std::format("Version             : 1.{:02}.{:02}\n", 
+    std::cout << std::format("Version             : 1.{:02}.{:02}\n",
         systemInfo.MajorVersion, systemInfo.MinorVersion);
-    
+
     std::wcout << std::format(L"Index               : {}\n", GetIndexStatusName(replayEngineView.GetIndexStatus()));
     std::cout << std::format("PID                 : 0x{:04X}\n", systemInfo.ProcessId);
     std::cout << std::format("PEB                 : 0x{:X}\n", replayEngineView.GetPebAddress());
-    
+
     std::cout << std::format("Lifetime            : {}\n", replayEngineView.GetLifetime());
-    
+
     std::cout << std::format("Threads             : {:>11}\n", replayEngineView.GetThreadCount());
     std::cout << std::format("Modules             : {:>11}\n", replayEngineView.GetModuleCount());
     std::cout << std::format("ModuleInstances     : {:>11}\n", replayEngineView.GetModuleInstanceCount());
@@ -102,12 +102,12 @@ static void ProcessTrace(IReplayEngineView const& replayEngineView) {
     // Print the system information
     // (see https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info for more details)
     std::cout << std::format("System              :\n");
-    
+
     std::cout << std::format("  OS                : {}.{}.{}\n",
-        systemInfo.System.MajorVersion, 
+        systemInfo.System.MajorVersion,
         systemInfo.System.MinorVersion,
         systemInfo.System.BuildNumber);
-    
+
     std::cout << std::format("  Product Type      : {}\n", systemInfo.System.ProductType);
     std::cout << std::format("  Suite Mask        : {}\n", systemInfo.System.SuiteMask);
     std::cout << std::format("  Processors        : {}\n", systemInfo.System.NumberOfProcessors);
@@ -116,7 +116,7 @@ static void ProcessTrace(IReplayEngineView const& replayEngineView) {
     std::cout << std::format("  Processor Revision: {}\n", systemInfo.System.ProcessorRevision);
 
     // If the live recorder was used, print the recording information (see TTDLiveRecorder.h for more details)
-    if (replayEngineView.GetRecordClientCount() > 0) {  
+    if (replayEngineView.GetRecordClientCount() > 0) {
         std::cout << std::format("Record clients      : {:>11}\n", replayEngineView.GetRecordClientCount());
         std::cout << std::format("Custom events       : {:>11}\n", replayEngineView.GetCustomEventCount());
         std::cout << std::format("Activities          : {:>11}\n", replayEngineView.GetActivityCount());

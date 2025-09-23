@@ -7,7 +7,7 @@ Utility function that safely attempts to print error messages through an `ErrorR
 ```cpp
 inline void TryVPrintError(
     _Inout_opt_            ErrorReporting * const pErrorReporting,
-    _Printf_format_string_ char const     * const pFmt, 
+    _Printf_format_string_ char const     * const pFmt,
     _In_                   va_list               argList);
 ```
 
@@ -31,10 +31,10 @@ void MyCustomErrorFunction(TTD::ErrorReporting* reporter, char const* fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    
+
     // Use TryVPrintError to safely forward the va_list
     TTD::TryVPrintError(reporter, fmt, args);
-    
+
     va_end(args);
 }
 ```

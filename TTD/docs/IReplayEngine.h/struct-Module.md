@@ -31,7 +31,7 @@ struct Module
 - **Description**: Module name (e.g., "kernel32.dll", "myapp.exe")
 - **Note**: For informational purposes only - not used in comparisons
 
-### NameLength  
+### NameLength
 - **Type**: `size_t`
 - **Description**: Length of the name string in characters
 
@@ -40,7 +40,7 @@ struct Module
 - **Description**: Base address where the module is loaded in the traced process
 
 ### Size
-- **Type**: `uint64_t` 
+- **Type**: `uint64_t`
 - **Description**: Size of the module in bytes
 
 ### Checksum
@@ -73,9 +73,9 @@ Module const* modules = engine->GetModuleList();
 
 for (size_t i = 0; i < moduleCount; ++i) {
     auto& module = modules[i];
-    
-    wprintf(L"Module: %.*s\n", 
-            static_cast<int>(module.NameLength), 
+
+    wprintf(L"Module: %.*s\n",
+            static_cast<int>(module.NameLength),
             module.pName);
     printf("  Address: 0x%llX\n", module.Address);
     printf("  Size: %llu bytes\n", module.Size);
@@ -110,7 +110,7 @@ if (kernel32) {
 // Check if an address belongs to a module
 bool IsAddressInModule(GuestAddress address, Module const& module)
 {
-    return address >= module.Address && 
+    return address >= module.Address &&
            address < module.Address + module.Size;
 }
 
