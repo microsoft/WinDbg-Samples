@@ -248,27 +248,36 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="TraceInformation.cpp" />
+    <!-- Copy platform-specific DLLs -->
+    <CopyFileToFolders Include="..\GetTtd\TTDDownload\x86\TTDReplay.dll">
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Platform)'=='Win32'">$(OutDir)\</DestinationFolders>
+      <ExcludedFromBuild Condition="'$(Platform)'!='Win32'">true</ExcludedFromBuild>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\GetTtd\TTDDownload\x86\TTDReplayCPU.dll">
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Platform)'=='Win32'">$(OutDir)\</DestinationFolders>
+      <ExcludedFromBuild Condition="'$(Platform)'!='Win32'">true</ExcludedFromBuild>
+    </CopyFileToFolders>
     <CopyFileToFolders Include="..\GetTtd\TTDDownload\x64\TTDReplay.dll">
       <FileType>Document</FileType>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">$(OutDir)\</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">$(OutDir)\</DestinationFolders>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <DestinationFolders Condition="'$(Platform)'=='x64'">$(OutDir)\</DestinationFolders>
+      <ExcludedFromBuild Condition="'$(Platform)'!='x64'">true</ExcludedFromBuild>
     </CopyFileToFolders>
     <CopyFileToFolders Include="..\GetTtd\TTDDownload\x64\TTDReplayCPU.dll">
       <FileType>Document</FileType>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(OutDir)\</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">$(OutDir)\</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)\</DestinationFolders>
-      <DestinationFolders Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">$(OutDir)\</DestinationFolders>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <DestinationFolders Condition="'$(Platform)'=='x64'">$(OutDir)\</DestinationFolders>
+      <ExcludedFromBuild Condition="'$(Platform)'!='x64'">true</ExcludedFromBuild>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\GetTtd\TTDDownload\ARM64\TTDReplay.dll">
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Platform)'=='ARM64'">$(OutDir)\</DestinationFolders>
+      <ExcludedFromBuild Condition="'$(Platform)'!='ARM64'">true</ExcludedFromBuild>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\GetTtd\TTDDownload\ARM64\TTDReplayCPU.dll">
+      <FileType>Document</FileType>
+      <DestinationFolders Condition="'$(Platform)'=='ARM64'">$(OutDir)\</DestinationFolders>
+      <ExcludedFromBuild Condition="'$(Platform)'!='ARM64'">true</ExcludedFromBuild>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>

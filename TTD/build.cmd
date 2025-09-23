@@ -1,6 +1,11 @@
 :: Script to build all TTD samples
+
 @echo off
 setlocal enabledelayedexpansion
+
+:: Capture remaining arguments as msbuild arguments
+shift
+set _msbuild_args=%*
 
 :: Make sure necessary tools are available
 
@@ -51,16 +56,25 @@ pushd %1
 nuget restore
 for %%F in (*.sln) do (
 
-  msbuild %%F %_targets% -p:Configuration=Debug;Platform=x64
+  :: X86
+  msbuild %%F -p:Configuration=Debug;Platform=x86 %_msbuild_args%
   if errorlevel 1 set _error=1&goto :eof
 
-  msbuild %%F %_targets% -p:Configuration=Release;Platform=x64
+  msbuild %%F -p:Configuration=Release;Platform=x86 %_msbuild_args%
   if errorlevel 1 set _error=1&goto :eof
-  
-  msbuild %%F %_targets% -p:Configuration=Debug;Platform=ARM64
+
+  :: X64
+  msbuild %%F -p:Configuration=Debug;Platform=x64 %_msbuild_args%
   if errorlevel 1 set _error=1&goto :eof
-  
-  msbuild %%F %_targets% -p:Configuration=Release;Platform=ARM64
+
+  msbuild %%F -p:Configuration=Release;Platform=x64 %_msbuild_args%
+  if errorlevel 1 set _error=1&goto :eof
+
+  :: ARM64
+  msbuild %%F -p:Configuration=Debug;Platform=ARM64 %_msbuild_args%
+  if errorlevel 1 set _error=1&goto :eof
+
+  msbuild %%F -p:Configuration=Release;Platform=ARM64 %_msbuild_args%
   if errorlevel 1 set _error=1&goto :eof
 )
 popd

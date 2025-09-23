@@ -59,7 +59,7 @@ static thread_local SegmentGatheredData s_segmentGatheredData{};
 // so it is very high frequency (millions to billions of calls, depending on the trace).
 // In general TTD analysis and data mining algorithms will use one or more
 // high-frequency callbacks just like this one.
-bool MemoryWatchpointCallback(
+bool __fastcall MemoryWatchpointCallback(
     uintptr_t                                  /*context*/,
     ICursorView::MemoryWatchpointResult const& watchpointResult,
     IThreadView                         const* pThreadView
@@ -100,7 +100,7 @@ static std::vector<SegmentGatheredData> s_completedSegmentList;
 // The thread continuity callback is invoked at the end of each segment, on the same thread that replayed the segment.
 // Its purpose is to get the data extracted by the high-frequency callbacks during replay of the segment,
 // compress, optimize or summarize it as appropriate, and add it to the global list.
-void ThreadContinuityCallback(uintptr_t /*context*/) noexcept
+void __fastcall ThreadContinuityCallback(uintptr_t /*context*/) noexcept
 {
     // The segment ended, so destructively remove and reset the TLS data.
     // This is generally good practice because it avoids leaving potentially large
@@ -169,7 +169,7 @@ static std::vector<GuestAddressRange> s_gatheredAddressRanges;
 // 2. To provide a convenient bottleneck point to throttle the replay.
 //    Without a bottleneck like this, memory use can increase unbounded.
 // 3. To report progress to the user.
-void ProgressCallback(uintptr_t context, Position const& position) noexcept
+void __fastcall ProgressCallback(uintptr_t context, Position const& position) noexcept
 {
     PositionRange const& positionRange = *reinterpret_cast<PositionRange const*>(context);
     std::cout << std::format("Progress at {:>6.02f}% position: {}\n", TTD::GetProgressPercent(position, positionRange), position);
@@ -301,7 +301,7 @@ void ProgressCallback(uintptr_t context, Position const& position) noexcept
 static std::future<void> s_previousProgress;
 
 // Simple, quick progress callback that schedules the merging work to be done asynchronously.
-void AsyncProgressCallback(uintptr_t context, Position const& position) noexcept
+void __stdcall AsyncProgressCallback(uintptr_t context, Position const& position) noexcept
 {
     // We wait for the previous async merge (if any) to complete before spawning a new one.
     if (s_previousProgress.valid())
@@ -359,8 +359,14 @@ void AnalyzeMemoryUsage(IReplayEngineView& replayEngine)
     pOwnedCursor->SetEventMask(EventMask::MemoryWatchpoint);
 
     // And replay the entire trace.
+    // Note: ReplayResult is a member of ICursorView so you have to refer to it in that way,
+    //       or use auto.
     pOwnedCursor->SetPosition(Position::Min);
-    pOwnedCursor->ReplayForward();
+    ICursorView::ReplayResult const result = pOwnedCursor->ReplayForward();
+    if (result.StopReason == EventType::Error)
+    {
+        std::cout << "Replay Error!\n";
+    }
 
     // Wait for the last async merge (if any) to complete before spawning a new one.
     if (s_previousProgress.valid())
