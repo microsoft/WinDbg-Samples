@@ -114,6 +114,7 @@
     <OutDir>$(SolutionDir)out\$(PlatformTarget)-$(Configuration)\</OutDir>
     <IntDir>$(ShortProjectName)\$(PlatformTarget)\$(Configuration)\</IntDir>
     <IncludePath>..\inc;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>$(SolutionDir)out\$(PlatformTarget)-$(Configuration)\</OutDir>
@@ -127,9 +128,11 @@
     <OutDir>$(SolutionDir)out\$(PlatformTarget)-$(Configuration)\</OutDir>
     <IntDir>$(ShortProjectName)\$(PlatformTarget)\$(Configuration)\</IntDir>
     <IncludePath>..\inc;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <IncludePath>..\inc;$(VC_IncludePath);$(WindowsSDK_IncludePath);</IncludePath>
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Label="UserMacros" />
   <Import Project="packages\Microsoft.TimeTravelDebugging.Apis.$(TTDApiVersion)\build\native\Microsoft.TimeTravelDebugging.Apis.props" Condition="Exists('packages\Microsoft.TimeTravelDebugging.Apis.$(TTDApiVersion)\build\native\Microsoft.TimeTravelDebugging.Apis.props')" />
@@ -199,6 +202,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>TTDReplay.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -219,6 +223,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>TTDReplay.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
