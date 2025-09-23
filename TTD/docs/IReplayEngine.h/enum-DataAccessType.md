@@ -22,10 +22,12 @@ constexpr bool IsDataAccessBeforeInstruction(DataAccessType type);
 ```
 
 Notes:
-- Execute is triggered just before the instruction starts.
-- CodeFetch is used to aggregate code usage; the size and exact hits are implementation-dependent.
-- Overwrite triggers before a write/mismatch and provides the value being overwritten.
-- DataMismatch/NewData/RedundantData classify data observations relative to previously seen data.
+- Execute - Triggered just before the instruction starts.
+- CodeFetch - Used to aggregate code usage; the size and exact hits are implementation-dependent.
+- Overwrite - Triggered before a write/mismatch, allowing the client to inspect the value before it is overwritten.
+- DataMismatch - The memory cache predicted the wrong value.
+- NewData - First time seeing data at this address.
+- RedundantData - Data read from trace file matches memory cache.
 
 ## Related mask type
 ```cpp

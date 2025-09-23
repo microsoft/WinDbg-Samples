@@ -422,13 +422,13 @@ static bool DbgUsage(ICursorView&, std::string_view)
 
     std::cout << "Valid accessmask characters:\n";
     std::cout << "  R - Read access\n";
-    std::cout << "  O - Overwrite access - triggers before a write / mismatch and provides the value being overwritten\n";
+    std::cout << "  O - Overwrite access - triggers before a write / mismatch, allowing the client to inspect the value before it is overwritten\n";
     std::cout << "  W - Write access\n";
     std::cout << "  E - Execute access\n";
-    std::cout << "  C - CodeFetch access - aggregate code usage; the size and exact hits are implementation - dependent.\n";
-    std::cout << "  M - Data mismatch - the memory cache predicted the wrong value.\n";
-    std::cout << "  N - New data - First time seeing data at this address.\n";
-    std::cout << "  D - Redundant data - Data read from trace file matches memory cache.\n";
+    std::cout << "  C - CodeFetch access - aggregate code usage; the size and exact hits are implementation - dependent\n";
+    std::cout << "  M - Data mismatch - the memory cache predicted the wrong value\n";
+    std::cout << "  N - New data - First time seeing data at this address\n";
+    std::cout << "  D - Redundant data - Data read from trace file matches memory cache\n";
 
     return true;
 }
