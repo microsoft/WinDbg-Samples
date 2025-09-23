@@ -36,7 +36,7 @@ if (result == S_OK)
     // Use the trace list
     result = traceList->AddTrace(L"trace1.ttd");
     result = traceList->AddTrace(L"trace2.ttd");
-    
+
     // Manual cleanup required
     traceList->Release();
 }

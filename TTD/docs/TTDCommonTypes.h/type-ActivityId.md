@@ -8,7 +8,7 @@ It is implemented as a C++ `enum class` to make it a strong type.
 
 |                         | Value        | Notes
 |-                        |-             |-
-| `TTD::ActivityId::Zero` | 0            | Used as N/A or error marker 
+| `TTD::ActivityId::Zero` | 0            | Used as N/A or error marker
 | `TTD::ActivityId::Min`  | 1            |
 | `TTD::ActivityId::Max`  | `UINT32_MAX` |
 

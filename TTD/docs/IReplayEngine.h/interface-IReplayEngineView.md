@@ -21,7 +21,7 @@ public:
     virtual size_t            GetThreadCount()               const noexcept = 0;
     virtual ThreadInfo const* GetThreadList()                const noexcept = 0;
 
-    // Module information  
+    // Module information
     virtual size_t        GetModuleCount() const noexcept = 0;
     virtual Module const* GetModuleList()  const noexcept = 0;
     virtual size_t                GetModuleInstanceCount() const noexcept = 0;
@@ -68,7 +68,7 @@ public:
         void const*                pCallerContext,
         IndexBuildFlags            flags = IndexBuildFlags::None
     ) noexcept = 0;
-    
+
     virtual IndexStatus    GetIndexStatus()    const noexcept = 0;
     virtual IndexFileStats GetIndexFileStats() const noexcept = 0;
 
@@ -115,8 +115,8 @@ size_t threadCount = engine->GetThreadCount();
 ThreadInfo const* threads = engine->GetThreadList();
 
 for (size_t i = 0; i < threadCount; ++i) {
-    printf("Thread %u: OS ID %u\n", 
-           threads[i].UniqueId, 
+    printf("Thread %u: OS ID %u\n",
+           threads[i].UniqueId,
            threads[i].ThreadId);
 }
 ```
@@ -141,8 +141,8 @@ Finds the first exception at or after the specified position.
 Position searchPos = GetSomePosition();
 ExceptionEvent const* exception = engine->GetExceptionAtOrAfterPosition(searchPos);
 if (exception) {
-    printf("Exception 0x%X at position %s\n", 
-           exception->ExceptionCode, 
+    printf("Exception 0x%X at position %s\n",
+           exception->ExceptionCode,
            PositionToString(exception->Position).c_str());
 }
 ```
@@ -185,9 +185,9 @@ auto lifetime = engine->GetLifetime();
 auto recordingType = engine->GetRecordingType();
 auto& systemInfo = engine->GetSystemInfo();
 
-printf("Trace spans %llu steps\n", 
+printf("Trace spans %llu steps\n",
        lifetime.End.Steps - lifetime.Begin.Steps);
-printf("Recording type: %s\n", 
+printf("Recording type: %s\n",
        GetRecordingTypeName(recordingType));
 printf("OS: %S\n", systemInfo.OsVersionString);
 ```
@@ -200,8 +200,8 @@ ExceptionEvent const* exceptions = engine->GetExceptionEventList();
 
 for (size_t i = 0; i < exceptionCount; ++i) {
     auto& ex = exceptions[i];
-    printf("Exception 0x%X at step %llu\n", 
-           ex.ExceptionCode, 
+    printf("Exception 0x%X at step %llu\n",
+           ex.ExceptionCode,
            ex.Position.Steps);
 }
 ```
@@ -218,8 +218,8 @@ ThreadTerminatedEvent const* terms = engine->GetThreadTerminatedEventList();
 // Match creates with terminations
 for (size_t i = 0; i < createCount; ++i) {
     auto& create = creates[i];
-    printf("Thread %u created at step %llu\n", 
-           create.pThreadInfo->ThreadId, 
+    printf("Thread %u created at step %llu\n",
+           create.pThreadInfo->ThreadId,
            create.Position.Steps);
 }
 ```
@@ -227,7 +227,7 @@ for (size_t i = 0; i < createCount; ++i) {
 ## See Also
 
 - [`IReplayEngine`](interface-IReplayEngine.md) - Owning engine interface
-- [`ICursorView`](interface-ICursorView.md) - Cursor navigation interface  
+- [`ICursorView`](interface-ICursorView.md) - Cursor navigation interface
 - [`Position`](struct-Position.md) - Timeline position structure
 - [`SystemInfo`](struct-SystemInfo.md) - System information structure
 - [`ThreadInfo`](struct-ThreadInfo.md) - Thread information structure

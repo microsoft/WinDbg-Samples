@@ -20,7 +20,7 @@ inline uint64_t GetErrorCheckingLevelInterval(ErrorCheckingLevel level);
 ```
 Returns the interval at which error checks are performed:
 - `Minimum`: Every 1,000 operations
-- `Debug`: Every 10 operations  
+- `Debug`: Every 10 operations
 - `Paranoid`: Every operation (1)
 - `Off`: Very large interval (effectively disabled)
 

@@ -10,22 +10,22 @@ struct TBufferView
 {
     T*     Buffer;
     size_t Count;
-    
+
     // Constructors
     TBufferView() : Buffer(nullptr), Count(0) {}
     TBufferView(T* buffer, size_t count) : Buffer(buffer), Count(count) {}
-    
+
     // Iterator support
     T* begin() const { return Buffer; }
     T* end() const { return Buffer + Count; }
-    
+
     // Element access
     T& operator[](size_t index) const { return Buffer[index]; }
-    
+
     // Properties
     bool IsEmpty() const { return Count == 0 || Buffer == nullptr; }
     size_t SizeInBytes() const { return Count * sizeof(T); }
-    
+
     // Subview creation
     TBufferView<T> SubView(size_t offset, size_t count) const
     {
@@ -57,19 +57,19 @@ void DemonstrateBasicUsage()
 {
     // Create a buffer
     std::vector<uint8_t> data = {0x01, 0x02, 0x03, 0x04, 0x05};
-    
+
     // Create buffer view
     BufferView view(data.data(), data.size());
-    
+
     // Check properties
     printf("Buffer size: %zu bytes, Count: %zu\n", view.SizeInBytes(), view.Count);
     printf("Is empty: %s\n", view.IsEmpty() ? "true" : "false");
-    
+
     // Element access
     for (size_t i = 0; i < view.Count; ++i) {
         printf("data[%zu] = 0x%02X\n", i, view[i]);
     }
-    
+
     // Iterator usage
     printf("Data via iterators: ");
     for (auto byte : view) {
@@ -87,7 +87,7 @@ void ProcessReadOnlyData(ConstBufferView const& view)
         printf("Empty buffer provided\n");
         return;
     }
-    
+
     // Safe iteration over read-only data
     size_t zeroCount = 0;
     for (auto const& byte : view) {
@@ -95,7 +95,7 @@ void ProcessReadOnlyData(ConstBufferView const& view)
             ++zeroCount;
         }
     }
-    
+
     printf("Found %zu zero bytes in %zu byte buffer\n", zeroCount, view.Count);
 }
 
@@ -103,7 +103,7 @@ void DemonstrateConstViews()
 {
     uint8_t const staticData[] = {0x00, 0x01, 0x00, 0x02, 0x00};
     ConstBufferView constView(staticData, sizeof(staticData));
-    
+
     ProcessReadOnlyData(constView);
 }
 ```

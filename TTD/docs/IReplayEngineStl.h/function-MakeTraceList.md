@@ -38,11 +38,11 @@ if (result == S_OK)
     result = traceList->AddTrace(L"trace1.ttd");
     result = traceList->AddTrace(L"trace2.ttd");
     result = traceList->AddTrace(L"trace3.ttd");
-    
+
     // Get information about the traces
     uint32_t traceCount;
     result = traceList->GetTraceCount(&traceCount);
-    
+
     for (uint32_t i = 0; i < traceCount; ++i)
     {
         wchar_t* tracePath;

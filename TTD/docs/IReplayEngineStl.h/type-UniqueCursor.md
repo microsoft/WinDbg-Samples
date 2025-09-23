@@ -32,11 +32,11 @@ if (result == S_OK)
     // Set position in the trace
     Position pos = GetSomePosition();
     cursor->SetPosition(pos);
-    
+
     // Query state at this position
     uint32_t threadId;
     cursor->GetCurrentThreadId(threadId);
-    
+
     // Read registers
     RegistersUnion registers;
     cursor->GetCrossPlatformContext(threadId, registers);

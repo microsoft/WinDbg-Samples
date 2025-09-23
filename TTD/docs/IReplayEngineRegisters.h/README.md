@@ -41,7 +41,7 @@ IReplayEngineRegisters.h defines register context structures that capture the co
 
 ### SIMD Data Types
 - [`M128BIT`](struct-M128BIT.md) - 128-bit SIMD data type
-- [`M256BIT`](struct-M256BIT.md) - 256-bit SIMD data type  
+- [`M256BIT`](struct-M256BIT.md) - 256-bit SIMD data type
 - [`M512BIT`](struct-M512BIT.md) - 512-bit SIMD data type
 
 ### x86 Architecture
@@ -49,7 +49,7 @@ IReplayEngineRegisters.h defines register context structures that capture the co
 - [`X86_FLOATING_SAVE_AREA`](struct-X86_FLOATING_SAVE_AREA.md) - x86 80387 floating-point save area
 - [`X86_NT5_CONTEXT`](struct-X86_NT5_CONTEXT.md) - Complete x86 processor context
 
-### x64 Architecture  
+### x64 Architecture
 - [`AMD64_XMM_SAVE_AREA32`](struct-AMD64_XMM_SAVE_AREA32.md) - AMD64 XMM register save area
 - [`AMD64_CONTEXT`](struct-AMD64_CONTEXT.md) - Complete AMD64 processor context
 
@@ -85,7 +85,7 @@ IReplayEngineRegisters.h defines register context structures that capture the co
 #define VDMCONTEXT_EXTENDED_REGISTERS  (VDMCONTEXT_i386 | 0x00000020L) // cpu specific extensions
 ```
 
-### AMD64 Context Flags  
+### AMD64 Context Flags
 ```cpp
 #define AMD64_CONTEXT_CONTROL           (AMD64_CONTEXT_AMD64 | 0x00000001L)
 #define AMD64_CONTEXT_INTEGER           (AMD64_CONTEXT_AMD64 | 0x00000002L)
@@ -176,11 +176,11 @@ void ProcessSIMDData(M128BIT const& simdReg)
     // Access as different data types
     uint64_t low64 = simdReg.Low;
     int64_t high64 = simdReg.High;
-    
+
     // Interpret as floating-point values
     double* doubleValues = reinterpret_cast<double const*>(&simdReg);
     float* floatValues = reinterpret_cast<float const*>(&simdReg);
-    
+
     // Process vector data
     for (int i = 0; i < 2; ++i) {
         printf("Double[%d]: %f\n", i, doubleValues[i]);
@@ -205,7 +205,7 @@ struct DebugRegisterState
 DebugRegisterState ExtractDebugState(CROSS_PLATFORM_CONTEXT const& context)
 {
     DebugRegisterState state{};
-    
+
     if (IsAMD64Context(context.Amd64Context.ContextFlags)) {
         state.breakpoints[0] = context.Amd64Context.Dr0;
         state.breakpoints[1] = context.Amd64Context.Dr1;
@@ -222,7 +222,7 @@ DebugRegisterState ExtractDebugState(CROSS_PLATFORM_CONTEXT const& context)
         state.breakpointCount = ARM64_MAX_BREAKPOINTS;
         state.watchpointCount = ARM64_MAX_WATCHPOINTS;
     }
-    
+
     return state;
 }
 ```
@@ -257,7 +257,7 @@ AVX_EXTENDED_CONTEXT avxExtendedCtx = extendedContext;
 
 All register structures follow strict alignment requirements:
 - X86_CONTEXT: 4-byte alignment
-- AMD64_CONTEXT: 16-byte alignment  
+- AMD64_CONTEXT: 16-byte alignment
 - ARM_CONTEXT: 8-byte alignment
 - ARM64_CONTEXT: 16-byte alignment
 - CROSS_PLATFORM_CONTEXT: Maximum alignment of contained types

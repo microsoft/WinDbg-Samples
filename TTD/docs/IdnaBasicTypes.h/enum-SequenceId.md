@@ -19,7 +19,7 @@ enum class SequenceId : uint64_t
 ## Values
 
 - `SequenceId::Min` (0) - Minimum valid sequence identifier
-- `SequenceId::Max` (UINT64_MAX - 1) - Maximum valid sequence identifier  
+- `SequenceId::Max` (UINT64_MAX - 1) - Maximum valid sequence identifier
 - `SequenceId::Invalid` (UINT64_MAX) - Invalid sequence marker
 
 ## Arithmetic Operations

@@ -13,7 +13,7 @@ It resides in the [Microsoft.TimeTravelDebugging.Apis](../Microsoft.TimeTravelDe
 ## Architectural Types
 
 - [`GuestAddress`](type-GuestAddress.md) - Guest process memory addresses
-- [`GuestAddressRange`](type-GuestAddressRange.md) - Memory address ranges  
+- [`GuestAddressRange`](type-GuestAddressRange.md) - Memory address ranges
 - [`PtrToGuestAddress`](function-PtrToGuestAddress.md) - Pointer to guest address conversion
 - [`ProcessorArchitecture`](enum-ProcessorArchitecture.md) - CPU architecture enumeration
 
@@ -92,9 +92,9 @@ buffer += 100; // Skip first 100 bytes
 ```cpp
 // Access system configuration
 SystemInfo const& sysInfo = GetSystemInfo();
-printf("OS Version: %u.%u.%u\n", 
+printf("OS Version: %u.%u.%u\n",
        sysInfo.System.MajorVersion,
-       sysInfo.System.MinorVersion, 
+       sysInfo.System.MinorVersion,
        sysInfo.System.BuildNumber);
 
 // Check processor architecture

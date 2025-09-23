@@ -71,7 +71,7 @@ ETW event channels for different purposes:
 enum class EtwEventChannel : uint8_t
 {
     Admin       = 16,  // Administrative events
-    Operational = 17,  // Operational events  
+    Operational = 17,  // Operational events
     Analytic    = 18,  // Analytic events
     Debug       = 19   // Debug events
 };

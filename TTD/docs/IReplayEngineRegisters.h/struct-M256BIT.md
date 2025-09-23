@@ -23,11 +23,11 @@ struct M256BIT {
 void DisplayM256BIT(M256BIT const& value)
 {
     printf("M256BIT:\n");
-    printf("  Low:  0x%016llX_%016llX\n", 
+    printf("  Low:  0x%016llX_%016llX\n",
            static_cast<uint64_t>(value.Low.High), value.Low.Low);
-    printf("  High: 0x%016llX_%016llX\n", 
+    printf("  High: 0x%016llX_%016llX\n",
            static_cast<uint64_t>(value.High.High), value.High.Low);
-    
+
     // Access as 32 bytes
     uint8_t const* bytes = reinterpret_cast<uint8_t const*>(&value);
     printf("  Bytes: ");
@@ -67,7 +67,7 @@ void ProcessAsFloatingPoint(M256BIT const& avxReg)
         printf("%f ", doubles[i]);
     }
     printf("\n");
-    
+
     // As single precision (8 x 32-bit)
     float const* floats = reinterpret_cast<float const*>(&avxReg);
     printf("Floats: ");
@@ -85,54 +85,54 @@ struct AVXOperations
     {
         float const* aFloats = reinterpret_cast<float const*>(&a);
         float const* bFloats = reinterpret_cast<float const*>(&b);
-        
+
         M256BIT result;
         float* resultFloats = reinterpret_cast<float*>(&result);
-        
+
         for (int i = 0; i < 8; ++i) {
             resultFloats[i] = aFloats[i] + bFloats[i];
         }
-        
+
         return result;
     }
-    
+
     // Packed double-precision multiply (4 elements)
     static M256BIT MulPD(M256BIT const& a, M256BIT const& b)
     {
         double const* aDoubles = reinterpret_cast<double const*>(&a);
         double const* bDoubles = reinterpret_cast<double const*>(&b);
-        
+
         M256BIT result;
         double* resultDoubles = reinterpret_cast<double*>(&result);
-        
+
         for (int i = 0; i < 4; ++i) {
             resultDoubles[i] = aDoubles[i] * bDoubles[i];
         }
-        
+
         return result;
     }
-    
+
     // Horizontal add
     static M256BIT HAddPS(M256BIT const& a, M256BIT const& b)
     {
         float const* aFloats = reinterpret_cast<float const*>(&a);
         float const* bFloats = reinterpret_cast<float const*>(&b);
-        
+
         M256BIT result;
         float* resultFloats = reinterpret_cast<float*>(&result);
-        
+
         // Low 128-bit lane
         resultFloats[0] = aFloats[0] + aFloats[1];
         resultFloats[1] = aFloats[2] + aFloats[3];
         resultFloats[2] = bFloats[0] + bFloats[1];
         resultFloats[3] = bFloats[2] + bFloats[3];
-        
+
         // High 128-bit lane
         resultFloats[4] = aFloats[4] + aFloats[5];
         resultFloats[5] = aFloats[6] + aFloats[7];
         resultFloats[6] = bFloats[4] + bFloats[5];
         resultFloats[7] = bFloats[6] + bFloats[7];
-        
+
         return result;
     }
 };
@@ -176,20 +176,20 @@ void ProcessAsIntegers(M256BIT const& avxReg)
 {
     M256BitView view;
     view.raw = avxReg;
-    
+
     printf("As unsigned integers:\n");
     printf("  QWords: ");
     for (int i = 0; i < 4; ++i) {
         printf("0x%016llX ", view.qwords[i]);
     }
     printf("\n");
-    
+
     printf("  DWords: ");
     for (int i = 0; i < 8; ++i) {
         printf("0x%08X ", view.dwords[i]);
     }
     printf("\n");
-    
+
     printf("  Words: ");
     for (int i = 0; i < 16; ++i) {
         printf("0x%04X ", view.words[i]);
@@ -276,10 +276,10 @@ void SetYMMRegister(void* ymmRegPtr, M256BIT const& value)
 void ProcessYMMRegisters(AVX_YMM_REGISTERS const& ymmRegs)
 {
     printf("YMM Registers:\n");
-    
+
     // Access individual YMM registers through the structure
     M256BIT const* ymmArray = reinterpret_cast<M256BIT const*>(&ymmRegs);
-    
+
     for (int i = 0; i < 16; ++i) {  // Assuming 16 YMM registers
         printf("YMM%d:\n", i);
         DisplayM256BIT(ymmArray[i]);
@@ -297,12 +297,12 @@ struct LaneOperations
     {
         return value.Low;
     }
-    
+
     static M128BIT ExtractHighLane(M256BIT const& value)
     {
         return value.High;
     }
-    
+
     // Insert 128-bit lane
     static M256BIT InsertLowLane(M256BIT const& value, M128BIT const& lane)
     {
@@ -310,14 +310,14 @@ struct LaneOperations
         result.Low = lane;
         return result;
     }
-    
+
     static M256BIT InsertHighLane(M256BIT const& value, M128BIT const& lane)
     {
         M256BIT result = value;
         result.High = lane;
         return result;
     }
-    
+
     // Permute lanes
     static M256BIT PermuteLanes(M256BIT const& value, bool swapLanes)
     {
@@ -329,7 +329,7 @@ struct LaneOperations
         }
         return value;
     }
-    
+
     // Broadcast 128-bit lane
     static M256BIT BroadcastLane(M128BIT const& lane)
     {
@@ -348,14 +348,14 @@ std::string M256BitToHexString(M256BIT const& value)
 {
     std::ostringstream oss;
     oss << std::hex << std::setfill('0') << std::uppercase;
-    
+
     // High 128 bits first
     oss << std::setw(16) << static_cast<uint64_t>(value.High.High);
     oss << std::setw(16) << value.High.Low;
     // Low 128 bits
     oss << std::setw(16) << static_cast<uint64_t>(value.Low.High);
     oss << std::setw(16) << value.Low.Low;
-    
+
     return oss.str();
 }
 
@@ -365,19 +365,19 @@ bool ParseM256BitFromHex(std::string const& hexStr, M256BIT& result)
     if (hexStr.length() != 64) {
         return false;
     }
-    
+
     try {
         // Parse 128-bit components
         std::string highHighStr = hexStr.substr(0, 16);
         std::string highLowStr = hexStr.substr(16, 16);
         std::string lowHighStr = hexStr.substr(32, 16);
         std::string lowLowStr = hexStr.substr(48, 16);
-        
+
         result.High.High = static_cast<int64_t>(std::stoull(highHighStr, nullptr, 16));
         result.High.Low = std::stoull(highLowStr, nullptr, 16);
         result.Low.High = static_cast<int64_t>(std::stoull(lowHighStr, nullptr, 16));
         result.Low.Low = std::stoull(lowLowStr, nullptr, 16);
-        
+
         return true;
     } catch (...) {
         return false;
@@ -431,9 +431,9 @@ M256BIT ShiftLeftM256BIT(M256BIT const& value, int bits)
     if (bits >= 256) {
         return ZeroM256BIT();
     }
-    
+
     M256BIT result = value;
-    
+
     if (bits >= 128) {
         // Shift more than 128 bits
         result.High = ShiftLeft(result.Low, bits - 128);
@@ -442,11 +442,11 @@ M256BIT ShiftLeftM256BIT(M256BIT const& value, int bits)
         // Shift within 256 bits
         M128BIT carry = ShiftRight(result.Low, 128 - bits);
         result.Low = ShiftLeft(result.Low, bits);
-        
+
         M128BIT shiftedHigh = ShiftLeft(result.High, bits);
         result.High = BitwiseOR(shiftedHigh, carry);
     }
-    
+
     return result;
 }
 
@@ -455,9 +455,9 @@ M256BIT ShiftRightM256BIT(M256BIT const& value, int bits)
     if (bits >= 256) {
         return ZeroM256BIT();
     }
-    
+
     M256BIT result = value;
-    
+
     if (bits >= 128) {
         // Shift more than 128 bits
         result.Low = ShiftRight(result.High, bits - 128);
@@ -466,11 +466,11 @@ M256BIT ShiftRightM256BIT(M256BIT const& value, int bits)
         // Shift within 256 bits
         M128BIT carry = ShiftLeft(result.High, 128 - bits);
         result.High = ShiftRight(result.High, bits);
-        
+
         M128BIT shiftedLow = ShiftRight(result.Low, bits);
         result.Low = BitwiseOR(shiftedLow, carry);
     }
-    
+
     return result;
 }
 ```
@@ -493,16 +493,16 @@ struct M256BitAnalysis
 M256BitAnalysis AnalyzeM256Bit(M256BIT const& value)
 {
     M256BitAnalysis analysis{};
-    
+
     // Basic checks
     analysis.isAllZeros = IsZeroM256BIT(value);
     analysis.isAllOnes = CompareM256BIT(value, CreateAllOnesM256BIT());
     analysis.isLaneSymmetric = CompareM128BIT(value.Low, value.High);
-    
+
     // Lane activity
     analysis.laneActivity[0] = !IsZeroM128BIT(value.Low);
     analysis.laneActivity[1] = !IsZeroM128BIT(value.High);
-    
+
     // Count non-zero bytes
     uint8_t const* bytes = reinterpret_cast<uint8_t const*>(&value);
     analysis.nonZeroBytes = 0;
@@ -511,7 +511,7 @@ M256BitAnalysis AnalyzeM256Bit(M256BIT const& value)
             analysis.nonZeroBytes++;
         }
     }
-    
+
     // Validate floating-point data
     float const* floats = reinterpret_cast<float const*>(&value);
     analysis.hasValidFloats = true;
@@ -521,7 +521,7 @@ M256BitAnalysis AnalyzeM256Bit(M256BIT const& value)
             break;
         }
     }
-    
+
     double const* doubles = reinterpret_cast<double const*>(&value);
     analysis.hasValidDoubles = true;
     for (int i = 0; i < 4; ++i) {
@@ -530,13 +530,13 @@ M256BitAnalysis AnalyzeM256Bit(M256BIT const& value)
             break;
         }
     }
-    
+
     // Entropy calculation
     std::map<uint8_t, int> byteFreq;
     for (int i = 0; i < 32; ++i) {
         byteFreq[bytes[i]]++;
     }
-    
+
     analysis.entropyScore = 0.0;
     for (auto const& pair : byteFreq) {
         double prob = static_cast<double>(pair.second) / 32.0;
@@ -544,14 +544,14 @@ M256BitAnalysis AnalyzeM256Bit(M256BIT const& value)
             analysis.entropyScore -= prob * log2(prob);
         }
     }
-    
+
     return analysis;
 }
 
 void DisplayM256BitAnalysis(M256BIT const& value)
 {
     auto analysis = AnalyzeM256Bit(value);
-    
+
     printf("M256BIT Analysis:\n");
     printf("  All zeros: %s\n", analysis.isAllZeros ? "Yes" : "No");
     printf("  All ones: %s\n", analysis.isAllOnes ? "Yes" : "No");
@@ -572,18 +572,18 @@ void DisplayM256BitAnalysis(M256BIT const& value)
 class AlignedM256BIT
 {
     alignas(32) M256BIT data_;
-    
+
 public:
     AlignedM256BIT() : data_(ZeroM256BIT()) {}
     AlignedM256BIT(M256BIT const& value) : data_(value) {}
-    
+
     M256BIT& Get() { return data_; }
     M256BIT const& Get() const { return data_; }
-    
+
     void* GetAlignedPtr() { return &data_; }
     void const* GetAlignedPtr() const { return &data_; }
-    
-    bool IsAligned() const 
+
+    bool IsAligned() const
     {
         return (reinterpret_cast<uintptr_t>(&data_) % 32) == 0;
     }

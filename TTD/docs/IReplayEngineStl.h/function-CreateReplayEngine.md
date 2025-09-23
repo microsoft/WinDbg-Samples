@@ -61,7 +61,7 @@ extern "C" uint32_t __cdecl CreateTraceList(
 Creates a trace list instance for managing multiple trace files.
 
 **Parameters:**
-- `pTraceList` - Output parameter that receives the created trace list interface  
+- `pTraceList` - Output parameter that receives the created trace list interface
 - `engineGuid` - GUID identifying the trace list type to create
 
 **Return Value:**

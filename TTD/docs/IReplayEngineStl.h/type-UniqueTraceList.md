@@ -36,7 +36,7 @@ if (result == S_OK)
     // Create and manage a cursor
     TTD::Replay::UniqueCursor cursor;
     result = engine->NewCursor(cursor.GetAddressOf());
-    
+
     if (result == S_OK)
     {
         // Use cursor - automatic cleanup when it goes out of scope

@@ -5,7 +5,7 @@
 ## Definition
 
 ```cpp
-struct ExceptionRecord64 
+struct ExceptionRecord64
 {
     uint32_t ExceptionCode;
     uint32_t ExceptionFlags;
@@ -36,7 +36,7 @@ Common Windows exception codes that may appear in TTD recordings:
 - `0xC000001D` (`EXCEPTION_ILLEGAL_INSTRUCTION`) - Illegal instruction
 - `0xC0000096` (`EXCEPTION_PRIVILEGED_INSTRUCTION`) - Privileged instruction
 
-### Arithmetic Exceptions  
+### Arithmetic Exceptions
 - `0xC0000094` (`EXCEPTION_INT_DIVIDE_BY_ZERO`) - Integer divide by zero
 - `0xC0000095` (`EXCEPTION_INT_OVERFLOW`) - Integer overflow
 - `0xC000008E` (`EXCEPTION_FLT_DIVIDE_BY_ZERO`) - Float divide by zero

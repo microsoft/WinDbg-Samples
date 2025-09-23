@@ -36,7 +36,7 @@ if (result == S_OK)
 {
     // Engine created successfully, use it
     result = engine->OpenTraceFile(L"mytrace.ttd");
-    
+
     if (result == S_OK)
     {
         TTD::Replay::UniqueCursor cursor;

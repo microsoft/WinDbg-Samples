@@ -24,17 +24,17 @@ void DisplayM512BIT(M512BIT const& value)
 {
     printf("M512BIT:\n");
     printf("  Low (256-bit):\n");
-    printf("    Low:  0x%016llX_%016llX\n", 
+    printf("    Low:  0x%016llX_%016llX\n",
            static_cast<uint64_t>(value.Low.Low.High), value.Low.Low.Low);
-    printf("    High: 0x%016llX_%016llX\n", 
+    printf("    High: 0x%016llX_%016llX\n",
            static_cast<uint64_t>(value.Low.High.High), value.Low.High.Low);
-    
+
     printf("  High (256-bit):\n");
-    printf("    Low:  0x%016llX_%016llX\n", 
+    printf("    Low:  0x%016llX_%016llX\n",
            static_cast<uint64_t>(value.High.Low.High), value.High.Low.Low);
-    printf("    High: 0x%016llX_%016llX\n", 
+    printf("    High: 0x%016llX_%016llX\n",
            static_cast<uint64_t>(value.High.High.High), value.High.High.Low);
-    
+
     // Access as 64 bytes
     uint8_t const* bytes = reinterpret_cast<uint8_t const*>(&value);
     printf("  Bytes: ");
@@ -74,7 +74,7 @@ void ProcessAsFloatingPoint(M512BIT const& zmm)
         if ((i + 1) % 4 == 0) printf("\n         ");
     }
     printf("\n");
-    
+
     // As single precision (16 x 32-bit)
     float const* floats = reinterpret_cast<float const*>(&zmm);
     printf("Floats: ");
@@ -93,58 +93,58 @@ struct AVX512Operations
     {
         float const* aFloats = reinterpret_cast<float const*>(&a);
         float const* bFloats = reinterpret_cast<float const*>(&b);
-        
+
         M512BIT result;
         float* resultFloats = reinterpret_cast<float*>(&result);
-        
+
         for (int i = 0; i < 16; ++i) {
             resultFloats[i] = aFloats[i] + bFloats[i];
         }
-        
+
         return result;
     }
-    
+
     // Packed double-precision multiply (8 elements)
     static M512BIT MulPD(M512BIT const& a, M512BIT const& b)
     {
         double const* aDoubles = reinterpret_cast<double const*>(&a);
         double const* bDoubles = reinterpret_cast<double const*>(&b);
-        
+
         M512BIT result;
         double* resultDoubles = reinterpret_cast<double*>(&result);
-        
+
         for (int i = 0; i < 8; ++i) {
             resultDoubles[i] = aDoubles[i] * bDoubles[i];
         }
-        
+
         return result;
     }
-    
+
     // Fused multiply-add (16 elements)
     static M512BIT FmaPS(M512BIT const& a, M512BIT const& b, M512BIT const& c)
     {
         float const* aFloats = reinterpret_cast<float const*>(&a);
         float const* bFloats = reinterpret_cast<float const*>(&b);
         float const* cFloats = reinterpret_cast<float const*>(&c);
-        
+
         M512BIT result;
         float* resultFloats = reinterpret_cast<float*>(&result);
-        
+
         for (int i = 0; i < 16; ++i) {
             resultFloats[i] = aFloats[i] * bFloats[i] + cFloats[i];
         }
-        
+
         return result;
     }
-    
+
     // Reciprocal square root approximation
     static M512BIT RsqrtPS(M512BIT const& a)
     {
         float const* aFloats = reinterpret_cast<float const*>(&a);
-        
+
         M512BIT result;
         float* resultFloats = reinterpret_cast<float*>(&result);
-        
+
         for (int i = 0; i < 16; ++i) {
             if (aFloats[i] > 0.0f) {
                 resultFloats[i] = 1.0f / sqrtf(aFloats[i]);
@@ -152,7 +152,7 @@ struct AVX512Operations
                 resultFloats[i] = INFINITY;
             }
         }
-        
+
         return result;
     }
 };
@@ -196,7 +196,7 @@ void ProcessAsIntegers(M512BIT const& zmmReg)
 {
     M512BitView view;
     view.raw = zmmReg;
-    
+
     printf("As unsigned integers:\n");
     printf("  QWords: ");
     for (int i = 0; i < 8; ++i) {
@@ -204,14 +204,14 @@ void ProcessAsIntegers(M512BIT const& zmmReg)
         if ((i + 1) % 4 == 0) printf("\n          ");
     }
     printf("\n");
-    
+
     printf("  DWords: ");
     for (int i = 0; i < 16; ++i) {
         printf("0x%08X ", view.dwords[i]);
         if ((i + 1) % 8 == 0) printf("\n          ");
     }
     printf("\n");
-    
+
     printf("  Words (first 16): ");
     for (int i = 0; i < 16; ++i) {
         printf("0x%04X ", view.words[i]);
@@ -228,46 +228,46 @@ struct AVX512IntegerOps
     {
         uint32_t const* aDwords = reinterpret_cast<uint32_t const*>(&a);
         uint32_t const* bDwords = reinterpret_cast<uint32_t const*>(&b);
-        
+
         M512BIT result;
         uint32_t* resultDwords = reinterpret_cast<uint32_t*>(&result);
-        
+
         for (int i = 0; i < 16; ++i) {
             resultDwords[i] = aDwords[i] + bDwords[i];
         }
-        
+
         return result;
     }
-    
+
     // Packed 64-bit integer multiply (8 elements)
     static M512BIT MulEPI64(M512BIT const& a, M512BIT const& b)
     {
         uint64_t const* aQwords = reinterpret_cast<uint64_t const*>(&a);
         uint64_t const* bQwords = reinterpret_cast<uint64_t const*>(&b);
-        
+
         M512BIT result;
         uint64_t* resultQwords = reinterpret_cast<uint64_t*>(&result);
-        
+
         for (int i = 0; i < 8; ++i) {
             resultQwords[i] = aQwords[i] * bQwords[i];
         }
-        
+
         return result;
     }
-    
+
     // Compare packed 32-bit integers for equality
     static uint16_t CmpEPI32(M512BIT const& a, M512BIT const& b)
     {
         uint32_t const* aDwords = reinterpret_cast<uint32_t const*>(&a);
         uint32_t const* bDwords = reinterpret_cast<uint32_t const*>(&b);
-        
+
         uint16_t mask = 0;
         for (int i = 0; i < 16; ++i) {
             if (aDwords[i] == bDwords[i]) {
                 mask |= (1 << i);
             }
         }
-        
+
         return mask;
     }
 };
@@ -340,12 +340,12 @@ struct LaneOperations512
     {
         return value.Low;
     }
-    
+
     static M256BIT ExtractHighLane(M512BIT const& value)
     {
         return value.High;
     }
-    
+
     // Insert 256-bit lane
     static M512BIT InsertLowLane(M512BIT const& value, M256BIT const& lane)
     {
@@ -353,14 +353,14 @@ struct LaneOperations512
         result.Low = lane;
         return result;
     }
-    
+
     static M512BIT InsertHighLane(M512BIT const& value, M256BIT const& lane)
     {
         M512BIT result = value;
         result.High = lane;
         return result;
     }
-    
+
     // Permute lanes
     static M512BIT PermuteLanes(M512BIT const& value, bool swapLanes)
     {
@@ -372,7 +372,7 @@ struct LaneOperations512
         }
         return value;
     }
-    
+
     // Broadcast 256-bit lane
     static M512BIT BroadcastLane(M256BIT const& lane)
     {
@@ -381,13 +381,13 @@ struct LaneOperations512
         result.High = lane;
         return result;
     }
-    
+
     // Extract 128-bit quadrants
     static M128BIT ExtractQuad0(M512BIT const& value) { return value.Low.Low; }
     static M128BIT ExtractQuad1(M512BIT const& value) { return value.Low.High; }
     static M128BIT ExtractQuad2(M512BIT const& value) { return value.High.Low; }
     static M128BIT ExtractQuad3(M512BIT const& value) { return value.High.High; }
-    
+
     // Complex permutations
     static M512BIT Permute4x128(M512BIT const& value, int imm8)
     {
@@ -395,13 +395,13 @@ struct LaneOperations512
             ExtractQuad0(value), ExtractQuad1(value),
             ExtractQuad2(value), ExtractQuad3(value)
         };
-        
+
         M512BIT result;
         result.Low.Low = quads[(imm8 >> 0) & 3];
         result.Low.High = quads[(imm8 >> 2) & 3];
         result.High.Low = quads[(imm8 >> 4) & 3];
         result.High.High = quads[(imm8 >> 6) & 3];
-        
+
         return result;
     }
 };
@@ -427,10 +427,10 @@ void SetZMMRegister(void* zmmRegPtr, M512BIT const& value)
 void ProcessZMMRegisters(AVX512_ZMM_REGISTERS const& zmmRegs)
 {
     printf("ZMM Registers:\n");
-    
+
     // Access individual ZMM registers through the structure
     M512BIT const* zmmArray = reinterpret_cast<M512BIT const*>(&zmmRegs);
-    
+
     for (int i = 0; i < 32; ++i) {  // AVX-512 supports 32 ZMM registers
         printf("ZMM%d:\n", i);
         DisplayM512BIT(zmmArray[i]);
@@ -462,10 +462,10 @@ struct MaskOperations
         uint32_t const* aDwords = reinterpret_cast<uint32_t const*>(&a);
         uint32_t const* bDwords = reinterpret_cast<uint32_t const*>(&b);
         uint32_t const* srcDwords = reinterpret_cast<uint32_t const*>(&src);
-        
+
         M512BIT result;
         uint32_t* resultDwords = reinterpret_cast<uint32_t*>(&result);
-        
+
         for (int i = 0; i < 16; ++i) {
             if (mask & (1 << i)) {
                 // Perform operation (example: add)
@@ -476,37 +476,37 @@ struct MaskOperations
                 resultDwords[i] = srcDwords[i];  // Preserve source
             }
         }
-        
+
         return result;
     }
-    
+
     // Extract mask from comparison
     static uint16_t ExtractMask32(M512BIT const& cmpResult)
     {
         uint32_t const* dwords = reinterpret_cast<uint32_t const*>(&cmpResult);
         uint16_t mask = 0;
-        
+
         for (int i = 0; i < 16; ++i) {
             if (dwords[i] != 0) {
                 mask |= (1 << i);
             }
         }
-        
+
         return mask;
     }
-    
+
     // 64-bit element masking (8 elements)
     static uint8_t ExtractMask64(M512BIT const& cmpResult)
     {
         uint64_t const* qwords = reinterpret_cast<uint64_t const*>(&cmpResult);
         uint8_t mask = 0;
-        
+
         for (int i = 0; i < 8; ++i) {
             if (qwords[i] != 0) {
                 mask |= (1 << i);
             }
         }
-        
+
         return mask;
     }
 };
@@ -519,12 +519,12 @@ std::string M512BitToHexString(M512BIT const& value)
 {
     std::ostringstream oss;
     oss << std::hex << std::setfill('0') << std::uppercase;
-    
+
     // High 256 bits first
     oss << M256BitToHexString(value.High);
     // Low 256 bits
     oss << M256BitToHexString(value.Low);
-    
+
     return oss.str();
 }
 
@@ -534,10 +534,10 @@ bool ParseM512BitFromHex(std::string const& hexStr, M512BIT& result)
     if (hexStr.length() != 128) {
         return false;
     }
-    
+
     std::string highStr = hexStr.substr(0, 64);
     std::string lowStr = hexStr.substr(64, 64);
-    
+
     return ParseM256BitFromHex(highStr, result.High) &&
            ParseM256BitFromHex(lowStr, result.Low);
 }
@@ -586,11 +586,11 @@ M512BIT ReverseBytes(M512BIT const& value)
     M512BIT result;
     uint8_t const* srcBytes = reinterpret_cast<uint8_t const*>(&value);
     uint8_t* destBytes = reinterpret_cast<uint8_t*>(&result);
-    
+
     for (int i = 0; i < 64; ++i) {
         destBytes[i] = srcBytes[63 - i];
     }
-    
+
     return result;
 }
 ```
@@ -617,7 +617,7 @@ struct M512BitAnalysis
 M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
 {
     M512BitAnalysis analysis{};
-    
+
     // Basic checks
     analysis.isAllZeros = IsZeroM512BIT(value);
     analysis.isAllOnes = CompareM512BIT(value, CreateAllOnesM512BIT());
@@ -625,7 +625,7 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
     analysis.isQuadSymmetric = CompareM128BIT(value.Low.Low, value.Low.High) &&
                                CompareM128BIT(value.Low.Low, value.High.Low) &&
                                CompareM128BIT(value.Low.Low, value.High.High);
-    
+
     // Lane and quadrant activity
     analysis.laneActivity[0] = !IsZeroM256BIT(value.Low);
     analysis.laneActivity[1] = !IsZeroM256BIT(value.High);
@@ -633,7 +633,7 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
     analysis.quadActivity[1] = !IsZeroM128BIT(value.Low.High);
     analysis.quadActivity[2] = !IsZeroM128BIT(value.High.Low);
     analysis.quadActivity[3] = !IsZeroM128BIT(value.High.High);
-    
+
     // Count non-zero bytes
     uint8_t const* bytes = reinterpret_cast<uint8_t const*>(&value);
     analysis.nonZeroBytes = 0;
@@ -642,7 +642,7 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
             analysis.nonZeroBytes++;
         }
     }
-    
+
     // Validate floating-point data
     float const* floats = reinterpret_cast<float const*>(&value);
     analysis.hasValidFloats = true;
@@ -652,7 +652,7 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
             break;
         }
     }
-    
+
     double const* doubles = reinterpret_cast<double const*>(&value);
     analysis.hasValidDoubles = true;
     for (int i = 0; i < 8; ++i) {
@@ -661,14 +661,14 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
             break;
         }
     }
-    
+
     // Pattern analysis
     std::map<uint32_t, size_t> dwordFreq;
     uint32_t const* dwords = reinterpret_cast<uint32_t const*>(&value);
     for (int i = 0; i < 16; ++i) {
         dwordFreq[dwords[i]]++;
     }
-    
+
     analysis.dominantPattern = 0;
     analysis.patternCount = 0;
     for (auto const& pair : dwordFreq) {
@@ -677,13 +677,13 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
             analysis.patternCount = pair.second;
         }
     }
-    
+
     // Entropy calculation
     std::map<uint8_t, int> byteFreq;
     for (int i = 0; i < 64; ++i) {
         byteFreq[bytes[i]]++;
     }
-    
+
     analysis.entropyScore = 0.0;
     for (auto const& pair : byteFreq) {
         double prob = static_cast<double>(pair.second) / 64.0;
@@ -691,14 +691,14 @@ M512BitAnalysis AnalyzeM512Bit(M512BIT const& value)
             analysis.entropyScore -= prob * log2(prob);
         }
     }
-    
+
     return analysis;
 }
 
 void DisplayM512BitAnalysis(M512BIT const& value)
 {
     auto analysis = AnalyzeM512Bit(value);
-    
+
     printf("M512BIT Analysis:\n");
     printf("  All zeros: %s\n", analysis.isAllZeros ? "Yes" : "No");
     printf("  All ones: %s\n", analysis.isAllOnes ? "Yes" : "No");
@@ -708,13 +708,13 @@ void DisplayM512BitAnalysis(M512BIT const& value)
     printf("  Entropy: %.2f bits\n", analysis.entropyScore);
     printf("  Valid floats: %s\n", analysis.hasValidFloats ? "Yes" : "No");
     printf("  Valid doubles: %s\n", analysis.hasValidDoubles ? "Yes" : "No");
-    printf("  Dominant pattern: 0x%08X (appears %zu times)\n", 
+    printf("  Dominant pattern: 0x%08X (appears %zu times)\n",
            analysis.dominantPattern, analysis.patternCount);
-    
+
     printf("  Lane activity: Low=%s, High=%s\n",
            analysis.laneActivity[0] ? "Active" : "Inactive",
            analysis.laneActivity[1] ? "Active" : "Inactive");
-    
+
     printf("  Quad activity: Q0=%s, Q1=%s, Q2=%s, Q3=%s\n",
            analysis.quadActivity[0] ? "Active" : "Inactive",
            analysis.quadActivity[1] ? "Active" : "Inactive",
@@ -729,28 +729,28 @@ void DisplayM512BitAnalysis(M512BIT const& value)
 class AlignedM512BIT
 {
     alignas(64) M512BIT data_;
-    
+
 public:
     AlignedM512BIT() : data_(ZeroM512BIT()) {}
     AlignedM512BIT(M512BIT const& value) : data_(value) {}
-    
+
     M512BIT& Get() { return data_; }
     M512BIT const& Get() const { return data_; }
-    
+
     void* GetAlignedPtr() { return &data_; }
     void const* GetAlignedPtr() const { return &data_; }
-    
-    bool IsAligned() const 
+
+    bool IsAligned() const
     {
         return (reinterpret_cast<uintptr_t>(&data_) % 64) == 0;
     }
-    
+
     // Cache line analysis
     size_t GetCacheLines() const
     {
         return (sizeof(M512BIT) + 63) / 64;  // Typically spans 1 cache line
     }
-    
+
     bool IsCache LineAligned() const
     {
         return IsAligned();  // 64-byte alignment matches cache line size
@@ -784,28 +784,28 @@ struct GatherScatterOps
     {
         uint32_t const* indicesPtr = reinterpret_cast<uint32_t const*>(&indices);
         uint8_t const* basePtr = static_cast<uint8_t const*>(baseAddr);
-        
+
         M512BIT result;
         uint32_t* resultPtr = reinterpret_cast<uint32_t*>(&result);
-        
+
         for (int i = 0; i < 16; ++i) {
-            uint64_t address = reinterpret_cast<uint64_t>(basePtr) + 
+            uint64_t address = reinterpret_cast<uint64_t>(basePtr) +
                               (indicesPtr[i] * scale);
             resultPtr[i] = *reinterpret_cast<uint32_t const*>(address);
         }
-        
+
         return result;
     }
-    
+
     // Scatter 32-bit values using 32-bit indices (16 elements)
     static void ScatterDWord(void* baseAddr, M512BIT const& indices, M512BIT const& src, int scale)
     {
         uint32_t const* indicesPtr = reinterpret_cast<uint32_t const*>(&indices);
         uint32_t const* srcPtr = reinterpret_cast<uint32_t const*>(&src);
         uint8_t* basePtr = static_cast<uint8_t*>(baseAddr);
-        
+
         for (int i = 0; i < 16; ++i) {
-            uint64_t address = reinterpret_cast<uint64_t>(basePtr) + 
+            uint64_t address = reinterpret_cast<uint64_t>(basePtr) +
                               (indicesPtr[i] * scale);
             *reinterpret_cast<uint32_t*>(address) = srcPtr[i];
         }

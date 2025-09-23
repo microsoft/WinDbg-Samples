@@ -3,7 +3,7 @@
 
 // TtdExtension - A simple debugger extension that demonstrates how to access TTD Replay API interfaces
 //                for the loaded trace file.
-// 
+//
 // To use it:
 // 1. Build the project.
 // 2. Start WinDbg and open a trace file.

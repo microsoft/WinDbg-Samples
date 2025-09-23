@@ -9,7 +9,7 @@ It resides in the [Microsoft.TimeTravelDebugging.Apis](../Microsoft.TimeTravelDe
 ### Trace File
 Contains all or portions of the execution of a single process between two points of time, including:
 - CPU instructions executed
-- Approximate contents of the process' memory  
+- Approximate contents of the process' memory
 - Relevant events (exceptions, debugger output, DLL load/unload, thread creation/termination)
 
 ### Timeline
@@ -127,15 +127,15 @@ if (result == S_OK) {
     if (engine->Initialize(L"trace.ttd")) {
         // Create cursor for navigation
         TTD::Replay::UniqueCursor cursor(engine->NewCursor());
-        
+
         // Navigate timeline and query state
         auto lifetime = engine->GetLifetime();
         cursor->SetPosition(lifetime.Begin);
-        
+
         // Query memory and registers
         auto registers = cursor->GetCrossPlatformContext();
         auto memory = cursor->QueryMemoryRange(someAddress);
-        
+
         // Execute with breakpoints
         cursor->SetEventMask(EventMask::MemoryWatchpoint | EventMask::Exception);
         cursor->ExecuteForward();

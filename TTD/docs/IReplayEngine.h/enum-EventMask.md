@@ -28,7 +28,7 @@ enum class EventMask : uint32_t
 ### MemoryWatchpoint
 Stops execution when memory watchpoints are triggered (read, write, execute access to specified memory addresses).
 
-### PositionWatchpoint  
+### PositionWatchpoint
 Stops execution when reaching specific positions in the timeline.
 
 ### Exception
@@ -56,7 +56,7 @@ EventMask mask = EventMask::MemoryWatchpoint | EventMask::Exception;
 // Add an event type
 mask |= EventMask::Gap;
 
-// Remove an event type  
+// Remove an event type
 mask &= ~EventMask::MemoryWatchpoint;
 
 // Check if specific event is enabled
@@ -76,7 +76,7 @@ cursor->SetEventMask(EventMask::MemoryWatchpoint | EventMask::Exception);
 if (cursor->ExecuteForward()) {
     // Execution stopped due to an event
     EventMask currentMask = cursor->GetEventMask();
-    
+
     if (currentMask & EventMask::MemoryWatchpoint) {
         printf("Stopped due to memory watchpoint\n");
     }
@@ -94,10 +94,10 @@ cursor->SetEventMask(EventMask::Exception);
 Position start = cursor->GetPosition();
 while (cursor->ExecuteForward()) {
     Position current = cursor->GetPosition();
-    
-    printf("Exception at position %s\n", 
+
+    printf("Exception at position %s\n",
            PositionToString(current).c_str());
-    
+
     // Continue past this exception
     cursor->SetPosition(current);
     cursor->ExecuteForward(); // Move to next instruction
@@ -113,7 +113,7 @@ cursor->SetEventMask(mask);
 while (cursor->ExecuteForward()) {
     Position pos = cursor->GetPosition();
     EventMask triggered = cursor->GetEventMask();
-    
+
     if (triggered & EventMask::MemoryWatchpoint) {
         ProcessMemoryWatchpoint(cursor, pos);
     }
@@ -135,18 +135,18 @@ while (cursor->ExecuteForward()) {
 void ConfigureCursorForAnalysis(ICursor* cursor, bool includeMemory, bool includeExceptions)
 {
     EventMask mask = EventMask::None;
-    
+
     if (includeMemory) {
         mask |= EventMask::MemoryWatchpoint;
     }
-    
+
     if (includeExceptions) {
         mask |= EventMask::Exception;
     }
-    
+
     // Always include position watchpoints for precise navigation
     mask |= EventMask::PositionWatchpoint;
-    
+
     cursor->SetEventMask(mask);
 }
 ```
@@ -158,15 +158,15 @@ void FastScan(ICursor* cursor, Position start, Position end)
 {
     // Only break on critical events
     cursor->SetEventMask(EventMask::Exception);
-    
+
     cursor->SetPosition(start);
-    
+
     while (cursor->GetPosition() < end) {
         if (!cursor->ExecuteForward()) {
             // Reached end or error
             break;
         }
-        
+
         // Process only critical events quickly
         QuickProcessException(cursor);
     }
@@ -179,23 +179,23 @@ void FastScan(ICursor* cursor, Position start, Position end)
 class TraceAnalyzer
 {
     ICursor* cursor_;
-    
+
 public:
     void AnalyzeMemoryAccess()
     {
         // Focus on memory events
         cursor_->SetEventMask(EventMask::MemoryWatchpoint | EventMask::Gap);
-        
+
         while (cursor_->ExecuteForward()) {
             ProcessMemoryEvent();
         }
     }
-    
+
     void AnalyzeControlFlow()
     {
         // Focus on exceptions and thread events
         cursor_->SetEventMask(EventMask::Exception | EventMask::Thread);
-        
+
         while (cursor_->ExecuteForward()) {
             ProcessControlFlowEvent();
         }
