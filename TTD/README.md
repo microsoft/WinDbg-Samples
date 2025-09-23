@@ -61,6 +61,11 @@ Start with the [docs/](docs/README.md) directory to understand TTD concepts, ter
 All samples include Visual Studio project files and can be built using C++20 or later. Each directory contains detailed build instructions and usage examples.
 The header files are also compatible with Clang for Windows.
 
+For convenience, you can run build.cmd in the root of the TTD folder to build all samples. This requires
+- You have Visual Studio 2022 or later installed.
+- Run it from a developer command prompt.
+- Have nuget.exe in your PATH.
+
 ## Prerequisites
 
 ### System Requirements
