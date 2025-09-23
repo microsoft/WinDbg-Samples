@@ -1,5 +1,6 @@
 :: Script to build all TTD samples
 @echo off
+setlocal enabledelayedexpansion
 
 :: Make sure necessary tools are available
 
@@ -30,8 +31,10 @@ if not exist %~dp0ReplayApi\GetTtd\TTDDownload\x64\TTDReplay.dll (
 )
 
 :: Build each sample
+set _error=0
 for /F %%F in ('dir /s /b /a:-d %~dp0packages.config') do (
   call :Build %%~dpF
+  if !_error! NEQ 0 exit /B 1
 )
 
 :: Report binaries that are built
@@ -49,16 +52,16 @@ nuget restore
 for %%F in (*.sln) do (
 
   msbuild %%F %_targets% -p:Configuration=Debug;Platform=x64
-  if errorlevel 1 exit /B 1
+  if errorlevel 1 set _error=1&goto :eof
 
   msbuild %%F %_targets% -p:Configuration=Release;Platform=x64
-  if errorlevel 1 exit /B 1
-
+  if errorlevel 1 set _error=1&goto :eof
+  
   msbuild %%F %_targets% -p:Configuration=Debug;Platform=ARM64
-  if errorlevel 1 exit /B 1
-
+  if errorlevel 1 set _error=1&goto :eof
+  
   msbuild %%F %_targets% -p:Configuration=Release;Platform=ARM64
-  if errorlevel 1 exit /B 1
+  if errorlevel 1 set _error=1&goto :eof
 )
 popd
 goto :eof
