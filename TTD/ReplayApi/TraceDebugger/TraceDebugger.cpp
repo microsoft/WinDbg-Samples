@@ -195,11 +195,10 @@ static bool DbgStepBackward(ICursorView& cursor, std::string_view = {})
 // Command handler for 'tt' command (time travel)
 static bool DbgTimeTravel(ICursorView& cursor, std::string_view line)
 {
-    // Attempt to parse the position from the command line input.
-    auto pos = TryParsePositionFromString(AsWString(line).c_str(), Position::Invalid);
+    Position pos = Position::Invalid;
 
-    // If the position is invalid, attempt to parse as a percentage
-    if (pos == Position::Invalid)
+    // If there is no sequence/step separator parse the number as a percentage
+    if (line.find(':') == std::string::npos)
     {
         auto lineEnd = line.data() + line.size();
         float percent = 0.0;
@@ -209,6 +208,11 @@ static bool DbgTimeTravel(ICursorView& cursor, std::string_view line)
             PositionRange const lifetime = cursor.GetReplayEngine()->GetLifetime();
             pos = TryParsePositionFromPercentage(lifetime, percent);
         }
+    }
+    else
+    {
+        // Parse as sequence:step
+        pos = TryParsePositionFromString(AsWString(line).c_str(), Position::Invalid);
     }
 
     if (pos == Position::Invalid)
@@ -418,13 +422,13 @@ static bool DbgUsage(ICursorView&, std::string_view)
 
     std::cout << "Valid accessmask characters:\n";
     std::cout << "  R - Read access\n";
-    std::cout << "  O - Owner access\n";
+    std::cout << "  O - Overwrite access - triggers before a write / mismatch and provides the value being overwritten\n";
     std::cout << "  W - Write access\n";
     std::cout << "  E - Execute access\n";
-    std::cout << "  C - Copy access\n";
-    std::cout << "  M - Memory access\n";
-    std::cout << "  N - No access\n";
-    std::cout << "  D - Debug access\n";
+    std::cout << "  C - CodeFetch access - aggregate code usage; the size and exact hits are implementation - dependent.\n";
+    std::cout << "  M - Data mismatch - the memory cache predicted the wrong value.\n";
+    std::cout << "  N - New data - First time seeing data at this address.\n";
+    std::cout << "  D - Redundant data - Data read from trace file matches memory cache.\n";
 
     return true;
 }
