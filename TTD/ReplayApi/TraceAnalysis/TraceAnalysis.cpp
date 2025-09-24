@@ -48,6 +48,48 @@ struct SegmentGatheredData
     std::vector<GuestAddressRange> AddressRanges;
 };
 
+// Merges adjacent and overlapping ranges in `segmentGatheredData`.
+void MergeRanges(SegmentGatheredData& segmentGatheredData)
+{
+    
+    // Sort and de-duplicate the list.
+    // Duplicates are actually commonplace wherever the same code gets to run multiple times.
+    // Think loops, or functions that are called multiple times.
+    std::ranges::sort(segmentGatheredData.AddressRanges, [](auto const& a, auto const& b) { return a.Min < b.Min; });
+    {
+        auto const [begin, end] = std::ranges::unique(segmentGatheredData.AddressRanges);
+        segmentGatheredData.AddressRanges.erase(begin, end);
+    }
+
+    // The merge algorithm below requires a non-empty list, so exit early if that's not the case.
+    auto it = segmentGatheredData.AddressRanges.begin();
+    if (it == segmentGatheredData.AddressRanges.end())
+    {
+        return;
+    }
+
+    // Now we can merge adjacent and overlapping ranges.
+    for (auto next = std::next(it); next != segmentGatheredData.AddressRanges.end(); ++next)
+    {
+        if (it->Max >= next->Min)
+        {
+            // The `*it` and `*next` ranges overlap, so we just merge them.
+            // The result remains in `*it` and `*next` is discarded.
+            it->Max = next->Max;
+        }
+        else
+        {
+            // The `*it` and `*next` ranges don't overlap.
+            // Move to the next `it` range and ensure it contains the `*next` range.
+            ++it;
+            // This is safe because at this point `it <= next`.
+            // If `it < next`, then `*it` has already been merged and can be overwritten.
+            *it = *next;
+        }
+    }
+    segmentGatheredData.AddressRanges.erase(std::next(it), segmentGatheredData.AddressRanges.end());
+}
+
 // We store the accumulated data from a single segment in thread-local storage (TLS).
 // This avoids the need to do any sort of synchronization in the hot path.
 // Considering the potentially very high frequency of callback invocation,
@@ -85,6 +127,15 @@ bool __fastcall MemoryWatchpointCallback(
     // We'll need the last position in the segment.
     segmentGatheredData.SegmentEndPosition = position;
 
+    // Merge and compress the segment ranges rather than reallocating.
+    // Heap operations on high-frequency code like this can hurt concurrency greatly,
+    // even the constant-amortized-time reallocations of std::vector.
+    // For this particular sample, this simple action has been observed to cut runtime by half.
+    if (segmentGatheredData.AddressRanges.size() == segmentGatheredData.AddressRanges.capacity())
+    {
+        MergeRanges(segmentGatheredData);
+    }
+
     // This is a high frequency callback, so we need to do as little work here as possible.
     // Just append the data and let the lower frequency callbacks do the expensive bits.
     segmentGatheredData.AddressRanges.emplace_back(watchpointResult.Address, watchpointResult.Address + watchpointResult.Size);
@@ -110,44 +161,14 @@ void __fastcall ThreadContinuityCallback(uintptr_t /*context*/) noexcept
     // in the TLS structure in case the thread replays a new segment.
     SegmentGatheredData segmentGatheredData = std::exchange(s_segmentGatheredData, {});
 
-    // Eliminate duplicates from the list of ranges.
-    // Duplicates are actually commonplace wherever the same code gets to run multiple times.
-    // Think loops, or functions that are called multiple times.
-    // It is best to de-duplicate, summarize or compress the data once per segment here.
-    std::ranges::sort(segmentGatheredData.AddressRanges, [](auto const& a, auto const& b) { return a.Min < b.Min; });
-    {
-        auto const [begin, end] = std::ranges::unique(segmentGatheredData.AddressRanges);
-        segmentGatheredData.AddressRanges.erase(begin, end);
-    }
+	// Merge adjacent and overlapping segment ranges one last time,
+    // to reduce memory overhead in the queue.
+    MergeRanges(segmentGatheredData);
 
-    // To further reduce the data that we will store in the global list, we can merge adjacent ranges.
-    if (auto it = segmentGatheredData.AddressRanges.begin(); it != segmentGatheredData.AddressRanges.end())
-    {
-        for (auto next = std::next(it); next != segmentGatheredData.AddressRanges.end(); ++next)
-        {
-            if (it->Max >= next->Min)
-            {
-                // The `*it` and `*next` ranges overlap, so we just merge them.
-                // The result remains in `*it` and `*next` is discarded.
-                it->Max = next->Max;
-            }
-            else
-            {
-                // The `*it` and `*next` ranges don't overlap.
-                // Move to the next `it` range and ensure it contains the `*next` range.
-                ++it;
-                // This is safe because at this point `it <= next`.
-                // If `it < next`, then `*it` has already been merged and can be overwritten.
-                *it = *next;
-            }
-        }
-        segmentGatheredData.AddressRanges.erase(std::next(it), segmentGatheredData.AddressRanges.end());
+    // Shrink the vector's allocation as needed to reduce memory overhead.
+    segmentGatheredData.AddressRanges.shrink_to_fit();
 
-        // After merging adjacent or overlapping ranges, we can shrink the vector's allocation
-        // to reduce memory overhead.
-        segmentGatheredData.AddressRanges.shrink_to_fit();
-    }
-
+    // And enqueue the resulting range list.
     {
         std::lock_guard lock{ s_completedSegmentListMutex }; // Serialize access to global completed list.
         s_completedSegmentList.push_back(std::move(segmentGatheredData));
