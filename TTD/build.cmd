@@ -5,7 +5,6 @@ setlocal enabledelayedexpansion
 
 :: Capture remaining arguments as msbuild arguments
 set _script_dir=%~dp0
-shift
 set _msbuild_args=%*
 
 :: Make sure necessary tools are available
