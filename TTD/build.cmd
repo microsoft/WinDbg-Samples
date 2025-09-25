@@ -4,7 +4,7 @@
 setlocal enabledelayedexpansion
 
 :: Capture remaining arguments as msbuild arguments
-shift
+set _script_dir=%~dp0
 set _msbuild_args=%*
 
 :: Make sure necessary tools are available
@@ -21,24 +21,24 @@ echo msbuild.exe must be on command line. Run this script from a developer promp
 
 :: Make sure the TTD bits are downloaded for both projects
 
-if not exist %~dp0LiveRecorderApiSample\TTDDownload\x64\TTDRecordCPU.dll (
-  pushd %~dp0LiveRecorderApiSample
+if not exist "%_script_dir%LiveRecorderApiSample\TTDDownload\x64\TTDRecordCPU.dll" (
+  pushd "%_script_dir%LiveRecorderApiSample"
   call Get-Ttd.cmd
-  if not exist %~dp0LiveRecorderApiSample\TTDDownload\x64\TTDRecordCPU.dll echo Error: LiveRecorderApiSample Get-Ttd.cmd failed& goto :eof
+  if not exist "%_script_dir%LiveRecorderApiSample\TTDDownload\x64\TTDRecordCPU.dll" popd & echo Error: LiveRecorderApiSample Get-Ttd.cmd failed& goto :eof
   popd
 )
 
-if not exist %~dp0ReplayApi\GetTtd\TTDDownload\x64\TTDReplay.dll (
-  pushd %~dp0ReplayApi\GetTtd
+if not exist "%_script_dir%ReplayApi\GetTtd\TTDDownload\x64\TTDReplay.dll" (
+  pushd "%_script_dir%ReplayApi\GetTtd"
   call Get-Ttd.cmd
-  if not exist %~dp0ReplayApi\GetTtd\TTDDownload\x64\TTDReplay.dll echo Error: ReplayApi Get-Ttd.cmd failed& goto :eof
+  if not exist "%_script_dir%ReplayApi\GetTtd\TTDDownload\x64\TTDReplay.dll" popd & echo Error: ReplayApi Get-Ttd.cmd failed& goto :eof
   popd
 )
 
 :: Build each sample
 set _error=0
-for /F %%F in ('dir /s /b /a:-d %~dp0packages.config') do (
-  call :Build %%~dpF
+for /F "delims=$" %%F in ('dir /s /b /a:-d "%_script_dir%packages.config"') do (
+  call :Build "%%~dpF"
   if !_error! NEQ 0 exit /B 1
 )
 
