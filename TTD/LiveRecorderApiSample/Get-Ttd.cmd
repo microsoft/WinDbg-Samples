@@ -1,3 +1,3 @@
 @echo off
 
-call powershell "%~dp0\Get-Ttd.ps1" %*
+call powershell -File "%~dp0Get-Ttd.ps1" %*
