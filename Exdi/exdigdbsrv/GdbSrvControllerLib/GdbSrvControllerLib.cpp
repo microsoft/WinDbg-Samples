@@ -56,6 +56,10 @@ LPCSTR const g_RequestGdbSetWritePAmode = "Qqemu.PhyMemMode";
 
 //  Server Name that supports configurable memory access mode (PAs vs VAs)
 LPCWSTR const g_GdbSrvConfigMemAccessMode = L"QEMU";
+
+// Slow server handling Asynchronous command
+LPCWSTR const g_GdbSrvSlowAsyncCmdProcess = L"BMC-OpenOCD";
+
 //
 //  Set of internal Exdi commands that are not sent to the GDB server,
 //  so these commands are processed offline, and they are accessible via 
@@ -2521,6 +2525,19 @@ public:
         return m_pRspClient->IsFeatureEnabled(PACKET_CONFIG_PA_MEMORY_MODE);
     }
 
+    bool GdbSrvControllerImpl::IsServerSlowAsynCmdRespMode() const
+    {
+        wstring targetName;
+        ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
+
+        cfgData.GetGdbServerTargetName(targetName);
+        if (_wcsicmp(targetName.c_str(), g_GdbSrvSlowAsyncCmdProcess) == 0)
+        {
+            return true;
+        }
+        return false;
+    }
+
     PCSTR GetSrvDynamicPAConfigModeCmd(_In_ bool mode)
     {
         PCSTR pFormat = nullptr;
@@ -3643,4 +3660,10 @@ bool GdbSrvController::GetDynConfPAGdbMemCmdMode()
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
     return m_pGdbSrvControllerImpl->GetDynConfigPAMemCommandMode();
+}
+
+bool GdbSrvController::IsServerSlowAsynResponseMode()
+{
+    assert(m_pGdbSrvControllerImpl != nullptr);
+    return m_pGdbSrvControllerImpl->IsServerSlowAsynCmdRespMode();
 }

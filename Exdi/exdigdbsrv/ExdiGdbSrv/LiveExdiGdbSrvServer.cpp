@@ -1722,6 +1722,12 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerParameters()
                 _T("Please set the full path to the SYSTEMREGISTERS.XML file."), _T("EXDI-GdbServer"), MB_ICONERROR);
         }
 
+        // Check server asynchronous command time interval mode
+        if (m_pGdbSrvController->IsServerSlowAsynResponseMode())
+        {
+            m_pGdbSrvController->SetSleepAsynCmdInterval(c_asyncSlowSrvResponsePauseMs);
+        }
+
         return S_OK;
     }
     CATCH_AND_RETURN_HRESULT;
@@ -1939,7 +1945,7 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
             }
             else
             {
-                Sleep(c_asyncResponsePauseMs);
+                Sleep(pController->GetSleepAsynCmdInterval());
             }
         }
         while (isWaitingOnStopReply &&

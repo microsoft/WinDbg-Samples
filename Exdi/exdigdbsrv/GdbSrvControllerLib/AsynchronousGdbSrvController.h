@@ -15,7 +15,8 @@ namespace GdbSrvControllerLib
 {
     //  Waiting times, to handle GDB servers over slow HW debugger interfaces.
     const int c_attemptsWaitingOnPendingResponse = 690; // 15 seconds to finish break/step command (150 * 20ms wait)
-    const int c_asyncResponsePauseMs = 20;              // milliseconds to sleep when waiting async packet arrival
+    const int c_asyncResponsePauseMs = 2;               // milliseconds to sleep when waiting async packet arrival
+    const int c_asyncSlowSrvResponsePauseMs = 20;       // Slow GDB server (e.g., OpenOCD) milliseconds to sleep when waiting async packet arrival
     const int c_maximumReplyPacketsInResponse = 1000;   // when halting, GDB server may send per core console data (OpenOCD does this)
     class AsynchronousGdbSrvController : public GdbSrvController
     {
@@ -56,6 +57,7 @@ namespace GdbSrvControllerLib
         void SetAsynchronousCmdStopReplyPacket() {m_isAsynchronousCmdStopReplyPacket = true;}
         void ResetAsynchronousCmdStopReplyPacket() {m_isAsynchronousCmdStopReplyPacket = false;}
         bool GetAsynchronousCmdStopReplyPacket() {return m_isAsynchronousCmdStopReplyPacket;}
+
         void ContinueWaitingOnStopReplyPacket();
         void HandleStopReply(_In_ const std::string reply, _In_ StopReplyPacketStruct& stopReply,
             _Inout_ AddressType* pPcAddress, _Out_ DWORD* pProcessorNumber, _Out_ bool* pEventNotification);
@@ -63,6 +65,8 @@ namespace GdbSrvControllerLib
         void StopTargetAtRun();
         void SetInterruptEvent();
         bool IsLastCommandTargetRun();
+        int GetSleepAsynCmdInterval() { return m_asyncResponsePauseMs; }
+        void SetSleepAsynCmdInterval(_In_ int interval) { m_asyncResponsePauseMs = interval; }
 
     protected:
         AsynchronousGdbSrvController(_In_ const std::vector<std::wstring> &coreConnectionParameters);
@@ -79,5 +83,7 @@ namespace GdbSrvControllerLib
         std::vector<bool> m_breakpointSlots;
         std::vector<bool> m_dataBreakpointSlots;
         bool m_isAsynchronousCmdStopReplyPacket;
+        int m_asyncResponsePauseMs;
+
     };
 }

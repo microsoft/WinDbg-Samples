@@ -357,6 +357,12 @@ int ReceiveInternal(_In_ int packetLength, _In_ TcpIpStream * const pStream,
         {
             pReadInputStreamBuffer = nullptr;
         }
+        else if (readInputStreamCharCounter == 0)
+        {
+            //  Connection has been closed
+            readInputStreamCharCounter = SOCKET_ERROR;
+            pReadInputStreamBuffer = nullptr;
+        }
     }
     if (pReadInputStreamBuffer != nullptr)
     {
