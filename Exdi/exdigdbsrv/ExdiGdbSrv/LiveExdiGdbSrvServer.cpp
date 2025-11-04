@@ -1725,7 +1725,7 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerParameters()
         // Check server asynchronous command time interval mode
         if (m_pGdbSrvController->IsServerSlowAsyncResponseMode())
         {
-            m_pGdbSrvController->SetSleepAsynCmdInterval(c_asyncSlowSrvResponsePauseMs);
+            m_pGdbSrvController->SetSleepAsyncCmdInterval(c_asyncSlowSrvResponsePauseMs);
         }
 
         return S_OK;
@@ -1945,7 +1945,7 @@ ADDRESS_TYPE CLiveExdiGdbSrvServer::ParseAsynchronousCommandResult(_Out_ DWORD *
             }
             else
             {
-                Sleep(pController->GetSleepAsynCmdInterval());
+                Sleep(pController->GetSleepAsyncCmdInterval());
             }
         }
         while (isWaitingOnStopReply &&

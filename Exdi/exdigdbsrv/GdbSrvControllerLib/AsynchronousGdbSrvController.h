@@ -65,8 +65,8 @@ namespace GdbSrvControllerLib
         void StopTargetAtRun();
         void SetInterruptEvent();
         bool IsLastCommandTargetRun();
-        int GetSleepAsynCmdInterval() { return m_asyncResponsePauseMs; }
-        void SetSleepAsynCmdInterval(_In_ int interval) { m_asyncResponsePauseMs = interval; }
+        int GetSleepAsyncCmdInterval() { return m_asyncResponsePauseMs; }
+        void SetSleepAsyncCmdInterval(_In_ int interval) { m_asyncResponsePauseMs = interval; }
 
     protected:
         AsynchronousGdbSrvController(_In_ const std::vector<std::wstring> &coreConnectionParameters);
