@@ -1723,7 +1723,7 @@ HRESULT CLiveExdiGdbSrvServer::SetGdbServerParameters()
         }
 
         // Check server asynchronous command time interval mode
-        if (m_pGdbSrvController->IsServerSlowAsynResponseMode())
+        if (m_pGdbSrvController->IsServerSlowAsyncResponseMode())
         {
             m_pGdbSrvController->SetSleepAsynCmdInterval(c_asyncSlowSrvResponsePauseMs);
         }

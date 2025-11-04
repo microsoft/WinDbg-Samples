@@ -337,7 +337,7 @@ namespace GdbSrvControllerLib
         bool GetDynConfPAGdbMemCmdMode();
 
         // Checks whether the GDB server support slow response mode
-        bool IsServerSlowAsynResponseMode();
+        bool IsServerSlowAsyncResponseMode();
 
     protected:
         bool IsReplyOK(_In_ const std::string & reply);

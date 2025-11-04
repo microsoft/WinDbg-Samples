@@ -2525,7 +2525,7 @@ public:
         return m_pRspClient->IsFeatureEnabled(PACKET_CONFIG_PA_MEMORY_MODE);
     }
 
-    bool GdbSrvControllerImpl::IsServerSlowAsynCmdRespMode() const
+    bool GdbSrvControllerImpl::IsServerSlowAsyncCmdRespMode() const
     {
         wstring targetName;
         ConfigExdiGdbServerHelper& cfgData = ConfigExdiGdbServerHelper::GetInstanceCfgExdiGdbServer(nullptr);
@@ -3662,8 +3662,8 @@ bool GdbSrvController::GetDynConfPAGdbMemCmdMode()
     return m_pGdbSrvControllerImpl->GetDynConfigPAMemCommandMode();
 }
 
-bool GdbSrvController::IsServerSlowAsynResponseMode()
+bool GdbSrvController::IsServerSlowAsyncResponseMode()
 {
     assert(m_pGdbSrvControllerImpl != nullptr);
-    return m_pGdbSrvControllerImpl->IsServerSlowAsynCmdRespMode();
+    return m_pGdbSrvControllerImpl->IsServerSlowAsyncCmdRespMode();
 }
