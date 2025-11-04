@@ -35,7 +35,6 @@ LPCSTR const g_GdbResumeEx = "vCont;c";
 LPCSTR g_GdbStepCmd = g_GdbStepEx;
 LPCSTR g_GdbResumeCmd = g_GdbResumeEx;
 
-
 //
 //  GetDataAccessBreakPointCommand  This function returns the data access breakpoint command that
 //                                  will be sent to the GdbServer.
@@ -127,6 +126,7 @@ AsynchronousGdbSrvController * AsynchronousGdbSrvController::Create(_In_ const s
         g_GdbStepCmd = g_GdbStepEx;
         g_GdbResumeCmd = g_GdbResumeEx;
     }
+
     return pResult;
 }
 
@@ -138,6 +138,7 @@ AsynchronousGdbSrvController::AsynchronousGdbSrvController(_In_ const std::vecto
     m_AsynchronousCmd.pController = nullptr;
     m_AsynchronousCmd.isRspNeeded = false;
     m_AsynchronousCmd.isReqNeeded = false;
+    m_asyncResponsePauseMs = c_asyncResponsePauseMs;
 }
 
 AsynchronousGdbSrvController::~AsynchronousGdbSrvController()
@@ -642,7 +643,7 @@ bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * p
             else
             {
                 // wait a little longer for a reply packet
-                Sleep(c_asyncResponsePauseMs);
+                Sleep(m_asyncResponsePauseMs);
             }
         }
         while (!*pEventNotification &&
