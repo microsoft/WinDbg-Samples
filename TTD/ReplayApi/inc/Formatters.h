@@ -47,6 +47,15 @@ struct std::formatter<TTD::Replay::StepCount, CharT> : std::formatter<uint64_t, 
     }
 };
 
+// Custom formatter for TTD::InstructionCount to work with std::format
+template < typename CharT >
+struct std::formatter<TTD::InstructionCount, CharT> : std::formatter<uint64_t, CharT> {
+    template <typename FormatContext>
+    auto format(const TTD::InstructionCount& instructionCount, FormatContext& ctx) const {
+        return std::formatter<uint64_t, CharT>::format(static_cast<uint64_t>(instructionCount), ctx);
+    }
+};
+
 // Custom formatter for TTD::Replay::Position to work with std::format
 template < typename CharT >
 struct std::formatter<TTD::Replay::Position, CharT> : std::formatter<std::basic_string<CharT>, CharT> {
