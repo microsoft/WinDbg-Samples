@@ -1,0 +1,6 @@
+{
+  "dependencies": [
+    "zydis",
+    "nlohmann-json"
+  ]
+}

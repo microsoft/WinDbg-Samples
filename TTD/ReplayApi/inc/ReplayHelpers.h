@@ -20,16 +20,22 @@ namespace TTD
 {
 
 // Get the architecture of the trace being replayed.
-inline ProcessorArchitecture GetGuestArchitecture(Replay::ICursorView& cursor)
+inline ProcessorArchitecture GetGuestArchitecture(Replay::IReplayEngineView& replayEngine)
 {
-    SystemInfo const& systemInfo = cursor.GetReplayEngine()->GetSystemInfo();
+    SystemInfo const& systemInfo = replayEngine.GetSystemInfo();
     switch (systemInfo.System.ProcessorArchitecture)
     {
-        case PROCESSOR_ARCHITECTURE_INTEL: return ProcessorArchitecture::x86;
-        case PROCESSOR_ARCHITECTURE_AMD64: return ProcessorArchitecture::x64;
-        case PROCESSOR_ARCHITECTURE_ARM64: return ProcessorArchitecture::Arm64;
-        default: return ProcessorArchitecture::Invalid;
+    case PROCESSOR_ARCHITECTURE_INTEL: return ProcessorArchitecture::x86;
+    case PROCESSOR_ARCHITECTURE_AMD64: return ProcessorArchitecture::x64;
+    case PROCESSOR_ARCHITECTURE_ARM64: return ProcessorArchitecture::Arm64;
+    default: return ProcessorArchitecture::Invalid;
     }
+}
+
+// Get the architecture of the trace being replayed.
+inline ProcessorArchitecture GetGuestArchitecture(Replay::ICursorView& cursor)
+{
+    return GetGuestArchitecture(*cursor.GetReplayEngine());
 }
 
 // Compute how far into the replay the given position is within the range.
@@ -382,6 +388,31 @@ inline TTD::Replay::Position TryParsePositionFromPercentage(
 inline TTD::Replay::PositionRange GetTracePositionRange(TTD::Replay::IReplayEngineView const& engine)
 {
     return { engine.GetFirstPosition(), engine.GetLastPosition() };
+}
+
+// Convert a block of bytes to a hex string representation, up to a maximum number of bytes.
+template < size_t MaxBytes >
+inline std::string GetBytesString(
+    _In_                        size_t            dataSizeInBytes,
+    _In_reads_(dataSizeInBytes) void const* const pData
+)
+{
+    if (dataSizeInBytes > MaxBytes)
+    {
+        dataSizeInBytes = MaxBytes;
+    }
+
+    if (dataSizeInBytes == 0 || pData == nullptr)
+    {
+        return {};
+    }
+
+    char buffer[MaxBytes * 3 + 1];
+    for (size_t i = 0; i < dataSizeInBytes; ++i)
+    {
+        snprintf(&buffer[i * 3], 4, "%02X ", static_cast<uint8_t const*>(pData)[i]);
+    }
+    return { buffer, dataSizeInBytes * 3 - 1 };
 }
 
 } // namespace TTD
