@@ -3,9 +3,18 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Capture remaining arguments as msbuild arguments
 set _script_dir=%~dp0
-set _msbuild_args=%*
+
+set _configs=Release
+set _platforms=x64
+if "%1"=="-all" (
+  set _configs=Debug Release
+  set _platforms=x86 x64 ARM64
+  shift
+)
+
+:: Capture remaining arguments as msbuild arguments
+set _msbuild_args=%1 %2 %3 %4 %5 %6 %7 %8 %9
 
 :: Make sure necessary tools are available
 
@@ -56,26 +65,12 @@ pushd %1
 nuget restore
 for %%F in (*.sln) do (
 
-  :: X86
-  msbuild %%F -p:Configuration=Debug;Platform=x86 %_msbuild_args%
-  if errorlevel 1 set _error=1&goto :eof
-
-  msbuild %%F -p:Configuration=Release;Platform=x86 %_msbuild_args%
-  if errorlevel 1 set _error=1&goto :eof
-
-  :: X64
-  msbuild %%F -p:Configuration=Debug;Platform=x64 %_msbuild_args%
-  if errorlevel 1 set _error=1&goto :eof
-
-  msbuild %%F -p:Configuration=Release;Platform=x64 %_msbuild_args%
-  if errorlevel 1 set _error=1&goto :eof
-
-  :: ARM64
-  msbuild %%F -p:Configuration=Debug;Platform=ARM64 %_msbuild_args%
-  if errorlevel 1 set _error=1&goto :eof
-
-  msbuild %%F -p:Configuration=Release;Platform=ARM64 %_msbuild_args%
-  if errorlevel 1 set _error=1&goto :eof
+  for %%C in (%_configs%) do (
+    for %%P in (%_platforms%) do (
+      msbuild %%F -p:Configuration=%%C;Platform=%%P %_msbuild_args%
+      if errorlevel 1 set _error=1&goto :eof
+    )
+  )
 )
 popd
 goto :eof
