@@ -5,16 +5,52 @@ setlocal enabledelayedexpansion
 
 set _script_dir=%~dp0
 
-set _configs=Release
-set _platforms=x64
-if "%1"=="-all" (
-  set _configs=Debug Release
-  set _platforms=x86 x64 ARM64
-  shift
+goto :SkipUsage
+
+:Usage
+
+echo Usage: build.cmd [^<option^>^|^<msbuild arg^>]...
+echo.
+echo ^<option^> can be one of:
+echo      -all                    Build all configurations (Debug and Release) for all platforms (x86, x64, ARM64).
+echo                              Default is to build only x64 Release.
+echo      -clean                  Clean all build outputs instead of building.
+echo      -out ^<path^>             Specify an output directory for all built binaries.
+echo.
+echo ^<msbuild arg^> can be any legal msbuild argument. These will be passed directly to msbuild.
+
+goto :eof
+
+:SkipUsage
+call :ParseArgs %*
+if %PrintUsage%==yes goto :Usage
+goto :ArgsParsed
+
+:ParseArgs
+set PrintUsage=no
+set Configs=Release
+set Platforms=x64
+set AdditionalArguments=
+set MsbuildArgs=
+
+:GatherArgs
+
+if           [%1]==[]                   ( rem Done gathering args
+) else if /I "%~1"=="-?"                ( set PrintUsage=yes&                                     shift /1 & goto :GatherArgs
+) else if /I "%~1"=="-all"              ( set Configs=Debug Release& set Platforms=x86 x64 ARM64& shift /1 & goto :GatherArgs
+) else if /I "%~1"=="-clean"            ( set MsbuildArgs=%MsbuildArgs% -t:Clean&                 shift /1 & goto :GatherArgs
+) else if /I "%~1"=="-out"              ( set MsbuildArgs=%MsbuildArgs% -p:OutDir=%2&             shift /1 & shift /1 & goto :GatherArgs
+) else (
+    set AdditionalArguments=%AdditionalArguments% %1
+    shift /1
+    goto :GatherArgs
 )
 
+goto :eof
+:ArgsParsed
+
 :: Capture remaining arguments as msbuild arguments
-set _msbuild_args=%1 %2 %3 %4 %5 %6 %7 %8 %9
+set MsbuildArgs=%MsbuildArgs% %AdditionalArguments%
 
 :: Make sure necessary tools are available
 
@@ -51,10 +87,6 @@ for /F "delims=$" %%F in ('dir /s /b /a:-d "%_script_dir%packages.config"') do (
   if !_error! NEQ 0 exit /B 1
 )
 
-:: Report binaries that are built
-echo Binaries produced:
-dir /s /b *.exe *.dll *.sys
-
 :: Exit the script
 goto :eof
 
@@ -65,9 +97,10 @@ pushd %1
 nuget restore
 for %%F in (*.sln) do (
 
-  for %%C in (%_configs%) do (
-    for %%P in (%_platforms%) do (
-      msbuild %%F -p:Configuration=%%C;Platform=%%P %_msbuild_args%
+  for %%C in (%Configs%) do (
+    for %%P in (%Platforms%) do (
+      echo *** msbuild %%F -p:Configuration=%%C;Platform=%%P %MsbuildArgs%
+      msbuild %%F -p:Configuration=%%C;Platform=%%P %MsbuildArgs%
       if errorlevel 1 set _error=1&goto :eof
     )
   )
