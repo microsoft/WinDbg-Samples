@@ -263,12 +263,6 @@ static void PrintFallbackStats(IReplayEngineView& replayEngineView, FallbackStat
 
 static void ProcessTrace(IReplayEngineView& replayEngineView, CommandLine const& commandLine)
 {
-    UniqueCursor pOwnedCursor{ replayEngineView.NewCursor() };
-    if (!pOwnedCursor)
-    {
-        throw std::runtime_error("Failed to create a replay engine cursor");
-    }
-
     // Show instruction count if requested
     if (commandLine.ShowInstructionCount)
     {
@@ -427,7 +421,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    // This allows the tool to get any messages from the initialization of the engine
+    // This allows the tool to get any messages from the replay engine
      BasicErrorReporting errorReporting;
      pOwnedReplayEngine->RegisterDebugModeAndLogging(DebugModeType::None, &errorReporting);
 

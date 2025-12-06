@@ -15,51 +15,68 @@
 #include <zydis/Zydis.h> // for instruction decoding
 
 #include <array>
+#include <charconv>
+#include <compare>
+#include <cstring>
+#include <functional>
 #include <span>
 #include <stdint.h>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 constexpr size_t MAX_INSTRUCTION_SIZE = 15;
 
 struct InstructionBytes
 {
     uint8_t size;
-    uint8_t bytes[15];
+    uint8_t bytes[MAX_INSTRUCTION_SIZE];
 
-    // For hashing.
-    operator std::string_view() const
+    // Custom equality and ordering that only compares the first 'size' bytes
+    bool operator==(InstructionBytes const& other) const
     {
-        auto const p = reinterpret_cast<char const*>(this);
-        return std::string_view(p, sizeof(*this));
+        if (size != other.size)
+        {
+            return false;
+        }
+        return std::memcmp(bytes, other.bytes, size) == 0;
+    }
+    
+    std::strong_ordering operator<=>(InstructionBytes const& other) const
+    {
+        int result = std::memcmp(bytes, other.bytes, size);
+        if (result < 0) return std::strong_ordering::less;
+        if (result > 0) return std::strong_ordering::greater;
+        return std::strong_ordering::equal;
     }
 };
-
-inline bool operator<(InstructionBytes const& a, InstructionBytes const& b) noexcept
-{
-    if (a.size != b.size)
-    {
-        return a.size < b.size;
-    }
-    return std::memcmp(a.bytes, b.bytes, a.size) < 0;
-}
 
 struct InstructionBytesHash
 {
     size_t operator()(InstructionBytes const& a) const
     {
-        std::hash<std::string_view> hasher;
-        return hasher.operator()(a);
+        // Use FNV-1a hash algorithm to hash the instruction bytes
+        constexpr size_t FNV_OFFSET_BASIS = 14695981039346656037ULL;
+        constexpr size_t FNV_PRIME = 1099511628211ULL;
+        
+        size_t hash = FNV_OFFSET_BASIS;
+        
+        // Hash the size first
+        hash ^= static_cast<size_t>(a.size);
+        hash *= FNV_PRIME;
+        
+        // Hash each byte of the instruction
+        for (uint8_t i = 0; i < a.size; ++i)
+        {
+            hash ^= static_cast<size_t>(a.bytes[i]);
+            hash *= FNV_PRIME;
+        }
+        
+        return hash;
     }
 };
 
-inline bool operator==(InstructionBytes const& a, InstructionBytes const& b)
-{
-    using Raw = std::array<uint8_t, sizeof(InstructionBytes)>;
-    return *reinterpret_cast<Raw const*>(&a) == *reinterpret_cast<Raw const*>(&b);
-}
-
-inline bool ParseHexBytes(std::string const& hexStr, InstructionBytes& instruction)
+inline bool ParseHexBytes(std::string_view hexStr, InstructionBytes& instruction)
 {
     instruction.size = 0;
 
@@ -84,11 +101,9 @@ inline bool ParseHexBytes(std::string const& hexStr, InstructionBytes& instructi
             return false;
         }
 
-        char const* start = hexStr.c_str() + pos;
-        char* end = nullptr;
-        unsigned long byte = std::strtoul(start, &end, 16);
-
-        if (end != start + 2 || byte > 0xFF)
+        unsigned char byte;
+        auto [_, ec] = std::from_chars(hexStr.data(), hexStr.data() + 2, byte, 16);
+        if (ec != std::errc())
         {
             return false;
         }

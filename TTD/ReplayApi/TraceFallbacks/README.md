@@ -39,7 +39,7 @@ While fallbacks achieve the goal of reducing maintenance burden, they significan
 
 - **Normal recording**: 10x-20x slower than native execution
 - **Heavy fallback usage**: 100x-1000x slower than native execution
-- **File size increase**: The amount varies based on the instruction, but it must record the impact of the instruction (register output + flags) and the indirect effects of stopping and starting emulation. If fallbacks occur for a heavily used instruction, the file size can increase substantially.
+- **File size increase**: The amount varies based on the instruction, but it must record the side effects of the instruction (register output, flags, memory reads/writes, etc.) and the indirect effects of stopping and starting emulation. If fallbacks occur for a heavily used instruction, the file size can increase substantially.
 
 **Why the impact?** Each fallback requires:
 - Decoding and encoding the instruction
@@ -55,7 +55,7 @@ While fallbacks achieve the goal of reducing maintenance burden, they significan
 
 ## 🚀 Build Instructions
 
-## 📦 Prerequisites
+### 📦 Prerequisites
 
 - Windows 10/11
 - Visual Studio 2022 (Community, Professional, or Enterprise)
@@ -66,12 +66,18 @@ While fallbacks achieve the goal of reducing maintenance burden, they significan
 
 ### 1. Clone the Repository
 ```cmd
-git clone https://github.com/<your-org>/<your-repo>.git
-cd <your-repo>/TTD/ReplayApi/TraceFallbacks
+git clone https://github.com/microsoft/WinDbg-Samples.git
 ```
 
-### 2. Open the Solution
+### 2. Get the TTD replay binaries
 ```cmd
+cd WinDbg-Samples\TTD\ReplayApi\GetTtd
+Get-TTD.cmd
+```
+
+### 3. Open the Solution
+```cmd
+cd ..\TraceFallbacks
 start TraceFallbacks.sln
 ```
 

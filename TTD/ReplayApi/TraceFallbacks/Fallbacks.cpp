@@ -76,7 +76,7 @@ FallbackStatsMap GatherRawFallbackInfo(IReplayEngineView& replayEngineView)
         auto& segmentGatheredData = s_segmentGatheredData;
 
         InstructionBytes fallback{};
-        DBG_ASSERT(size <= _countof(fallback.bytes));
+        DBG_ASSERT(size <= std::size(fallback.bytes));
 
         fallback.size = static_cast<uint8_t>(size);
         auto const queryResult = pThreadView->QueryMemoryBuffer(pc, BufferView{ fallback.bytes, size });
@@ -85,7 +85,10 @@ FallbackStatsMap GatherRawFallbackInfo(IReplayEngineView& replayEngineView)
 
         Position const position = pThreadView->GetPosition();
 
-        InstructionBytes const& key = queryResult.Memory.Size == size ? fallback : InstructionBytes{};
+        if (queryResult.Memory.Size < size)
+        {
+            fallback = InstructionBytes{};
+        }
         
         RawFallbackInfo const value = {
             .Position = position,
@@ -93,7 +96,7 @@ FallbackStatsMap GatherRawFallbackInfo(IReplayEngineView& replayEngineView)
             .Type = fallbackType,
         };
 
-        if (auto [iter, inserted] = segmentGatheredData.Stats.insert({ key, value }); !inserted)
+        if (auto [iter, inserted] = segmentGatheredData.Stats.insert({ fallback, value }); !inserted)
         {
             iter->second.Count += 1;
         }
