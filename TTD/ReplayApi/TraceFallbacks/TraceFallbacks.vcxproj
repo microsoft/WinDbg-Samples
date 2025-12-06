@@ -279,7 +279,6 @@
     <ClInclude Include="InstructionDecoder.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <Import Condition="Exists('$(VCInstallDir)vcpkg\scripts\buildsystems\msbuild\vcpkg.targets')" Project="$(VCInstallDir)vcpkg\scripts\buildsystems\msbuild\vcpkg.targets" />
   <Target Name="EnsureVCPKG" BeforeTargets="_CheckForInvalidConfigurationAndPlatform">
     <PropertyGroup>
       <ErrorText>This project requires the VCPKG integration support in Visual Studio. Add the Microsoft.VisualStudio.Component.Vcpkg component to your install.</ErrorText>
