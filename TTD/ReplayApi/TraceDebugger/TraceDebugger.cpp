@@ -516,7 +516,7 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    // This allows the tool to get any messages from the initialization of the engine
+    // This allows the tool to get any messages from the replay engine
     BasicErrorReporting errorReporting;
     pOwnedReplayEngine->RegisterDebugModeAndLogging(DebugModeType::None, &errorReporting);
 
