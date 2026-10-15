@@ -614,7 +614,28 @@ bool AsynchronousGdbSrvController::HandleInterruptTarget(_Inout_ AddressType * p
     bool isBreakDone = false;
     *pEventNotification = false;
 
-    // check of the asyc recv is still active
+    bool hasPendingStopReply = false;
+    if (!IsAsynchronousCommandInProgress() && !m_currentAsynchronousCommandResult.empty())
+    {
+        StopReplyPacketStruct pendingStopReply = {};
+        if (GdbSrvController::HandleAsynchronousCommandResponse(
+                m_currentAsynchronousCommandResult, &pendingStopReply))
+        {
+            hasPendingStopReply =
+                pendingStopReply.status.isTAAPacket ||
+                pendingStopReply.status.isSAAPacket;
+        }
+    }
+
+    // A completed stop reply may be waiting for the notification thread to
+    // enter the server STA. Do not replace and clear that result with another
+    // receive operation or consume it from the break-in path. The scheduled
+    // asynchronous callback remains responsible for the single halt event.
+    if (hasPendingStopReply)
+    {
+        return true;
+    }
+
     if (!IsAsynchronousCommandInProgress())
     {
         // try to get a new pending response sent by GDBserver
@@ -788,4 +809,3 @@ void AsynchronousGdbSrvController::SetInterruptEvent()
 {
     GdbSrvController::SetInterruptEvent();
 }
-
