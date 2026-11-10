@@ -1465,7 +1465,17 @@ bool XmlDataSystemRegister::HandleMapSystemRegAccessCode(_In_ TAG_ATTR_LIST* con
             {
                 regNameOrder.first = string("n/a");
             }
-            itMap->second->insert({(encodedValue & 0xffffffff), move(regNameOrder)});
+            auto itEntry = itMap->second->find(encodedValue & 0xffffffff);
+            if (itEntry != itMap->second->end() &&
+                itEntry->second.first == "n/a" && regNameOrder.first != "n/a")
+            {
+                // Prefer an exported alias over an unavailable register name.
+                itEntry->second = move(regNameOrder);
+            }
+            else
+            {
+                itMap->second->insert({(encodedValue & 0xffffffff), move(regNameOrder)});
+            }
             isDone = true;
         }
     }

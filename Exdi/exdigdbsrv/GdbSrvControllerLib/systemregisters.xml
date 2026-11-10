@@ -57,6 +57,7 @@
 
         <!-- System control registers -->
         <register Name ="SCTLR"          AccessCode = "3, 0,  1, 0, 0" />
+        <register Name ="SCTLR_EL1"      AccessCode = "3, 0,  1, 0, 0" />
         <register Name ="SCTLR_EL2"      AccessCode = "3, 4,  1, 0, 0" />
         <register Name ="HCR_EL2"        AccessCode = "3, 4,  1, 1, 0" />
         <register Name ="HSTR_EL2"       AccessCode = "3, 4,  1, 1, 3" />
@@ -124,6 +125,7 @@
 
         <!-- Security extensions registers -->
         <register Name ="VBAR"       AccessCode = "3, 0, 12, 0, 0" />
+        <register Name ="VBAR_EL1"   AccessCode = "3, 0, 12, 0, 0" />
         <register Name ="VBAR_EL2"   AccessCode = "3, 4, 12, 0, 0" />
         <register Name ="RVBAR_EL2"  AccessCode = "3, 4, 12, 0, 1" />
 
