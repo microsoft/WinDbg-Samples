@@ -302,7 +302,7 @@ void AsynchronousGdbSrvController::DeleteCodeBreakpoint(_In_ unsigned breakpoint
 //
 //  Parameters:
 //      address:            Breakpoint address
-//      accessWidth:        Specifies the size of the location, in bytes, to monitor for access.
+//      accessWidth:        EXDI width in bits; converted to bytes for data watchpoints.
 //      dataAccessType:     Specifies the type of access that satisfies the breakpoint 
 //                          (can be daWrite/daRead/daBoth)
 //
@@ -322,16 +322,32 @@ void AsynchronousGdbSrvController::DeleteCodeBreakpoint(_In_ unsigned breakpoint
 //  'E NN'                  if failed. 
 //
 //  Example:
-//  ba r4 0x81419120
+//  ba w4 0x81419120
 //  
-//  $Z3,81419120,32#e4
+//  Packet payload: Z2,81419120,4
 //  +
 //  $OK#9a
 //  +  
 //
+// EXDI data breakpoint widths are in bits; RSP watchpoint lengths are in bytes.
+// Z1 uses a target-specific kind, so leave execution breakpoints unchanged.
+static unsigned GetDataBreakpointKind(BYTE accessWidth, DATA_ACCESS_TYPE dataAccessType)
+{
+    if (dataAccessType == daExecution)
+    {
+        return accessWidth;
+    }
+    if (accessWidth == 0 || accessWidth % 8 != 0)
+    {
+        throw _com_error(E_INVALIDARG);
+    }
+    return accessWidth / 8;
+}
+
 unsigned AsynchronousGdbSrvController::CreateDataBreakpoint(_In_ AddressType address, _In_ BYTE accessWidth, 
                                                             _In_ DATA_ACCESS_TYPE dataAccessType)
 {
+    const unsigned kind = GetDataBreakpointKind(accessWidth, dataAccessType);
     unsigned slot = static_cast<unsigned>(-1);
     for(unsigned i = 0; i < m_dataBreakpointSlots.size(); ++i)
     {
@@ -353,8 +369,8 @@ unsigned AsynchronousGdbSrvController::CreateDataBreakpoint(_In_ AddressType add
     char breakCmd[128] = {0}; 
     TargetArchitecture targetArchitecture = GdbSrvController::GetTargetArchitecture();
     PCSTR pFormat = (targetArchitecture == ARM64_ARCH || targetArchitecture == AMD64_ARCH) ?
-                     "%s,%I64x,%d" : "%s,%x,%d";     
-    sprintf_s(breakCmd, _countof(breakCmd), pFormat, pCommandType, address, accessWidth);
+                     "%s,%I64x,%x" : "%s,%x,%x";     
+    sprintf_s(breakCmd, _countof(breakCmd), pFormat, pCommandType, address, kind);
 
     bool isReplyOK = false;
     unsigned totalNumberOfCores = GdbSrvController::GetNumberOfRspConnections();
@@ -409,6 +425,7 @@ unsigned AsynchronousGdbSrvController::CreateDataBreakpoint(_In_ AddressType add
 void AsynchronousGdbSrvController::DeleteDataBreakpoint(_In_ unsigned breakpointNumber, _In_ AddressType address,
                                                         _In_ BYTE accessWidth, _In_ DATA_ACCESS_TYPE dataAccessType)
 {
+    const unsigned kind = GetDataBreakpointKind(accessWidth, dataAccessType);
     if (breakpointNumber >= m_dataBreakpointSlots.size() || !m_dataBreakpointSlots[breakpointNumber])
     {
         throw std::exception("Trying to delete nonexisting data breakpoint");
@@ -420,8 +437,8 @@ void AsynchronousGdbSrvController::DeleteDataBreakpoint(_In_ unsigned breakpoint
     char breakCmd[128] = {0}; 
     TargetArchitecture targetArchitecture = GdbSrvController::GetTargetArchitecture();
     PCSTR pFormat = (targetArchitecture == ARM64_ARCH || targetArchitecture == AMD64_ARCH) ?
-                     "%s,%I64x,%d" : "%s,%x,%d";     
-    sprintf_s(breakCmd, _countof(breakCmd), pFormat, pCommandType, address, accessWidth);
+                     "%s,%I64x,%x" : "%s,%x,%x";     
+    sprintf_s(breakCmd, _countof(breakCmd), pFormat, pCommandType, address, kind);
 
     bool isReplyOK = false;
     unsigned totalNumberOfCores = GdbSrvController::GetNumberOfRspConnections();
