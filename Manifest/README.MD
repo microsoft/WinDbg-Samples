@@ -76,6 +76,34 @@ There is one important thing to note about the icons here.  While you **MUST** p
 
 You can use the "as a file in the extension package" method **if and only if** your extension will **always** be on the local disk.  If your extension is included in a network based extension gallery, you **MUST CURRENTLY** use the binary blob method.
 
+#### Adding MCP Functionality
+*For an extension to add MCP functionality, you need to be running WinDbg 1.2610.1001.0 or newer*
+
+If your script wants to add MCP tools or MCP prompts to the debugger's MCP server, it may do so by binding a function exposed in the data model to a tool or prompt via its gallery manifest.
+
+For tools, there is a top level `McpTools` tag which may have any number of `McpTool` elements underneath it.  Each `McpTool` element has two attributes:
+
+* **Name**: a string - the name of the MCP tool
+* **ModelFunction**: a string - a data model query the result of which is a function representing the tool
+
+Each `McpTool` element also has a number of child elements:
+
+* **Description**: text/CDATA - The description of the tool presented by the aggregate server
+* **Parameters**: contains a collection of parameters.
+
+The `Parameters` element contains any number of `Parameter` elements underneath it.  Each `Parameter` element has three attributes:
+
+* **Name**: a string - the name of the parameter
+* **IsRequired**: bool - an indication of whether the parameter is required
+* **Type**: string - the type of the parameter which may be one of "string", "int", "integer64", "number", "bool", "object", or "array<...>" (with the "..." being replaced by a type name
+
+The `Parameter` element also has a single child element:
+
+* **Description**: text/CDATA - The description of the parameter presented by the aggregate server.
+
+For prompts, there is a top level `McpPrompts` tag which may have any number of `McpPrompt` elements underneath it.  Each `McpPrompt` element has an identical set of attributes and child elements as an `McpTool` element.
+
+When your extension applies by manifest and the debugger's MCP server is enabled, any such tools and prompts will be merged into WinDbg's MCP server.  If the tool or prompt is invoked, the function as discovered by the `ModelFunction` attribute will be invoked to service the tool call or the prompt request.
 
 ## Make your own gallery
 You can also make your own extension gallery! You'll want to look through all three files in this folder to understand what to do.
